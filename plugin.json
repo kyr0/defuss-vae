@@ -1,0 +1,17 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "defuss-vae",
+  "version": "0.2.0",
+  "description": "Lean verified agentic engineering: human-triggered skills plus deterministic verify/review/docs lifecycle gates.",
+  "author": {
+    "name": "defuss"
+  },
+  "license": "MIT",
+  "keywords": [
+    "agentic-engineering",
+    "verification",
+    "code-review",
+    "yagni",
+    "testing"
+  ]
+}

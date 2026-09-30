@@ -1,0 +1,16 @@
+{
+  "name": "defuss-vae",
+  "version": "0.2.0",
+  "description": "Verified agentic engineering with deterministic lifecycle gates.",
+  "license": "MIT",
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "defuss-vae",
+    "shortDescription": "Lean verified agentic engineering",
+    "longDescription": "Human-triggered planning, implementation, review and finalization; hooks force verifier, review and documentation gates before commits.",
+    "developerName": "defuss",
+    "category": "Productivity",
+    "capabilities": ["Instructions", "Lifecycle hooks"]
+  }
+}

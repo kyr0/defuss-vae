@@ -1,0 +1,14 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "defuss-vae",
+  "description": "Verified agentic engineering with minimal context cost.",
+  "owner": {"name": "defuss"},
+  "plugins": [
+    {
+      "name": "defuss-vae",
+      "description": "Plan → implement → deterministic verify → review → docs → finalize.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

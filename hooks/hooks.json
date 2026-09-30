@@ -1,0 +1,42 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact|fork",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/lifecycle.py\"",
+            "timeout": 10,
+            "statusMessage": "defuss-vae context"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/lifecycle.py\"",
+            "timeout": 600,
+            "statusMessage": "defuss-vae verify/review/docs"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/lifecycle.py\"",
+            "timeout": 10,
+            "statusMessage": "defuss-vae commit gate"
+          }
+        ]
+      }
+    ]
+  }
+}

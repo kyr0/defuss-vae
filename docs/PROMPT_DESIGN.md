@@ -1,0 +1,92 @@
+# Prompt design provenance
+
+Research checked: 2026-09-29; hook/skill runtime semantics re-checked 2026-09-30.
+
+This document is provenance only; skills do not load it during normal use.
+
+## Sources
+
+- Anthropic, Prompting best practices: https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/prompt-templates-and-variables
+- Anthropic Claude Code, feature-dev plugin: https://github.com/anthropics/claude-code/tree/main/plugins/feature-dev
+- Anthropic Claude Code, feature-dev code reviewer: https://github.com/anthropics/claude-code/blob/main/plugins/feature-dev/agents/code-reviewer.md
+- Anthropic Claude Code, plugin-dev skill reviewer: https://github.com/anthropics/claude-code/blob/main/plugins/plugin-dev/agents/skill-reviewer.md
+- Dietrich Gebert, Ponytail: https://github.com/DietrichGebert/ponytail
+- Ponytail core skill: https://github.com/DietrichGebert/ponytail/blob/main/skills/ponytail/SKILL.md
+- Ponytail review skill: https://github.com/DietrichGebert/ponytail/blob/main/skills/ponytail-review/SKILL.md
+- obra/superpowers, writing plans: https://github.com/obra/superpowers/blob/main/skills/writing-plans/SKILL.md
+- obra/superpowers, executing plans: https://github.com/obra/superpowers/blob/main/skills/executing-plans/SKILL.md
+- obra/superpowers, TDD: https://github.com/obra/superpowers/blob/main/skills/test-driven-development/SKILL.md
+- obra/superpowers, verification before completion: https://github.com/obra/superpowers/blob/main/skills/verification-before-completion/SKILL.md
+- Conventional Commits 1.0.0: https://www.conventionalcommits.org/en/v1.0.0/
+- Keep a Changelog: https://keepachangelog.com/
+- Claude Code hooks reference (Stop decision control, output caps): https://code.claude.com/docs/en/hooks
+- Claude Code skills (string substitutions, `disable-model-invocation` loading): https://code.claude.com/docs/en/skills
+
+## Derived prompt principles
+
+### Shared
+
+1. Explicit role + ordered workflow + output contract. Anthropic recommends direct instructions and sequential steps when order/completeness matters.
+2. Investigate before claims. Read referenced code and trace the relevant path instead of filling gaps from filenames or assumptions.
+3. Prompt for minimalism explicitly. Current Claude prompting guidance calls out over-engineering, speculative abstractions, unnecessary files, and defensive code as behaviors worth constraining.
+4. Evidence before completion claims. Fresh commands/results are stronger than confidence or reviewer prose.
+5. Keep skills lean and move provenance/background out of the runtime prompt. Skill bodies contain only behavior needed during execution.
+6. Human-only skills; deterministic hooks own automatic enforcement. Mechanical policy belongs in code rather than repeated prose.
+7. Signan is fully specified rather than named implicitly; conventional prose is the fallback when compression would make meaning ambiguous.
+8. Skills are written *in* Signan, not only about it. `VERIFIED:` the rewrite added the evidence loop, layout, proof programs, memory hierarchy and gate loop while the pack grew 0.6% (17,993 → 18,099 B). Uppercase is reserved for operators; a test rejects other uppercase prose words and any `WHEN` outside the core, because v0.2.0 hook text used `WHEN … THEN` as a conditional although the grammar defines `WHEN` as equivalence.
+9. Evidence loop outranks everything else in `implement`: observe before editing, cheapest observation first, one discriminating probe per open hypothesis split. `HYPOTHESIS:` acting on unverified runtime assumptions is the dominant avoidable agent failure; a probe at the divergence point settles it for one run's cost. The counter-risk, log pollution, is handled mechanically rather than by exhortation: probe lines carry a tag and the verifier fails while any remain; reads are bounded (`make log`, `tail`, `grep`); passing checks report one line.
+10. Proof as programs: every acceptance invariant becomes a test, a `make e2e` step or a `.agents/VERIFY.py` rule that the gate executes. Prose memory is the fallback for what cannot run. Hierarchy: executable check > MEMORY line > EPISODES line.
+11. Real tests, dogfood e2e. `HYPOTHESIS:` mocks mostly verify the mock; a template rule rejects mock frameworks in changed files, and e2e must consume the built artifact. `VERIFIED:` this repo's e2e installs the release zip and drives only the shipped hook adapter through the same Stop/PreToolUse JSON contract Claude Code uses. The v0.2.0 gap (Stop `additionalContext` ends the turn, so no gate was ever forced) was found by checking the current hooks docs before trusting the README claim — the evidence loop applied to prose. `VERIFIED:` the old `package` target excluded only caches, so `.DS_Store` files present in the tree shipped in the release.
+12. One interface: the Makefile verbs (`start stop restart status log metrics bench test e2e`) remove per-project discovery cost for agents; LSB status codes and process-group control make services safe to run from an agent shell.
+
+### plan
+
+Best elements combined:
+
+- Anthropic: investigate before answering; clear success criteria; structured research with competing hypotheses only when useful.
+- Feature-dev: understand codebase before design and make implementation mapping concrete.
+- Superpowers: exact files/symbols/tests, but defuss-vae removes the expensive “zero-context engineer + complete code in plan” verbosity.
+- Ponytail: understand the flow first, then minimize via YAGNI/reuse/stdlib/native/dependency/minimum code.
+
+Result: research is causal and ordered; a plan contains exact change points + proof, not a tutorial.
+
+### implement
+
+Best elements combined:
+
+- Ponytail full-mode reasoning, including “understand first”, root-cause repair, sibling-caller inspection, deletion/reuse first, and no speculative abstractions.
+- Anthropic anti-overengineering guidance: only requested/necessary changes; no one-use helpers or hypothetical flexibility; trust internal guarantees and validate boundaries.
+- Anthropic anti-test-gaming guidance: solve the general contract, not the fixture.
+- Superpowers TDD: non-trivial behavior uses a RED→GREEN→REFACTOR proof; bug fixes prefer regression tests.
+- defuss-vae gate: the Stop hook blocks once per turn (the host limit), and the agent loops `vae.py gate` in-turn until verify → review → docs clear for the current fingerprint; commits stay denied until then.
+
+### review
+
+Best elements combined:
+
+- Anthropic code-reviewer: high precision, concrete path/line evidence, bugs/correctness/project conventions before low-value style commentary.
+- Feature-dev: correctness + simplicity/DRY + project abstraction/convention review.
+- Ponytail-review: explicit deletion/reuse/YAGNI pass after correctness; shortest correct diff is the target.
+- defuss-vae: actionable defects are fixed by default; behavioral findings are demonstrated (failing test or probe) when cheap, otherwise labeled `HYPOTHESIS` with a falsifier; repeatable defect classes become tests or verifier rules.
+
+Result: review is not “find something to say”; it is a high-precision attempt to falsify correctness and remove unnecessary complexity.
+
+### finalize
+
+Best elements combined:
+
+- Verification-before-completion: fresh evidence before commit/completion claims.
+- Conventional Commits: split commits when one diff contains multiple intents; use machine-readable type/scope/description.
+- Keep a Changelog: maintain `Unreleased` notable changes rather than dumping commit history.
+- Anthropic long-horizon guidance: filesystem/git are persistent state; durable agent state should be structured and corrected, not an append-only diary.
+- Episodic → semantic consolidation: the gate writes a bounded episode log for free; finalize promotes recurring lessons to tests, rules or MEMORY lines and deletes the episodes. Memory and CLI gist are injected at session start under byte budgets that `doctor --repo` enforces.
+
+Result: finalize creates a reconstructable history plus minimal durable state, without pushing or rewriting history implicitly.
+
+## Deliberate exclusions
+
+- No mandatory subagents: token cost conflicts with defuss-vae's goal; hook-enforced fresh evidence gives a cheaper baseline.
+- No numeric reviewer confidence score: it looks precise without calibrated probabilities. Findings instead require direct evidence or an explicit falsifiable hypothesis.
+- No huge implementation plans containing full code: implementation skills/models already know language syntax; plans lock decisions, interfaces, files, proof, and risks only.
+- No mandatory comments on obvious syntax: docs must answer WHY. Each changed production file/method/inline level is assessed; `not-applicable` requires rationale.
+- No memory without budget: unbounded memory files become per-session token tax; MEMORY ≤4 KiB, CLI gist ≤2 KiB, episodes ≤100 entries.
