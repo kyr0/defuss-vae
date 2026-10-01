@@ -41,6 +41,13 @@ class PackageTests(unittest.TestCase):
             for token in ("disable-model-invocation: true", "## Signan core", "VERIFIED", "HYPOTHESIS", "UNKNOWN", "IF … THEN … ELSE", "../../references/SIGNAN.md"):
                 self.assertIn(token, text, name)
 
+    def test_skill_frontmatter_is_strict_yaml(self):
+        # Strict YAML parsers (e.g. the `npx skills` installer) skip a skill whose plain scalar contains ": ".
+        for name in self.SKILLS:
+            for line in self.skill(name).split("---", 2)[1].strip().splitlines():
+                value = line.split(": ", 1)[1]
+                self.assertTrue(": " not in value or value[0] == value[-1] == '"', f"{name}: quote {line!r}")
+
     def test_skills_use_signan_operators_strictly(self):
         for name in self.SKILLS:
             body = self.skill(name).split("## Signan core")[0].split("---", 2)[2]

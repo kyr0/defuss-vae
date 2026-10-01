@@ -1,6 +1,6 @@
 ---
 name: finalize
-description: Human-triggered finalization: fresh gate proof, coherent Conventional Commits, CHANGELOG, consolidated agent memory.
+description: "Human-triggered finalization: fresh gate proof, coherent Conventional Commits, CHANGELOG, consolidated agent memory."
 disable-model-invocation: true
 allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py *)
 ---

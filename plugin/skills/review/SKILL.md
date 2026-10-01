@@ -1,6 +1,6 @@
 ---
 name: review
-description: Human-triggered high-precision review against requirements, callers, real tests, gate evidence and Ponytail minimalism; fixes confirmed defects, encodes repeatable ones as tests or rules.
+description: "Human-triggered high-precision review against requirements, callers, real tests, gate evidence and Ponytail minimalism; fixes confirmed defects, encodes repeatable ones as tests or rules."
 disable-model-invocation: true
 allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py *)
 ---

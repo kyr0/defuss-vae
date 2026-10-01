@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Human-triggered lean planning: trace the real path, probe unknowns, climb the prior-art ladder, emit the smallest plan whose invariants are executable checks.
+description: "Human-triggered lean planning: trace the real path, probe unknowns, climb the prior-art ladder, emit the smallest plan whose invariants are executable checks."
 disable-model-invocation: true
 ---
 

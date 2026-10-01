@@ -1,6 +1,6 @@
 ---
 name: implement
-description: Human-triggered implementation: Ponytail minimalism, probe-before-assume debugging, root-cause fixes, mock-free tests, dogfood e2e, gated verify → review → docs.
+description: "Human-triggered implementation: Ponytail minimalism, probe-before-assume debugging, root-cause fixes, mock-free tests, dogfood e2e, gated verify → review → docs."
 disable-model-invocation: true
 allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py *)
 ---
