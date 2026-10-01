@@ -8,15 +8,70 @@ plan → implement → gate[verify → review → docs] → finalize → Convent
 
 Skills never self-trigger; enforcement lives in programs, not prompts. `git commit` is denied until the current code fingerprint passes verify + review + docs; the hook adapter fails closed. Verification is content-addressed (cached per fingerprint); evidence stays out of the context window.
 
-## Use
+## Install
 
 Requirements: `python3` ≥ 3.9, `git`, `make`. Hooks and CLI are stdlib-only.
 
-- **Claude Code**: `claude --plugin-dir "$PWD/plugin"`, or `/plugin marketplace add <repo>` then install `defuss-vae@defuss-vae`.
-- **Codex**: `plugin/plugin.json` (Agent Plugins 1.0) + `plugin/.codex-plugin/plugin.json`; trust hooks via `/hooks`.
-- **Other hosts**: copy `plugin/skills/`; without hooks, run `python3 plugin/scripts/vae.py gate --repo .` before finishing. See `docs/COMPATIBILITY.md`.
+defuss-vae ships four Agent Skills (`plan`, `implement`, `review`, `finalize`) plus the hooks and CLI that enforce the gate. Skills alone are prompts; the hooks are what deny `git commit` and block finishing until the gate passes. Install as a **plugin** wherever the host supports it, so you get both.
 
-Skills: `/defuss-vae:plan`, `:implement`, `:review`, `:finalize`.
+### Claude Code (recommended: plugin, includes hooks)
+
+Inside Claude Code:
+
+```text
+/plugin marketplace add kyr0/defuss-vae
+/plugin install defuss-vae@defuss-vae
+```
+
+Or from your shell:
+
+```bash
+claude plugin marketplace add kyr0/defuss-vae
+claude plugin install defuss-vae@defuss-vae
+```
+
+Start a new session afterwards. Update with `/plugin marketplace update defuss-vae`. Local checkout instead: `claude --plugin-dir "$PWD/plugin"`.
+
+### Codex (plugin)
+
+`plugin/plugin.json` (Agent Plugins 1.0) + `plugin/.codex-plugin/plugin.json`; trust the hooks via `/hooks`. Hook parity with Claude Code is untested, see `docs/COMPATIBILITY.md`.
+
+### Codex, Cursor, Gemini CLI, Copilot, Windsurf, … (skills only)
+
+The skills install into any Agent Skills host with the open [`skills`](https://www.npmjs.com/package/skills) CLI. It detects your agents and asks interactively:
+
+```bash
+npx skills add kyr0/defuss-vae --skill '*'
+```
+
+Pick agents with repeated `--agent` (`claude-code`, `codex`, `cursor`, `gemini-cli`, `github-copilot`, `windsurf`, or `'*'` for all) and skills with repeated `--skill`:
+
+```bash
+npx skills add kyr0/defuss-vae --skill plan --skill implement --agent codex --agent cursor
+```
+
+Skills install into the current project by default; add `--global` (`-g`) for all projects, `--yes` (`-y`) for bootstrap scripts, or `--list` to see what is available:
+
+```bash
+npx skills add kyr0/defuss-vae --skill '*' --agent codex --global --yes
+npx skills update
+```
+
+**No hooks, no CLI.** This route copies only `plugin/skills/`: nothing blocks `git commit` or finishing, and the skills' `vae.py` path does not resolve. Clone the repo once and run the gate yourself before finishing:
+
+```bash
+git clone https://github.com/kyr0/defuss-vae ~/defuss-vae
+python3 ~/defuss-vae/plugin/scripts/vae.py gate --repo .
+```
+
+In Claude Code prefer the plugin: its skills are namespaced (`/defuss-vae:plan`), skills-CLI installs are not (`/plan`).
+
+### Using the skills
+
+Skills are human-triggered only: the agent never invokes them on its own. Call them explicitly:
+
+- Claude Code plugin: `/defuss-vae:plan`, `/defuss-vae:implement`, `/defuss-vae:review`, `/defuss-vae:finalize`
+- Codex: `$plan add rate limiting to the upload endpoint`, then `$implement`, `$review`, `$finalize`
 
 ## CLI
 
