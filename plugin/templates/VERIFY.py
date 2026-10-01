@@ -2,12 +2,14 @@
 
 CONFIG = {
     "coverage_min": 60,
-    "test_command": None,          # None → `make test`, else ecosystem autodiscovery.
-    "coverage_command": None,      # None → `make coverage`, else autodiscovery; may use {coverage_json}, {coverage_file}, {tmp}, {repo}.
+    "lint_command": None,          # None → `make lint` (uv run ruff check . | bunx oxlint --deny-warnings).
+    "test_command": None,          # None → `make test`. Commands run in the repo root.
+    "coverage_command": None,      # None → `make coverage`; output needs `TOTAL <n>%` or an `All files |…|` table.
     "integration_commands": [],    # [] → `make integration` if present.
     "e2e_commands": [],            # [] → `make e2e`: build + consume the publishable artifact.
     "timeout_s": 180,
     "layout": True,                # Makefile verbs + gitignored var/log/ and tmp/.
+    "toolchain": True,             # new (sub)projects start on bun (JS/TS) / uv (Python): newly added npm/yarn/pnpm/poetry/pipenv/pdm/pip lockfiles fail.
 }
 
 # Deterministic invariants only; no semantic guesses.

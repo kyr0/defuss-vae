@@ -1,6 +1,6 @@
 ---
 name: implement
-description: Human-triggered implementation of an approved plan — Ponytail minimalism, probe-before-assume debugging, root-cause fixes, mock-free tests, dogfood e2e, forced verify → review → docs gate.
+description: Human-triggered implementation: Ponytail minimalism, probe-before-assume debugging, root-cause fixes, mock-free tests, dogfood e2e, gated verify → review → docs.
 disable-model-invocation: true
 allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py *)
 ---
@@ -29,13 +29,14 @@ NOT one-implementation interface|factory, speculative config, "for later" scaffo
 ## Execution
 
 1. read `AGENTS.md`, `.agents/MEMORY.md`, `.agents/CLI_GIST.md`, plan|requirements, EVERY file they name; NOT speculate about unopened code. IF layout missing THEN CLI `init --repo .` (never overwrites).
-2. Preserve public contracts unless the plan changes them; keep unrelated user changes intact.
+2. Preserve public contracts unless the plan changes them; keep unrelated user changes intact. Toolchain: IF new project|subproject THEN start on `bun init` (JS|TS) | `uv init` (Python), NOT npm|yarn|pnpm|pip|poetry ELSE keep the repo's toolchain AND propose migrating.
 3. Non-trivial behavior REQUIRES RED→GREEN→REFACTOR: failing test → observe expected failure → minimum general code → observe pass → refactor only IF smaller|clearer. NOT hard-code to fixtures; NOT weaken|delete valid tests.
 4. tests = real subsystems in isolation (real fs|process|db|port under `tmp/`), NOT mocks|stubs|fakes. `make e2e` = build publishable artifact → install into clean consumer → `input/` → `output/` → assert; NOT source-tree imports.
-5. Services only via `make start|stop|status|log` → `var/log/<svc>.stdout|.stderr`, `tmp/<svc>.pid`; NOT foreground|unredirected `&` in the agent shell.
-6. EVERY acceptance invariant → check the gate runs: `make test`|`make e2e`|`.agents/VERIFY.py` rule; NOT claim done from inspection.
-7. Docs for changed production code: why this design > plausible alternative, NOT syntax; assess file, changed method|function, non-obvious inline; material claims prefixed `VERIFIED:`|`HYPOTHESIS:`|`UNKNOWN:`; `not-applicable` REQUIRES concrete reason.
-8. Before finishing: CLI `gate --repo . --session ${CLAUDE_SESSION_ID}` → fix `AGENT_CMD` from lowest causal failure → its review → docs steps; repeat until `VERIFIED[gate]=true`. NOT disable|bypass hooks. New deterministic defect class → regression test OR `VERIFY.py` rule.
+5. Habits: concerns separated (pure core; I/O|config at edges), small modules testable with real inputs; logs = ISO-8601 UTC timestamp first + level; env vars from gitignored `.env`, EVERY key in `.env.example`.
+6. Services only via `make start|stop|status|log` → `var/log/<svc>.stdout|.stderr`, `tmp/<svc>.pid`; NOT foreground|unredirected `&` in the agent shell.
+7. EVERY acceptance invariant → check the gate runs: `make test`|`make e2e`|`.agents/VERIFY.py` rule; NOT claim done from inspection.
+8. Docs for changed production code: why this design > plausible alternative, NOT syntax; assess file, changed method|function, non-obvious inline; material claims prefixed `VERIFIED:`|`HYPOTHESIS:`|`UNKNOWN:`; `not-applicable` REQUIRES concrete reason.
+9. Before finishing: CLI `gate --repo . --session ${CLAUDE_SESSION_ID}` → fix `AGENT_CMD` from lowest causal failure → its review → docs steps; repeat until `VERIFIED[gate]=true`. NOT disable|bypass hooks. New deterministic defect class → regression test OR `VERIFY.py` rule.
 
 ## Output contract
 

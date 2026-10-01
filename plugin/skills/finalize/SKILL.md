@@ -1,6 +1,6 @@
 ---
 name: finalize
-description: Human-triggered finalization of verified work — fresh gate proof, coherent Conventional Commits without unrelated changes, CHANGELOG, and consolidated agent memory (MEMORY, CLI gist, episodes, AGENTS.md).
+description: Human-triggered finalization: fresh gate proof, coherent Conventional Commits, CHANGELOG, consolidated agent memory.
 disable-model-invocation: true
 allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py *)
 ---
@@ -16,7 +16,7 @@ CLI = `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py` (other hosts: plugin root =
 2. **Prove current state.** `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py gate --repo . --session ${CLAUDE_SESSION_ID}` → `VERIFIED[gate]=true` for the current fingerprint; read full results. NOT claim success|commit code from stale evidence. IF fail|UNKNOWN THEN fix cause first; code edit → gate again.
 3. **Partition by causal concern.** EVERY commit independently understandable|revertible AND leaves the repo coherent. Separate unrelated feat|fix|refactor|test|build; a regression test stays with the behavior it proves unless project convention differs. Conventional Commits 1.0.0: `type(scope): imperative description`; `feat` feature, `fix` bug fix, also `refactor|perf|test|docs|build|ci|chore`; `!`|`BREAKING CHANGE:` only for actual breaking API|behavior.
 4. **Commit implementation groups.** Stage exact paths|hunks; inspect staged diff before each commit. NOT `git add -A` IF unrelated changes exist. NOT `--no-verify`; NOT rewrite published history.
-5. **Init state.** `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py init --repo .` → missing `.agents/*`, `Makefile`, gitignored `var/log/` `tmp/`, managed `AGENTS.md` block; never overwrites.
+5. **Init state.** `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py init --repo .` → missing `.agents/*`, `Makefile`, default `.gitignore` lines, managed `AGENTS.md` block; never overwrites.
 6. **Consolidate memory; replace stale, NOT append-only.** Hierarchy: test|`VERIFY.py` rule > MEMORY line > EPISODES line.
    - `CHANGELOG.md`: concise `Unreleased` user-visible changes; keep project format.
    - `.agents/MEMORY.md`: one tagged line per durable decision|invariant|constraint NOT derivable from code|git|docs; delete superseded lines.

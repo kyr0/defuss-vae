@@ -4,14 +4,15 @@
 
 `--bench` reuses the same installed copy to time the gate cold (runs the suite) vs cached (review/docs loop)."""
 from __future__ import annotations
+
 import json
-from pathlib import Path
 import re
 import subprocess
 import sys
 import tempfile
 import time
 import zipfile
+from pathlib import Path
 
 PY = sys.executable
 SID = "e2e"
@@ -19,7 +20,7 @@ steps: list[dict] = []
 
 
 def run(args: list[str], cwd: Path, stdin: str | None = None, ok: tuple[int, ...] = (0,)) -> subprocess.CompletedProcess[str]:
-    p = subprocess.run(args, cwd=cwd, input=stdin, text=True, capture_output=True, timeout=300)
+    p = subprocess.run(args, cwd=cwd, input=stdin, text=True, capture_output=True, timeout=300, check=False)
     if p.returncode not in ok:
         raise SystemExit(f"FAIL {' '.join(args)} → exit={p.returncode}\n{p.stdout}\n{p.stderr}")
     return p
@@ -50,7 +51,10 @@ def consumer(root: Path, td: Path) -> Path:
     (proj / "input/pair.txt").write_text("2 3\n")
     out = run([PY, str(root / "scripts/vae.py"), "init", "--repo", str(proj)], proj).stdout
     step("init.scaffold", "Makefile" in out and ".gitignore" in out, out.strip())
+    with (proj / ".gitignore").open("a") as f:
+        f.write("!input/pair.txt\n")  # input/* is ignored by default; commit the e2e fixture explicitly
     mk = (proj / "Makefile").read_text()
+    mk = define(mk, "lint", "python3 -m py_compile calc.py test_calc.py")  # hermetic stand-in; real projects: ruff / oxlint
     mk = define(mk, "test", "python3 -m unittest discover -p 'test_*.py'")
     # The consumer dogfoods its own artifact: build a zip, import only from it, read input/, write output/.
     mk = define(mk, "e2e", "mkdir -p tmp output && rm -f tmp/calc.zip && python3 -m zipfile -c tmp/calc.zip calc.py\n"
@@ -58,8 +62,9 @@ def consumer(root: Path, td: Path) -> Path:
                 "open('../output/sum.txt', 'w').write(str(calc.add(a, b)))\"\ntest \"$$(cat output/sum.txt)\" = 5")
     mk = define(mk, "metrics", "wc -l calc.py")
     mk = define(mk, "bench", "python3 -m timeit -s 'from calc import add' 'add(2, 3)'")
-    mk += ("\ncoverage:  # real stdlib measurement, formatted for the verifier\n"
-           "\t@python3 -m trace --count --summary -C tmp/cov --module unittest discover -p 'test_*.py' 2>/dev/null | awk '$$3==\"calc\"{print \"TOTAL\", $$2}'\n")
+    # Stdlib-only fixture keeps e2e hermetic (no network); real projects use uv/bun per the template hints.
+    mk = define(mk, "coverage", "@python3 -m trace --count --summary -C tmp/cov --module unittest discover -p 'test_*.py' 2>/dev/null "
+                "| awk '$$3==\"calc\"{print \"TOTAL\", $$2}'")
     (proj / "Makefile").write_text(mk)
     run(["git", "add", "-A"], proj)
     run(["git", "commit", "-qm", "scaffold"], proj)
@@ -93,7 +98,7 @@ def attest(proj: Path, fp: str) -> None:
     (vae / "review.json").write_text(json.dumps({
         "schema": 1, "status": "VERIFIED", "code_fingerprint": fp, "reviewed_paths": ["calc.py", "test_calc.py"],
         "checklist": ["requirements", "correctness", "callers", "errors", "state-concurrency", "security", "tests", "e2e",
-                      "observability", "reuse", "yagni", "smells-gotchas", "abstraction", "performance", "docs"],
+                      "observability", "structure", "reuse", "yagni", "smells-gotchas", "abstraction", "performance", "docs"],
         "findings": [],
     }))
 
@@ -121,8 +126,8 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="vae-e2e-") as raw:
         td = Path(raw).resolve()
         with zipfile.ZipFile(zip_path) as z:
-            z.extractall(td / "install")
-        root = next(p for p in (td / "install").iterdir() if p.is_dir())
+            root = td / "install" / "defuss-vae"
+            z.extractall(root)
         step("install.doctor", run([PY, str(root / "scripts/vae.py"), "doctor"], td).stdout.startswith("VERIFIED[plugin.files]=true"), str(zip_path.name))
         proj = consumer(root, td)
         ctx = hook(root, proj, {"hook_event_name": "SessionStart", "source": "startup"})

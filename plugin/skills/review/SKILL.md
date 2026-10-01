@@ -1,6 +1,6 @@
 ---
 name: review
-description: Human-triggered high-precision review of current changes against requirements, callers, real tests, gate evidence, and Ponytail minimalism; fixes confirmed defects by default and encodes repeatable ones as tests or verifier rules.
+description: Human-triggered high-precision review against requirements, callers, real tests, gate evidence and Ponytail minimalism; fixes confirmed defects, encodes repeatable ones as tests or rules.
 disable-model-invocation: true
 allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py *)
 ---
@@ -20,11 +20,12 @@ Review the change in context, NOT an isolated diff: read requirements|plan, `AGE
 - language|framework|runtime gotchas BC current code|version|docs.
 - tests absent, tautological, mocked|stubbed (EVERY test REQUIRES real subsystems in isolation), testing implementation NOT behavior, blind to realistic mutations.
 - e2e REQUIRES consuming the built publishable artifact, NOT the source tree.
-- observability: leftover probe|debug print|unleveled log spam = defect; services via `make start` → `var/log/`, `tmp/*.pid`.
+- observability: leftover probe|debug print|log spam|log without ISO-8601 timestamp + level = defect; services via `make start` → `var/log/`, `tmp/*.pid`.
 - gate evidence: test|integration|e2e as applicable + coverage ≥60%; UNKNOWN stays blocking and explicit.
 
 **Ponytail / maintainability pass**
 
+- tangled concerns (I/O in core logic), oversized|untestable modules.
 - delete|reuse before adding: repo helper → stdlib → native platform|framework → installed dependency → minimum code.
 - duplication, dead flexibility, one-use abstraction, premature config, wrapper|factory|interface without a second real case.
 - needless files|dependencies|allocations|I/O|loops; perf change only IF measured (`make bench`) OR asymptotically|resource-obviously dominant.

@@ -1,0 +1,13 @@
+# defuss-vae CI: the same bootstrap and verbs as local development, so CI cannot drift from `make verify`.
+name: verify
+on:
+  push:
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # setup installs a missing uv/bun with the official installers; later steps get their dirs on PATH.
+      - run: make setup && printf '%s\n' "$HOME/.local/bin" "$HOME/.bun/bin" >> "$GITHUB_PATH"
+      - run: make verify

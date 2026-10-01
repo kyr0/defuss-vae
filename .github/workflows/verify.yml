@@ -1,0 +1,17 @@
+# Same entry points as local development; both OSes because the Makefile template's process groups use
+# `setsid` on Linux and job control on macOS, and only real runs prove each branch.
+name: verify
+on:
+  push:
+  pull_request:
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - run: make setup && printf '%s\n' "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - run: make verify

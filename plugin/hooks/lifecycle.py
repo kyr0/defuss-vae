@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-"""Claude/Codex lifecycle adapter; all policy logic stays in scripts/vae_core.py."""
+"""Claude/Codex lifecycle adapter; event logic lives in scripts/vae_hooks.py, policy in the modules it imports."""
 from __future__ import annotations
+
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from vae_core import commit_gate, deny, is_commit_command, session_start, stop_gate  # noqa: E402
+from vae_hooks import commit_gate, deny, is_commit_command, session_start, stop_gate
 
 
 def main() -> int:
     try:
         event = json.load(sys.stdin)
-    except Exception:
+    except ValueError:  # not JSON: nothing to gate
         return 0
     name = event.get("hook_event_name")
     try:
@@ -24,7 +25,7 @@ def main() -> int:
             out = stop_gate(event, ROOT)
         elif name == "PreToolUse":
             out = commit_gate(event)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - fail closed on ANY gate crash, see below
         # Fail closed: a crashing gate must not silently allow a commit or end the turn as if verified.
         reason = f"defuss-vae gate could not run ({type(e).__name__}: {e}); resolve the cause or report it to the human."
         tool_input = event.get("tool_input") if isinstance(event.get("tool_input"), dict) else {}

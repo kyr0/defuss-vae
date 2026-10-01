@@ -6,11 +6,14 @@ For code changes (paths outside `.agents/`, `tmp/`, `var/`, `output/`), `VERIFIE
 
 1. **verify** — every required check passes:
    - `.agents/VERIFY.py` loads;
-   - `layout` (unless `CONFIG["layout"]=False`): Makefile verbs `start stop status log metrics bench test e2e` exist and `var/log/`, `tmp/` are gitignored;
+   - `layout` (unless `CONFIG["layout"]=False`): Makefile verbs `setup start stop status log metrics bench test coverage lint e2e verify` exist and `var/`, `tmp/`, `.env` are gitignored (`init` writes these plus the other defaults);
+   - `toolchain` (unless `CONFIG["toolchain"]=False`): the change introduces no npm/yarn/pnpm/poetry/pipenv/pdm lockfile, and no pip `requirements.txt` without a `uv.lock`, that `HEAD` doesn't track;
+   - `env.example`: every env var that changed code reads directly (JS/TS `process.env`/`Bun.env`/`import.meta.env`, Python `os.environ`/`os.getenv`, Go `os.Getenv`, Rust `env::var`; OS-provided names exempt) or root `.env` sets is declared in the nearest `.env.example`, which is not gitignored;
    - repository has test files;
-   - test command exits 0 (`make test` first, then ecosystem autodiscovery or `CONFIG`);
-   - every integration/e2e command exits 0 (`make integration`/`make e2e` first);
-   - measured coverage ≥ `coverage_min` (default 60%);
+   - `make lint` exits 0 (or `CONFIG["lint_command"]`), run first as the cheapest failure;
+   - `make test` exits 0 (or `CONFIG["test_command"]`);
+   - every `make integration`/`make e2e` (or `CONFIG` command) exits 0;
+   - `make coverage` (or `CONFIG["coverage_command"]`) prints `TOTAL <n>%` or an `All files |…|` table at ≥ `coverage_min` (default 60%);
    - built-in `hygiene.probes`: no temporary probe tag in changed code;
    - every project rule passes.
 2. **review** — attestation for the current fingerprint covers every changed code path, the full checklist, and only resolved findings with location + evidence + learning.
@@ -20,9 +23,29 @@ A missing command or metric is `UNKNOWN` and fails closed. Any code edit changes
 
 ## Why a gate CLI and not only the Stop hook
 
-`VERIFIED:` (Claude Code hooks reference, checked 2026-09-30) a Stop hook can block once per turn; `hookSpecificOutput.additionalContext` on Stop does not continue the turn. v0.2.0 returned only `additionalContext`, so its "forced" gates never forced a continuation; only the commit gate enforced anything.
+`VERIFIED:` (Claude Code hooks reference, checked 2026-09-30) a Stop hook can block once per turn; `hookSpecificOutput.additionalContext` on Stop does not continue the turn. A hook-only gate therefore gets one forced continuation per turn, not a loop.
 
 Therefore the Stop hook blocks once with the gate text, which carries the exact `vae.py gate --repo … --session …` command; the agent loops that command in-turn. The commit gate remains the hard backstop.
+
+## Why no ecosystem autodiscovery
+
+`VERIFIED:` the `layout` check already requires the Makefile verbs, so guessing runners per ecosystem (npm/pnpm/yarn/bun scripts, pytest, go, cargo, maven, gradle) duplicated the declared interface and could verify commands the project never committed to; removing it cut the core from 1118 to 942 lines. Commands run in the repo root, so they need no placeholders.
+
+`VERIFIED:` the parser reads real output of bun 1.3.11 `bun test --coverage`, pytest-cov under `uv run`, c8 10 (istanbul text) and go 1.26 `go tool cover -func`. In `All files` tables it takes the last numeric column, which is % Lines for both bun (Funcs|Lines) and istanbul (Stmts|Branch|Funcs|Lines); the previous 4-column pattern returned nothing for bun.
+
+## Why the toolchain check keys on `HEAD`
+
+New projects start on bun (JS/TS) or uv (Python); existing repos keep their toolchain. A foreign lockfile that `HEAD` already tracks is an existing toolchain; one `HEAD` lacks is being introduced by this change, which is the new-(sub)project case. `VERIFIED:` lockfiles count as code, so adding one after a cached pass still changes the fingerprint and re-runs the check. `UNKNOWN:` an existing project whose lockfile was never committed looks new; the human commits it or sets `CONFIG["toolchain"]=False`.
+
+## Why `.env.example` is checked but log format and structure are not
+
+`.env.example` is the only committed record of required config; a missing key breaks the next checkout, and completeness is decidable from reads + keys, so the gate enforces it. `UNKNOWN:` indirect reads (destructuring, config libraries, dynamic names) are not seen, so the check is a floor, not a proof.
+
+Separation of concerns and log format are review items, not gate checks: proxies such as file-size limits or log-line regexes would push agents to game the proxy (arbitrary file splits) instead of improving structure.
+
+## Why gate commands get the installer dirs on PATH
+
+`VERIFIED:` GNU make 3.81 (macOS) execs a recipe without shell metacharacters (`uv run pytest`) directly, looking it up on make's *own* `PATH`; a Makefile `export PATH` reaches only recipes that run through a shell. So after `make setup` installs uv into `~/.local/bin` mid-session, the gate's `make test` failed with `uv: No such file or directory` until the verifier began appending `~/.local/bin` and `~/.bun/bin` to every command's `PATH`. Appending, not prepending, keeps a tool already on `PATH` (e.g. Homebrew's uv) in charge: the installer dirs are only a fallback. A failure that still names a missing uv/bun yields `AGENT_CMD: RUN: make setup`.
 
 ## Why a verification cache
 

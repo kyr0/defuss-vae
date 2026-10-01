@@ -1,6 +1,8 @@
-/var/log/
-/tmp/
-/output/
+.env
 __pycache__/
 *.pyc
+var/*
+tmp/*
+output/*
 .DS_Store
+.ruff_cache/

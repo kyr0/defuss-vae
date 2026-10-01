@@ -1,0 +1,3 @@
+# Dev lint for this repo only. py39 = oldest python3 the hooks support (macOS Command Line Tools),
+# so ruff never proposes syntax that would break them; the version is pinned in the Makefile.
+target-version = "py39"

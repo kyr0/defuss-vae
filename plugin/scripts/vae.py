@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
 """CLI for defuss-vae: deterministic verifier, session gate, layout scaffold, doctor."""
 from __future__ import annotations
+
 import argparse
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from vae_core import doctor_repo, gate, git_root, init_project, latest_session, render_checks, render_report, verify  # noqa: E402
+from vae_gate import gate
+from vae_project import doctor_repo, init_project
+from vae_repo import git_root
+from vae_state import latest_session
+from vae_verify import render_checks, render_report, verify
 
 SKILLS = ("plan", "implement", "review", "finalize")
-SKILL_MAX = 5500  # AGENTS.md budget: runtime prompts stay lean.
+SKILL_MAX = 5500  # runtime prompts stay lean: each SKILL.md loads whole on invocation.
 
 
 def repo_from(raw: str) -> Path:
@@ -22,14 +27,14 @@ def repo_from(raw: str) -> Path:
 def doctor_plugin() -> list[str]:
     required = [ROOT / p for p in ("plugin.json", ".claude-plugin/plugin.json", ".codex-plugin/plugin.json",
                                    "hooks/hooks.json", "hooks/lifecycle.py", "references/SIGNAN.md")]
-    required += [ROOT / "templates" / n for n in ("VERIFY.py", "MEMORY.md", "CLI_GIST.md", "EPISODES.md", "Makefile")]
+    required += [ROOT / "templates" / n for n in ("VERIFY.py", "MEMORY.md", "CLI_GIST.md", "EPISODES.md", "Makefile", "verify.yml")]
     required += [ROOT / "skills" / n / "SKILL.md" for n in SKILLS]
     gaps = [str(p.relative_to(ROOT)) for p in required if not p.exists()]
     for p in required:
         if p.suffix == ".json" and p.exists():
             try:
                 json.loads(p.read_text("utf-8"))
-            except Exception as e:
+            except (OSError, ValueError) as e:
                 gaps.append(f"invalid-json:{p.relative_to(ROOT)}:{e}")
     for n in SKILLS:
         p = ROOT / "skills" / n / "SKILL.md"
@@ -51,7 +56,7 @@ def main() -> int:
     p = sp.add_parser("gate", help="session gate verify → review → docs; exit 0 when done")
     p.add_argument("--repo", default=".")
     p.add_argument("--session", nargs="?", default=None, help="session id (default: latest under tmp/vae/)")
-    p = sp.add_parser("init", aliases=["finalize-init"], help="scaffold layout + .agents state; never overwrites")
+    p = sp.add_parser("init", help="scaffold layout + .agents state; never overwrites")
     p.add_argument("--repo", default=".")
     p = sp.add_parser("doctor", help="validate plugin files, or project agent state with --repo")
     p.add_argument("--repo", default=None)
@@ -66,7 +71,7 @@ def main() -> int:
         g = gate(repo, a.session or latest_session(repo), ROOT)
         print(g.text)
         return 0 if g.done else 2
-    if a.cmd in ("init", "finalize-init"):
+    if a.cmd == "init":
         changed = init_project(repo_from(a.repo), ROOT)
         print("VERIFIED[init]=true")
         print("CHANGED: " + (", ".join(changed) or "∅"))
