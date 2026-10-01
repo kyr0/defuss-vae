@@ -54,7 +54,7 @@ bench:    ; @echo "UNKNOWN[bench] BC undefined: measure hot paths before perf cl
 test:     ; @echo "UNKNOWN[test] BC undefined: real subsystems, no mocks — bun test | uv run pytest"; exit 2
 coverage: ; @echo "UNKNOWN[coverage] BC undefined: print TOTAL <n>% — bun test --coverage | uv run pytest --cov"; exit 2
 lint:     ; @echo "UNKNOWN[lint] BC undefined: uv run ruff check . | bunx oxlint --deny-warnings (plain oxlint exits 0 on findings)"; exit 2
-e2e:      ; @echo "UNKNOWN[e2e] BC undefined: build → clean consumer → input/ → output/ — bun pm pack + bun add <tgz> | uv build + uv run --isolated --no-project --with dist/<whl>"; exit 2
+e2e:      ; @echo "UNKNOWN[e2e] BC undefined: build → clean consumer → input/ → output/ — bun pm pack + bun add <tgz> | uv build + uv run --isolated --no-project --with dist/<whl> | web: Playwright on the served build (WebGL2, network, permissions)"; exit 2
 
 # What CI runs; the gate runs the same verbs one by one. Fail-fast order: cheapest first.
 verify: lint test coverage e2e

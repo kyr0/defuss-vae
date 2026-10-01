@@ -125,7 +125,7 @@ def review_instruction(fp: str, path: Path, changed: list[str]) -> str:
         "defuss-vae GATE 2/3 review: REQUIRED (verify=VERIFIED). Do NOT invoke a skill.\n"
         "Review requirements|plan + current diff + EVERY changed code path + relevant callers|callees|tests.\n"
         "PASS1 requirements, correctness, error paths, state|concurrency|resources, security, API|schema compat, "
-        "tests (real subsystems in isolation, NOT mocks), e2e (consumes the built artifact), observability (no leftover probe|debug spam; logs ISO-8601 UTC first + level).\n"
+        "tests (real subsystems in isolation, NOT mocks), e2e (consumes the built artifact; web frontend → Playwright browser with WebGL2|network|permissions it needs), observability (no leftover probe|debug spam; logs ISO-8601 UTC first + level).\n"
         "PASS2 structure + Ponytail: separated concerns in small testable modules; delete|reuse → stdlib → native → installed dependency → minimum code; NOT duplicate machinery, speculative config|abstraction, unmeasured optimization.\n"
         "Actionable finding REQUIRES location + causal evidence + minimal fix; fix EVERY one. "
         "IF recurrence mechanically checkable THEN regression test OR .agents/VERIFY.py rule ELSE learning.status=UNKNOWN + why.\n"

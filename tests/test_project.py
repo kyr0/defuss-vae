@@ -27,6 +27,9 @@ class InitDoctorTests(RepoCase):
         text = (self.repo / "AGENTS.md").read_text()
         self.assertIn("Keep me.", text)
         self.assertIn(PROBE_TAG, text)
+        # Hosts without hooks get the web-frontend e2e rule only through this block.
+        for token in ("real Playwright browser", "WebGL2", "--enable-unsafe-swiftshader", "grantPermissions", "real network"):
+            self.assertIn(token, text)
         self.assertEqual(init_project(self.repo, ROOT), [])
         self.assertEqual((self.repo / "AGENTS.md").read_text().count(MANAGED_START), 1)
 
@@ -98,6 +101,7 @@ class MakefileTemplateTests(unittest.TestCase):
             p = sh(f"make -s {verb}", self.dir, check=False)
             self.assertNotEqual(p.returncode, 0)
             self.assertIn(f"UNKNOWN[{verb}]", p.stdout)
+        self.assertIn("web: Playwright", sh("make -s e2e", self.dir, check=False).stdout)
 
 
 if __name__ == "__main__":
