@@ -15,6 +15,8 @@ from vae_verify import Check, VerifyReport
 
 PY = sys.executable
 TEST_CMD = f"{PY} -m unittest discover -p 'test_*.py'"
+LINT_CMD = f"{PY} -m py_compile calc.py"
+E2E_CMD = "mkdir -p output && echo 5 > output/sum.txt"  # the gate requires fresh output/ evidence
 
 
 def sh(cmd: str, cwd: Path, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -50,7 +52,7 @@ class RepoCase(unittest.TestCase):
         self.write("calc.py", "def add(a, b):\n    return a + b\n")
         self.write("test_calc.py", "import unittest\nfrom calc import add\n\nclass T(unittest.TestCase):\n    def test_add(self): self.assertEqual(add(2, 3), 5)\n")
         self.write(".agents/VERIFY.py", (
-            f"CONFIG={{'coverage_min':60, 'test_command':{test_command!r},\n"
+            f"CONFIG={{'coverage_min':60, 'test_command':{test_command!r}, 'lint_command':{LINT_CMD!r}, 'e2e_commands':[{E2E_CMD!r}],\n"
             f" 'coverage_command':\"{PY} -c \\\"print('TOTAL {coverage}%')\\\"\", 'timeout_s':60, 'layout':{layout}}}\n"
             f"RULES={rules}\n"
         ))

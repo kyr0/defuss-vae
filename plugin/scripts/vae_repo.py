@@ -185,13 +185,60 @@ def find_test_files(repo: Path) -> list[str]:
     return [p for p in walk_files(repo) if is_test(p) and Path(p).suffix.lower() in TEST_EXT]
 
 
-def make_targets(repo: Path) -> set[str]:
+# Rule lines only (`a b: deps`, `a::`); `:=` and `::=` assignments are excluded by the lookahead.
+MAKE_RULE = re.compile(r"([A-Za-z0-9_.%/ -]+?)\s*:(?!:?=)(.*)")
+MAKE_ASSIGN = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s*[:?+!]*=\s*(.*)")
+# Recursive calls in a recipe: `$(MAKE) a b`, `${MAKE} -s a`, `make a`; arguments end at the first shell operator.
+MAKE_CALL = re.compile(r"(?:\$[({]MAKE[)}]|\bmake\b)((?:[ \t]+[^\s;&|<>()]+)*)")
+MAKE_VAR = re.compile(r"\$[({]([A-Za-z_][A-Za-z0-9_]*)[)}]")
+
+
+def make_graph(repo: Path) -> dict[str, set[str]]:
+    """Target → targets it runs: prerequisites plus same-Makefile `$(MAKE) t` recipe calls.
+    WHY static parsing over `make -pn`: VERIFIED (GNU Make 3.81) a dry run still evaluates `$(shell)` and spawns
+    `$(MAKE)` lines, so asking make would run project code; simple `$(VAR)` expansion covers `verify: $(CHECKS)`."""
     try:
-        text = (repo / "Makefile").read_text("utf-8", errors="replace")
+        lines = (repo / "Makefile").read_text("utf-8", errors="replace").replace("\\\n", " ").splitlines()
     except OSError:
-        return set()
-    # Rule lines only (`a b: deps`, `a::`); `:=` and `::=` assignments are excluded by the lookahead.
-    return {n for m in re.finditer(r"(?m)^([A-Za-z0-9_.%/ -]+?)\s*:(?!:?=)", text) for n in m.group(1).split()}
+        return {}
+    assigns = {m.group(1): m.group(2) for m in map(MAKE_ASSIGN.match, lines) if m}
+
+    def expand(s: str) -> list[str]:
+        for _ in range(5):  # bounded: self-referencing variables must not loop
+            s = MAKE_VAR.sub(lambda m: assigns.get(m.group(1), m.group(0)) if m.group(1) != "MAKE" else m.group(0), s)
+        return s.split("#")[0].split()
+
+    graph: dict[str, set[str]] = {}
+    current: list[str] = []
+    for line in lines:
+        recipe = ""
+        if line.startswith("\t"):
+            recipe = line
+        elif (m := MAKE_RULE.match(line)) and not MAKE_ASSIGN.match(line):
+            current = m.group(1).split()
+            deps, _, recipe = m.group(2).lstrip(":").partition(";")
+            for t in current:
+                graph.setdefault(t, set()).update(expand(deps))
+        elif line.strip() and not line.lstrip().startswith("#"):
+            current = []  # an assignment or directive ends the rule
+        for call in MAKE_CALL.finditer(recipe):
+            args = expand(call.group(1))
+            if any(a.startswith(("-C", "-f", "--directory", "--file")) for a in args):
+                continue  # another Makefile: its targets are not this file's
+            for t in current:
+                graph[t].update(a for a in args if not a.startswith("-") and "=" not in a)
+    return graph
+
+
+def make_reach(graph: dict[str, set[str]], target: str) -> set[str]:
+    seen: set[str] = set()
+    todo = [target]
+    while todo:
+        for dep in graph.get(todo.pop(), ()):
+            if dep not in seen:
+                seen.add(dep)
+                todo.append(dep)
+    return seen
 
 
 def safe_name(raw: str) -> str:

@@ -86,7 +86,7 @@ python3 plugin/scripts/vae.py doctor --repo .   # memory/layout hygiene
 
 `.agents/VERIFY.py` (executable policy: config + rules `command|file_exists|contains|regex|not_regex`), `.agents/MEMORY.md` ≤4 KiB, `.agents/CLI_GIST.md` ≤2 KiB, `.agents/EPISODES.md` (last 100), `Makefile` (`setup start stop test coverage lint e2e verify`), gitignored `.env`/`var/`/`tmp/`/`input/`/`output/`, committed `.env.example`.
 
-Verifier requires: tests present and passing, integration/e2e passing, coverage ≥60% (`make coverage` prints `TOTAL <n>%`), no leftover `vae:probe` lines, no new foreign toolchain, complete `.env.example`, all VERIFY.py rules. A missing command or metric is `UNKNOWN`, which fails.
+Verifier requires: `.agents/VERIFY.py` present, `make verify` wired to lint test coverage e2e, lint passing, tests present and passing, integration/e2e passing with fresh evidence in `output/`, coverage ≥60% (`make coverage` prints `TOTAL <n>%`), no leftover `vae:probe` lines, no new foreign toolchain, complete `.env.example`, all VERIFY.py rules. A missing command or metric is `UNKNOWN`, which fails.
 
 ## Details
 

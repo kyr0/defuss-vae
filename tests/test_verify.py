@@ -17,7 +17,7 @@ from vae_testkit import (  # first: puts plugin/scripts on sys.path
 
 # isort: split
 from vae_project import init_project
-from vae_repo import is_code, make_targets, run
+from vae_repo import is_code, make_graph, make_reach, run
 from vae_verify import (
     PROBE_TAG,
     check_layout,
@@ -38,6 +38,7 @@ class VerifyTests(RepoCase):
         self.assertTrue(unit.evidence.startswith("exit=0; ") and len(unit.evidence) < 250, unit.evidence)
         self.assertEqual(self.check(report, "coverage").metric, 75.0)
         self.assertIn("Ran 1 test", (self.repo / "var/log/vae/tests.unit.log").read_text())
+        self.assertEqual(self.check(report, "tests.e2e.evidence").evidence, "changed=['output/sum.txt']")
         self.assertNotIn("var/", sh("git status --porcelain", self.repo).stdout)
 
     def test_failing_test_reports_tail_and_log_path(self):
@@ -102,12 +103,12 @@ class VerifyTests(RepoCase):
         rule = namespace["RULES"][0]
         rx = re.compile(rule["pattern"])
         self.assertIsNone(rx.search((ROOT / "templates/VERIFY.py").read_text()))
-        for bad in ("from unittest import mock", "m = MagicMock()", "jest" + ".mock('./db')", "vi" + ".fn()", "mock" + ".patch('x')", "@Mock\n  Foo foo;"):
+        for bad in ("from unittest import " + "mock", "m = Magic" + "Mock()", "jest" + ".mock('./db')", "vi" + ".fn()", "mock" + ".patch('x')", "@Mock\n  Foo foo;"):
             self.assertIsNotNone(rx.search(bad), bad)
         for fine in ("def mockup(): pass", "# tests avoid mocks", "monkeypatch.setenv('A', '1')"):
             self.assertIsNone(rx.search(fine), fine)
         self.make_python_project(rules=repr(namespace["RULES"]))
-        self.write("test_db.py", "from unittest import mock\n")
+        self.write("test_db.py", "from unittest import " + "mock\n")
         self.assertFalse(self.check(verify(self.repo, ["test_db.py"]), "tests.no-mocks").value)
 
     def test_makefile_is_the_only_command_source(self):
@@ -119,12 +120,20 @@ class VerifyTests(RepoCase):
         unit, cov = self.check(report, "tests.unit"), self.check(report, "coverage")
         self.assertEqual((unit.status, cov.status), ("UNKNOWN", "UNKNOWN"))
         self.assertIn("Makefile target `test`", unit.next)
+        # Missing lint|e2e verbs and a missing VERIFY.py fail closed instead of being skipped.
+        self.assertEqual((self.check(report, "lint").status, self.check(report, "tests.e2e").status), ("UNKNOWN", "UNKNOWN"))
+        verifier = self.check(report, "verifier.config")
+        self.assertEqual((verifier.value, verifier.evidence), (False, "missing"))
+        self.assertIn("scripts/vae.py init --repo", verifier.next)
         self.write("Makefile", "lint:\n\t@true\ntest:\n\t@true\ncoverage:\n\t@echo 'TOTAL 80%'\ne2e: dist\n\t@true\ndist:\n\t@true\nX := y\nURL ::= z\n")
         report = verify(self.repo, ["test_x.py"])
         self.assertEqual((self.check(report, "lint").command, self.check(report, "tests.unit").command, self.check(report, "tests.e2e.1").command),
                          ("make lint", "make test", "make e2e"))
         self.assertEqual(self.check(report, "coverage").metric, 80.0)
-        self.assertEqual(make_targets(self.repo), {"lint", "test", "coverage", "e2e", "dist"})
+        self.assertEqual(set(make_graph(self.repo)), {"lint", "test", "coverage", "e2e", "dist"})
+        # A passing e2e that leaves no consumer output (`@true`) is not evidence.
+        evidence = self.check(report, "tests.e2e.evidence")
+        self.assertEqual((evidence.value, evidence.evidence), (False, "output/ unchanged by e2e"))
         self.write("Makefile", "lint:\n\t@echo 'x.py:1:1: F401 unused import'; exit 1\n")
         lint = self.check(verify(self.repo, ["test_x.py"]), "lint")
         self.assertFalse(lint.value)
@@ -188,6 +197,17 @@ class VerifyTests(RepoCase):
         for output, pct in ((bun, 100.0), (pytest_cov, 100.0), (istanbul, 80.12), (go, 75.0)):
             self.assertEqual(parse_coverage(output)[0], pct, output)
         self.assertIsNone(parse_coverage("1 pass\nRan 1 test\n")[0])
+
+    def test_verify_target_must_run_every_gate_verb(self):
+        # CI runs only `make verify`; the gate runs the verbs one by one, so a hollow `verify` would pass locally only.
+        verbs = "setup start stop status log metrics bench lint test coverage e2e:\n\t@true\n"
+        self.write(".gitignore", "var/*\ntmp/*\n.env\n")
+        self.write("Makefile", verbs + "verify: lint test coverage\n\tcd sub && $(MAKE) -C sub e2e\n")
+        self.assertIn("gaps=Makefile:verify→e2e", check_layout(self.repo).evidence)
+        # Prerequisites, `$(VAR)` expansion, transitive targets and recursive `$(MAKE)` calls all count.
+        self.write("Makefile", verbs + "CHECKS := coverage \\\n  e2e\nverify: ci $(CHECKS)\nci:\n\t@$(MAKE) -s lint test && echo done\n")
+        self.assertTrue(check_layout(self.repo).value, check_layout(self.repo).evidence)
+        self.assertEqual(make_reach(make_graph(self.repo), "verify"), {"ci", "lint", "test", "coverage", "e2e"})
 
     def test_layout_gaps_then_init_closes_them(self):
         self.make_python_project(layout=True)

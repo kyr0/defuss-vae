@@ -1,6 +1,7 @@
 # Project interface (defuss-vae layout): the same verbs for humans, agents and CI.
 # Service: RUN = foreground command; stdout/stderr → var/log/$(NAME).*, pid → tmp/$(NAME).pid (both gitignored).
-# test/coverage/e2e exit 2 (UNKNOWN) until defined: the verifier runs them on every gate.
+# test/coverage/lint/e2e exit 2 (UNKNOWN) until defined: the verifier runs them on every gate,
+# and e2e must leave fresh files in output/ (the consumer's results or a Playwright report).
 # Toolchain: new projects start on bun (JS/TS) or uv (Python); each placeholder names the default recipe.
 # RUN e.g. `bun run src/index.ts` (bun loads .env) | `uv run --env-file .env python -m app`; apps log ISO-8601 UTC first, exit cleanly on SIGTERM.
 NAME ?= app
@@ -56,5 +57,5 @@ coverage: ; @echo "UNKNOWN[coverage] BC undefined: print TOTAL <n>% — bun test
 lint:     ; @echo "UNKNOWN[lint] BC undefined: uv run ruff check . | bunx oxlint --deny-warnings (plain oxlint exits 0 on findings)"; exit 2
 e2e:      ; @echo "UNKNOWN[e2e] BC undefined: build → clean consumer → input/ → output/ — bun pm pack + bun add <tgz> | uv build + uv run --isolated --no-project --with dist/<whl> | web: Playwright on the served build (WebGL2, network, permissions)"; exit 2
 
-# What CI runs; the gate runs the same verbs one by one. Fail-fast order: cheapest first.
+# What CI runs; the gate runs the same verbs one by one and fails while verify skips any. Fail-fast order: cheapest first.
 verify: lint test coverage e2e

@@ -11,8 +11,8 @@ from vae_verify import (
     GITIGNORE,
     Check,
     check_layout,
+    check_verifier,
     ignored_probes,
-    load_project_verifier,
 )
 
 MANAGED_START = "<!-- defuss-vae:start -->"
@@ -69,10 +69,7 @@ def init_project(repo: Path, template_root: Path = PLUGIN_ROOT) -> list[str]:
 def doctor_repo(repo: Path) -> list[Check]:
     """Deterministic memory hygiene: loadable policy, bounded + epistemically tagged state, layout."""
     init_cmd = f"RUN: python3 {PLUGIN_ROOT}/scripts/vae.py init --repo {repo}"
-    exists = (repo / ".agents" / "VERIFY.py").exists()
-    _, _, err = load_project_verifier(repo)
-    checks = [Check("state.verifier", ".agents/VERIFY.py exists and loads", "VERIFIED", exists and err is None,
-                    err or ("ok" if exists else "missing"), next=None if exists and err is None else (f"FIX: {err}" if err else init_cmd))]
+    checks = [check_verifier(repo, "state.verifier")[0]]
     for name, budget in STATE_BUDGET.items():
         p = repo / ".agents" / name
         if not p.exists():

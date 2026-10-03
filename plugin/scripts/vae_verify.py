@@ -17,7 +17,8 @@ from vae_repo import (
     dirty_paths,
     find_test_files,
     is_code,
-    make_targets,
+    make_graph,
+    make_reach,
     now_iso,
     run,
     runtime_dir,
@@ -28,6 +29,8 @@ from vae_repo import (
 FOREIGN_LOCKS = {"package-lock.json": "npm", "npm-shrinkwrap.json": "npm", "yarn.lock": "yarn", "pnpm-lock.yaml": "pnpm",
                  "poetry.lock": "poetry", "Pipfile.lock": "pipenv", "pdm.lock": "pdm", "requirements.txt": "pip"}
 MAKE_TARGETS = ("setup", "start", "stop", "status", "log", "metrics", "bench", "test", "coverage", "lint", "e2e", "verify")
+# What `make verify` (= CI) must run; the gate runs them one by one, so a hollow `verify` would pass locally only.
+VERIFY_VERBS = ("lint", "test", "coverage", "e2e")
 # How `make`, sh, bash and dash report a missing uv/bun (VERIFIED: `make: uv: No such file or directory`).
 MISSING_TOOL = re.compile(r"\b(uv|bun)\b:? (?:command not found|No such file or directory|not found)")
 # Split literal: this file must not contain the tag itself, or the probe rule would flag the plugin's own source.
@@ -67,6 +70,16 @@ def load_project_verifier(repo: Path) -> tuple[dict[str, Any], list[dict[str, An
         return config, rules, None
     except Exception as e:  # noqa: BLE001 - VERIFY.py is project code; any error means "does not load"
         return {}, [], f"{type(e).__name__}: {e}"
+
+
+def check_verifier(repo: Path, check_id: str) -> tuple[Check, dict[str, Any], list[dict[str, Any]]]:
+    """WHY missing fails: without VERIFY.py the template rules (e.g. no-mocks) silently never run."""
+    exists = (repo / ".agents" / "VERIFY.py").exists()
+    config, rules, err = load_project_verifier(repo)
+    ok = exists and err is None
+    init_cmd = f"RUN: python3 {PLUGIN_ROOT}/scripts/vae.py init --repo {repo}"
+    return Check(check_id, ".agents/VERIFY.py exists and loads", "VERIFIED", ok, err or ("CONFIG/RULES valid" if exists else "missing"),
+                 next=None if ok else (f"FIX .agents/VERIFY.py: {err}" if err else init_cmd)), config, rules
 
 
 @dataclasses.dataclass
@@ -224,8 +237,18 @@ def ignored_probes(repo: Path) -> set[str]:
     return ignored | {probe for probe, line in GITIGNORE.items() if line in lines}
 
 
+def tree_state(root: Path) -> dict[str, tuple[int, int]]:
+    # (mtime_ns, size) per file: a rewrite changes mtime even when the content is identical.
+    return {p.relative_to(root.parent).as_posix(): (s.st_mtime_ns, s.st_size)
+            for p in (root.rglob("*") if root.is_dir() else ()) if p.is_file() for s in (p.stat(),)}
+
+
 def check_layout(repo: Path) -> Check:
-    gaps = [f"Makefile:{t}" for t in MAKE_TARGETS if t not in make_targets(repo)]
+    graph = make_graph(repo)
+    gaps = [f"Makefile:{t}" for t in MAKE_TARGETS if t not in graph]
+    reach = make_reach(graph, "verify")
+    unwired = [v for v in VERIFY_VERBS if "verify" in graph and v not in reach]
+    gaps += [f"Makefile:verify→{','.join(unwired)}"] if unwired else []
     ignored = ignored_probes(repo)
     gaps += [f"gitignore:{GITIGNORE[probe]}" for probe in LAYOUT_IGNORES if probe not in ignored]
     return Check(
@@ -233,7 +256,7 @@ def check_layout(repo: Path) -> Check:
         "gaps=" + ",".join(gaps) if gaps else "Makefile verbs + ignores present",
         next=None if not gaps else (
             f"RUN: python3 {PLUGIN_ROOT}/scripts/vae.py init --repo {repo}  "
-            f"(then define missing verbs; template {PLUGIN_ROOT}/templates/Makefile)"
+            f"(then define missing verbs; `verify: {' '.join(VERIFY_VERBS)}`; template {PLUGIN_ROOT}/templates/Makefile)"
         ),
     )
 
@@ -302,11 +325,8 @@ def verify(repo: Path, changed_paths: list[str] | None = None) -> VerifyReport:
         changed_paths = sorted(dirty_paths(repo))
     code_paths = sorted(p for p in changed_paths if is_code(p))
     checks: list[Check] = []
-    config, rules, config_error = load_project_verifier(repo)
-    checks.append(Check(
-        "verifier.config", ".agents/VERIFY.py loads", "VERIFIED", config_error is None,
-        config_error or "CONFIG/RULES valid", next="FIX: .agents/VERIFY.py" if config_error else None,
-    ))
+    verifier, config, rules = check_verifier(repo, "verifier.config")
+    checks.append(verifier)
     coverage_min = float(config.get("coverage_min", 60.0))
     timeout = int(config.get("timeout_s", 180))
     if config.get("layout", True):
@@ -322,7 +342,7 @@ def verify(repo: Path, changed_paths: list[str] | None = None) -> VerifyReport:
     ))
     # WHY no ecosystem autodiscovery: the Makefile is the interface the project declares; guessing runners would
     # verify commands the project never committed to. CONFIG overrides remain the explicit escape hatch.
-    verbs = make_targets(repo)
+    verbs = set(make_graph(repo))
     lint_cmd = config.get("lint_command") or ("make lint" if "lint" in verbs else None)
     test_cmd = config.get("test_command") or ("make test" if "test" in verbs else None)
     coverage_cmd = config.get("coverage_command") or ("make coverage" if "coverage" in verbs else None)
@@ -330,6 +350,11 @@ def verify(repo: Path, changed_paths: list[str] | None = None) -> VerifyReport:
     e2e = list(config.get("e2e_commands") or (["make e2e"] if "e2e" in verbs else []))
     if lint_cmd:  # first: the cheapest deterministic failure
         checks.append(check_command("lint", "lint passes", str(lint_cmd), repo, timeout))
+    else:
+        checks.append(Check(
+            "lint", "lint passes", "UNKNOWN", None, "no Makefile `lint` target or CONFIG['lint_command']",
+            next="ADD Makefile target `lint` (uv run ruff check . | bunx oxlint --deny-warnings)",
+        ))
     if test_cmd:
         checks.append(check_command("tests.unit", "test command passes", str(test_cmd), repo, timeout))
     else:
@@ -339,8 +364,23 @@ def verify(repo: Path, changed_paths: list[str] | None = None) -> VerifyReport:
         ))
     for i, cmd in enumerate(integration):
         checks.append(check_command(f"tests.integration.{i+1}", "integration test command passes", str(cmd), repo, timeout))
+    before = tree_state(repo / "output")
     for i, cmd in enumerate(e2e):
         checks.append(check_command(f"tests.e2e.{i+1}", "e2e (dogfood) command passes", str(cmd), repo, timeout))
+    if not e2e:
+        checks.append(Check(
+            "tests.e2e", "e2e command passes", "UNKNOWN", None, "no Makefile `e2e` target or CONFIG['e2e_commands']",
+            next="ADD Makefile target `e2e`: build the publishable artifact → clean consumer → input/ → output/",
+        ))
+    elif all(c.value for c in checks if c.id.startswith("tests.e2e.")):
+        # HYPOTHESIS: an e2e that leaves no consumer output most likely never ran the artifact; it cannot prove
+        # artifact consumption (review checks that), but it catches `@true` and source-tree-only stand-ins.
+        fresh = sorted(p for p, st in tree_state(repo / "output").items() if before.get(p) != st)
+        checks.append(Check(
+            "tests.e2e.evidence", "e2e wrote fresh evidence to output/", "VERIFIED", bool(fresh),
+            f"changed={fresh[:5]}" if fresh else "output/ unchanged by e2e",
+            next=None if fresh else "EDIT e2e: the consumer of the built artifact writes its results (web: Playwright report) to output/",
+        ))
     claim = f"coverage >= {coverage_min:g}%"
     if coverage_cmd:
         p, log = run_logged("coverage", str(coverage_cmd), repo, timeout)
