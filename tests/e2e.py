@@ -169,27 +169,23 @@ def main() -> int:
         step("gate.rejects_leftover_probe", probe.returncode == 2 and "hygiene.probes" in probe.stdout, "calc.py probe line")
         run(["git", "checkout", "--", "calc.py"], proj)
 
-        # The echo proves the service shell itself ran and wrote, separately from python's banner.
-        started_svc = run(["make", "-s", "start", "RUN=echo svc-shell; python3 -u -m http.server 0 --bind 127.0.0.1"], proj)
-        # WHY poll, not a fixed sleep: a cold python3 on CI macOS runners can take seconds to print its banner.
-        deadline, log = time.time() + 20, ""
-        while "Serving HTTP" not in log and time.time() < deadline:
+        # WHY a raw listener, not http.server: VERIFIED (CI macOS runner) its server_bind calls socket.getfqdn('127.0.0.1')
+        # before the banner, and that reverse lookup took >30s there. The echo shows the service shell itself ran.
+        listener = "import socket; s = socket.create_server(('127.0.0.1', 0)); print('listening port', s.getsockname()[1]); s.accept()"
+        started_svc = run(["make", "-s", "start", f'RUN=echo svc-shell; python3 -u -c "{listener}"'], proj)
+        deadline, log = time.time() + 20, ""  # poll: a cold python3 can take seconds to start on CI runners
+        while "listening port" not in log and time.time() < deadline:
             time.sleep(0.2)
             log = run(["make", "-s", "log", "N=5"], proj).stdout
         diag = ""
-        if "Serving HTTP" not in log:  # failure-only diagnostics: what runs in the service's group, which python3
+        if "listening port" not in log:  # failure-only diagnostics: what runs in the service's group, which python3
             pgid = (proj / "tmp/app.pid").read_text().strip()
             ps = run(["ps", "-A", "-o", "pid=,pgid=,stat=,etime=,command="], proj).stdout.splitlines()
             py = run(["sh", "-c", "command -v python3; python3 -V 2>&1"], proj, ok=(0, 1, 127)).stdout
-            fqdn = "import socket, time; t = time.time(); socket.getfqdn('127.0.0.1'); print(round(time.time() - t, 1))"
-            try:  # http.server's server_bind does this reverse lookup before printing its banner
-                fqdn_s = subprocess.run([PY, "-c", fqdn], text=True, capture_output=True, timeout=30, check=False).stdout.strip()
-            except subprocess.TimeoutExpired:
-                fqdn_s = ">30"
-            diag = f"; group={[ln.strip() for ln in ps if ln.split()[1:2] == [pgid]]}; python3={py.split()}; getfqdn_s={fqdn_s}"
+            diag = f"; group={[ln.strip() for ln in ps if ln.split()[1:2] == [pgid]]}; python3={py.split()}"
         stopped = run(["make", "-s", "stop"], proj).stdout
         status = run(["make", "-s", "status"], proj, ok=(2,)).stdout
-        parts = {"start": "running pid=" in started_svc.stdout, "log": "Serving HTTP" in log, "stop": "stopped" in stopped, "status": "stopped" in status}
+        parts = {"start": "running pid=" in started_svc.stdout, "log": "listening port" in log, "stop": "stopped" in stopped, "status": "stopped" in status}
         step("service.lifecycle", all(parts.values()), f"{parts}; start={started_svc.stdout.strip()!r}; log={log.strip()!r}; status={status.strip()!r}{diag}")
         step("doctor.repo", run([PY, str(root / "scripts/vae.py"), "doctor", "--repo", str(proj)], proj).returncode == 0, "budgets, tags, layout")
 
