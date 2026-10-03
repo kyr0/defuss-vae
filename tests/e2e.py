@@ -181,7 +181,12 @@ def main() -> int:
             pgid = (proj / "tmp/app.pid").read_text().strip()
             ps = run(["ps", "-A", "-o", "pid=,pgid=,stat=,etime=,command="], proj).stdout.splitlines()
             py = run(["sh", "-c", "command -v python3; python3 -V 2>&1"], proj, ok=(0, 1, 127)).stdout
-            diag = f"; group={[ln.strip() for ln in ps if ln.split()[1:2] == [pgid]]}; python3={py.split()}"
+            fqdn = "import socket, time; t = time.time(); socket.getfqdn('127.0.0.1'); print(round(time.time() - t, 1))"
+            try:  # http.server's server_bind does this reverse lookup before printing its banner
+                fqdn_s = subprocess.run([PY, "-c", fqdn], text=True, capture_output=True, timeout=30, check=False).stdout.strip()
+            except subprocess.TimeoutExpired:
+                fqdn_s = ">30"
+            diag = f"; group={[ln.strip() for ln in ps if ln.split()[1:2] == [pgid]]}; python3={py.split()}; getfqdn_s={fqdn_s}"
         stopped = run(["make", "-s", "stop"], proj).stdout
         status = run(["make", "-s", "status"], proj, ok=(2,)).stdout
         parts = {"start": "running pid=" in started_svc.stdout, "log": "Serving HTTP" in log, "stop": "stopped" in stopped, "status": "stopped" in status}
