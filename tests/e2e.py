@@ -169,16 +169,23 @@ def main() -> int:
         step("gate.rejects_leftover_probe", probe.returncode == 2 and "hygiene.probes" in probe.stdout, "calc.py probe line")
         run(["git", "checkout", "--", "calc.py"], proj)
 
-        started_svc = run(["make", "-s", "start", "RUN=python3 -u -m http.server 0 --bind 127.0.0.1"], proj)
+        # The echo proves the service shell itself ran and wrote, separately from python's banner.
+        started_svc = run(["make", "-s", "start", "RUN=echo svc-shell; python3 -u -m http.server 0 --bind 127.0.0.1"], proj)
         # WHY poll, not a fixed sleep: a cold python3 on CI macOS runners can take seconds to print its banner.
         deadline, log = time.time() + 20, ""
         while "Serving HTTP" not in log and time.time() < deadline:
             time.sleep(0.2)
             log = run(["make", "-s", "log", "N=5"], proj).stdout
+        diag = ""
+        if "Serving HTTP" not in log:  # failure-only diagnostics: what runs in the service's group, which python3
+            pgid = (proj / "tmp/app.pid").read_text().strip()
+            ps = run(["ps", "-A", "-o", "pid=,pgid=,stat=,etime=,command="], proj).stdout.splitlines()
+            py = run(["sh", "-c", "command -v python3; python3 -V 2>&1"], proj, ok=(0, 1, 127)).stdout
+            diag = f"; group={[ln.strip() for ln in ps if ln.split()[1:2] == [pgid]]}; python3={py.split()}"
         stopped = run(["make", "-s", "stop"], proj).stdout
         status = run(["make", "-s", "status"], proj, ok=(2,)).stdout
         parts = {"start": "running pid=" in started_svc.stdout, "log": "Serving HTTP" in log, "stop": "stopped" in stopped, "status": "stopped" in status}
-        step("service.lifecycle", all(parts.values()), f"{parts}; start={started_svc.stdout.strip()!r}; log={log.strip()!r}; status={status.strip()!r}")
+        step("service.lifecycle", all(parts.values()), f"{parts}; start={started_svc.stdout.strip()!r}; log={log.strip()!r}; status={status.strip()!r}{diag}")
         step("doctor.repo", run([PY, str(root / "scripts/vae.py"), "doctor", "--repo", str(proj)], proj).returncode == 0, "budgets, tags, layout")
 
     evidence = {"zip": zip_path.name, "seconds": round(time.time() - started, 2), "steps": steps}
