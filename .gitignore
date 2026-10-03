@@ -6,3 +6,4 @@ tmp/*
 output/*
 .DS_Store
 .ruff_cache/
+.agents/
