@@ -19,8 +19,10 @@ from vae_testkit import (  # first: puts plugin/scripts on sys.path
 from vae_project import init_project
 from vae_repo import is_code, make_graph, make_reach, run
 from vae_verify import (
+    NO_SERVICE_STUB,
     PROBE_TAG,
     check_layout,
+    check_wiring,
     parse_coverage,
     remedy,
     render_report,
@@ -198,16 +200,36 @@ class VerifyTests(RepoCase):
             self.assertEqual(parse_coverage(output)[0], pct, output)
         self.assertIsNone(parse_coverage("1 pass\nRan 1 test\n")[0])
 
-    def test_verify_target_must_run_every_gate_verb(self):
+    def test_verify_target_must_run_every_gate_verb_even_without_layout(self):
         # CI runs only `make verify`; the gate runs the verbs one by one, so a hollow `verify` would pass locally only.
-        verbs = "setup start stop status log metrics bench lint test coverage e2e:\n\t@true\n"
-        self.write(".gitignore", "var/*\ntmp/*\n.env\n")
+        verbs = "lint test coverage e2e:\n\t@true\n"
         self.write("Makefile", verbs + "verify: lint test coverage\n\tcd sub && $(MAKE) -C sub e2e\n")
-        self.assertIn("gaps=Makefile:verify→e2e", check_layout(self.repo).evidence)
+        self.write(".agents/VERIFY.py", "CONFIG={'layout':False}\nRULES=[]\n")
+        wiring = self.check(verify(self.repo, []), "wiring")
+        self.assertEqual((wiring.value, wiring.evidence), (False, "verify→coverage,lint,test; missing=e2e"))
+        self.assertIn("verify: lint test coverage e2e", wiring.next)
+        # A verb the gate takes from CONFIG is the project's own CI concern, not verify's.
+        self.assertTrue(check_wiring(self.repo, {"e2e_commands": ["true"]}).value)
         # Prerequisites, `$(VAR)` expansion, transitive targets and recursive `$(MAKE)` calls all count.
         self.write("Makefile", verbs + "CHECKS := coverage \\\n  e2e\nverify: ci $(CHECKS)\nci:\n\t@$(MAKE) -s lint test && echo done\n")
-        self.assertTrue(check_layout(self.repo).value, check_layout(self.repo).evidence)
+        self.assertTrue(check_wiring(self.repo, {}).value, check_wiring(self.repo, {}).evidence)
         self.assertEqual(make_reach(make_graph(self.repo), "verify"), {"ci", "lint", "test", "coverage", "e2e"})
+
+    def test_library_without_service_keeps_layout_with_one_stub_line(self):
+        self.write(".gitignore", "var/*\ntmp/*\n.env\n")
+        self.write("Makefile", "setup metrics bench lint test coverage e2e:\n\t@true\nverify: lint test coverage e2e\n")
+        c = check_layout(self.repo)
+        self.assertEqual(c.evidence, "gaps=Makefile:start,Makefile:stop,Makefile:status,Makefile:log")
+        stub = NO_SERVICE_STUB.format(verbs="start stop restart status log")
+        self.assertIn(f"no service (library): add the Makefile line `{stub}`", c.next)
+        self.assertNotIn("copy `", c.next)  # only service verbs are missing
+        with (self.repo / "Makefile").open("a") as f:
+            f.write(stub + "\n")
+        self.assertTrue(check_layout(self.repo).value)
+        self.assertEqual(sh("make -s status", self.repo).stdout.strip(), "∅ status: no service")
+        # An existing service verb is never redefined by the suggested line.
+        self.write("Makefile", "setup metrics bench lint test coverage e2e verify log:\n\t@true\n")
+        self.assertIn("`start stop restart status: ;", check_layout(self.repo).next)
 
     def test_layout_gaps_then_init_closes_them(self):
         self.make_python_project(layout=True)

@@ -23,6 +23,7 @@ setup:
 	@if [ -f uv.lock ]; then command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh; uv sync --locked; fi
 	@if [ -f bun.lock ] || [ -f bun.lockb ]; then command -v bun >/dev/null 2>&1 || curl -fsSL https://bun.sh/install | bash; bun install --frozen-lockfile; fi
 
+# No service (library)? Replace start..log with one line: start stop restart status log: ; @echo "∅ $@: no service"
 # Own process group (setsid, else job control) so stop reaps children too; redirected stdio keeps agent shells from hanging.
 start:
 	@mkdir -p var/log tmp

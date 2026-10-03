@@ -6,9 +6,10 @@ For code changes (paths outside `.agents/`, `tmp/`, `var/`, `output/`), `VERIFIE
 
 1. **verify** — every required check passes:
    - `.agents/VERIFY.py` exists and loads (`init` writes it);
-   - `layout` (unless `CONFIG["layout"]=False`): Makefile verbs `setup start stop status log metrics bench test coverage lint e2e verify` exist, `verify` reaches `lint test coverage e2e` (prerequisites, transitively, or same-Makefile `$(MAKE) t` calls), and `var/`, `tmp/`, `.env` are gitignored (`init` writes these plus the other defaults);
+   - `layout` (unless `CONFIG["layout"]=False`): Makefile verbs `setup start stop status log metrics bench test coverage lint e2e verify` exist and `var/`, `tmp/`, `.env` are gitignored (`init` writes these plus the other defaults);
    - `toolchain` (unless `CONFIG["toolchain"]=False`): the change introduces no npm/yarn/pnpm/poetry/pipenv/pdm lockfile, and no pip `requirements.txt` without a `uv.lock`, that `HEAD` doesn't track;
    - `env.example`: every env var that changed code reads directly (JS/TS `process.env`/`Bun.env`/`import.meta.env`, Python `os.environ`/`os.getenv`, Go `os.Getenv`, Rust `env::var`; OS-provided names exempt) or root `.env` sets is declared in the nearest `.env.example`, which is not gitignored;
+   - `wiring` (always, also with `layout` off): `make verify` reaches every one of `lint test coverage e2e` the gate takes from the Makefile (prerequisites, transitively, or same-Makefile `$(MAKE) t` calls); verbs overridden in `CONFIG` are exempt;
    - repository has test files;
    - `make lint` exits 0 (or `CONFIG["lint_command"]`), run first as the cheapest failure;
    - `make test` exits 0 (or `CONFIG["test_command"]`);
@@ -24,6 +25,12 @@ A missing command (lint, test, e2e, coverage) or metric is `UNKNOWN` and fails c
 ## Why the verifier must exist and be wired
 
 A gate that silently falls back to defaults verifies less than the project thinks: without `.agents/VERIFY.py` the template rules (e.g. no mocks) never run, and before this check only `doctor` noticed. `make verify` is what CI runs while the gate runs the verbs one by one, so a `verify` that skips e2e passed every local gate and only CI was hollow. The wiring check parses the Makefile statically instead of asking make (`make -pn`): `VERIFIED:` with GNU Make 3.81 a dry run still evaluates `$(shell …)` and spawns the recursive `$(MAKE)` line (probed), so reading the wiring would run project code. `UNKNOWN:` whether `make -p` database output is stable enough across make 3.81 and 4.x to parse. `UNKNOWN:` prerequisites built from functions (`$(foreach …)`, `$(wildcard …)`) or computed variables are not expanded, so such a `verify` reports a gap; list the verbs literally.
+
+`wiring` is its own check rather than part of `layout` because `layout` is the one check projects legitimately turn off, and turning it off must not make CI hollow again.
+
+## Why a library keeps the layout instead of disabling it
+
+`VERIFIED:` an agent on a library with no service hit `layout` gaps (`start stop status log metrics`, `var/*` and `.env` ignores) and proposed `CONFIG["layout"]=False` as the fix, because the gate's hint named no cheaper option. Disabling trades away the `var/`, `tmp/`, `.env` ignore checks, the part that protects secrets and runtime state, to avoid four Makefile verbs. The cheaper fix keeps both: `init` appends the missing ignore lines, and one line `start stop restart status log: ; @echo "∅ $@: no service"` covers the service verbs, as this repo's own Makefile does. The uniform interface survives too: `make status` answers "no service" definitively, where a missing target leaves the next agent guessing. The layout hint now names exactly the missing steps and ranks `layout=False` last.
 
 ## Why e2e must leave evidence in `output/`
 

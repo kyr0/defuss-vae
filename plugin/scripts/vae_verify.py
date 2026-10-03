@@ -31,6 +31,11 @@ FOREIGN_LOCKS = {"package-lock.json": "npm", "npm-shrinkwrap.json": "npm", "yarn
 MAKE_TARGETS = ("setup", "start", "stop", "status", "log", "metrics", "bench", "test", "coverage", "lint", "e2e", "verify")
 # What `make verify` (= CI) must run; the gate runs them one by one, so a hollow `verify` would pass locally only.
 VERIFY_VERBS = ("lint", "test", "coverage", "e2e")
+VERB_CONFIG = {"lint": "lint_command", "test": "test_command", "coverage": "coverage_command", "e2e": "e2e_commands"}
+SERVICE_VERBS = ("start", "stop", "status", "log")
+# A library keeps the uniform interface with one line instead of disabling `layout`: `make status` then answers
+# "no service" definitively, where a missing target leaves the agent guessing.
+NO_SERVICE_STUB = '{verbs}: ; @echo "∅ $@: no service"'
 # How `make`, sh, bash and dash report a missing uv/bun (VERIFIED: `make: uv: No such file or directory`).
 MISSING_TOOL = re.compile(r"\b(uv|bun)\b:? (?:command not found|No such file or directory|not found)")
 # Split literal: this file must not contain the tag itself, or the probe rule would flag the plugin's own source.
@@ -245,19 +250,34 @@ def tree_state(root: Path) -> dict[str, tuple[int, int]]:
 
 def check_layout(repo: Path) -> Check:
     graph = make_graph(repo)
-    gaps = [f"Makefile:{t}" for t in MAKE_TARGETS if t not in graph]
-    reach = make_reach(graph, "verify")
-    unwired = [v for v in VERIFY_VERBS if "verify" in graph and v not in reach]
-    gaps += [f"Makefile:verify→{','.join(unwired)}"] if unwired else []
+    verbs = [t for t in MAKE_TARGETS if t not in graph]
     ignored = ignored_probes(repo)
-    gaps += [f"gitignore:{GITIGNORE[probe]}" for probe in LAYOUT_IGNORES if probe not in ignored]
+    ignores = [GITIGNORE[probe] for probe in LAYOUT_IGNORES if probe not in ignored]
+    gaps = [f"Makefile:{t}" for t in verbs] + [f"gitignore:{line}" for line in ignores]
+    steps = [f"RUN: python3 {PLUGIN_ROOT}/scripts/vae.py init --repo {repo} (appends missing .gitignore lines; never edits an existing Makefile)"]
+    if set(SERVICE_VERBS) & set(verbs):
+        stub = NO_SERVICE_STUB.format(verbs=" ".join(v for v in ("start", "stop", "restart", "status", "log") if v not in graph))  # only missing: no recipe overrides
+        steps.append(f"no service (library): add the Makefile line `{stub}`; a service: copy the service block from the template")
+    if set(verbs) - set(SERVICE_VERBS):
+        steps.append(f"copy `{' '.join(v for v in verbs if v not in SERVICE_VERBS)}` from {PLUGIN_ROOT}/templates/Makefile")
+    steps.append("CONFIG['layout']=False only as a last resort: it also drops the var/ tmp/ .env ignore checks")
     return Check(
         "layout", "Makefile verbs + gitignored var/, tmp/, .env", "VERIFIED", not gaps,
-        "gaps=" + ",".join(gaps) if gaps else "Makefile verbs + ignores present",
-        next=None if not gaps else (
-            f"RUN: python3 {PLUGIN_ROOT}/scripts/vae.py init --repo {repo}  "
-            f"(then define missing verbs; `verify: {' '.join(VERIFY_VERBS)}`; template {PLUGIN_ROOT}/templates/Makefile)"
-        ),
+        "gaps=" + ",".join(gaps) if gaps else "Makefile verbs + ignores present", next="; ".join(steps) if gaps else None,
+    )
+
+
+def check_wiring(repo: Path, config: dict[str, Any]) -> Check:
+    """Always on, independent of `layout`: CI runs only `make verify`, so it must reach every verb the gate takes from
+    the Makefile (CONFIG-overridden verbs are the project's own CI concern)."""
+    graph = make_graph(repo)
+    from_make = [v for v in VERIFY_VERBS if not config.get(VERB_CONFIG[v]) and v in graph]
+    reach = make_reach(graph, "verify")
+    unwired = [v for v in from_make if v not in reach]
+    evidence = ("no `verify` target" if "verify" not in graph else "verify→" + ",".join(sorted(reach & set(VERIFY_VERBS)))) if from_make else "∅ gate verbs from Makefile"
+    return Check(
+        "wiring", "make verify runs every Makefile gate verb", "VERIFIED", not unwired, evidence + (f"; missing={','.join(unwired)}" if unwired else ""),
+        next=f"EDIT Makefile: `verify: {' '.join(VERIFY_VERBS)}` (prerequisites or $(MAKE) calls; CI runs only make verify)" if unwired else None,
     )
 
 
@@ -331,6 +351,7 @@ def verify(repo: Path, changed_paths: list[str] | None = None) -> VerifyReport:
     timeout = int(config.get("timeout_s", 180))
     if config.get("layout", True):
         checks.append(check_layout(repo))
+    checks.append(check_wiring(repo, config))
     if config.get("toolchain", True):
         checks.append(check_toolchain(repo, code_paths))
     checks.append(check_env(repo, code_paths))

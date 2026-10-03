@@ -12,6 +12,7 @@ from vae_verify import (
     Check,
     check_layout,
     check_verifier,
+    check_wiring,
     ignored_probes,
 )
 
@@ -69,7 +70,8 @@ def init_project(repo: Path, template_root: Path = PLUGIN_ROOT) -> list[str]:
 def doctor_repo(repo: Path) -> list[Check]:
     """Deterministic memory hygiene: loadable policy, bounded + epistemically tagged state, layout."""
     init_cmd = f"RUN: python3 {PLUGIN_ROOT}/scripts/vae.py init --repo {repo}"
-    checks = [check_verifier(repo, "state.verifier")[0]]
+    verifier, config, _ = check_verifier(repo, "state.verifier")
+    checks = [verifier]
     for name, budget in STATE_BUDGET.items():
         p = repo / ".agents" / name
         if not p.exists():
@@ -83,5 +85,5 @@ def doctor_repo(repo: Path) -> list[Check]:
             f"bytes={size}" + (f"; untagged={untagged[:5]}" if untagged else ""),
             next=None if ok else f"CONSOLIDATE .agents/{name}: merge, delete stale|derivable lines, tag every entry",
         ))
-    checks.append(check_layout(repo))
+    checks += [check_layout(repo), check_wiring(repo, config)]
     return checks
