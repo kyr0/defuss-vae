@@ -170,11 +170,15 @@ def main() -> int:
         run(["git", "checkout", "--", "calc.py"], proj)
 
         started_svc = run(["make", "-s", "start", "RUN=python3 -u -m http.server 0 --bind 127.0.0.1"], proj)
-        time.sleep(0.5)
-        log = run(["make", "-s", "log", "N=5"], proj).stdout
+        # WHY poll, not a fixed sleep: a cold python3 on CI macOS runners can take seconds to print its banner.
+        deadline, log = time.time() + 20, ""
+        while "Serving HTTP" not in log and time.time() < deadline:
+            time.sleep(0.2)
+            log = run(["make", "-s", "log", "N=5"], proj).stdout
         stopped = run(["make", "-s", "stop"], proj).stdout
         status = run(["make", "-s", "status"], proj, ok=(2,)).stdout
-        step("service.lifecycle", "running pid=" in started_svc.stdout and "Serving HTTP" in log and "stopped" in stopped and "stopped" in status, log.strip())
+        parts = {"start": "running pid=" in started_svc.stdout, "log": "Serving HTTP" in log, "stop": "stopped" in stopped, "status": "stopped" in status}
+        step("service.lifecycle", all(parts.values()), f"{parts}; start={started_svc.stdout.strip()!r}; log={log.strip()!r}; status={status.strip()!r}")
         step("doctor.repo", run([PY, str(root / "scripts/vae.py"), "doctor", "--repo", str(proj)], proj).returncode == 0, "budgets, tags, layout")
 
     evidence = {"zip": zip_path.name, "seconds": round(time.time() - started, 2), "steps": steps}
