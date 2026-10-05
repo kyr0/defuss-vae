@@ -264,6 +264,21 @@ start stop restart status log: ; @echo "∅ $@: no service"
 
 `make status` then answers "no service" instead of failing on a missing target, and the `var/`, `tmp/` and `.env` ignore checks stay on. The layout check suggests this line when the verbs are missing. `CONFIG["layout"]=False` would also silence it, but it drops those ignore checks, so treat it as a last resort.
 
+## Speed
+
+The gate adds about a tenth of a second to your own suites. Measured with `make bench`, 0.5.1 release installed into a small consumer project, medians of 7 runs, Apple M4, macOS 15.7.3, Python 3.14.3, 2026-10-05:
+
+| What | Median |
+|---|---|
+| PreToolUse hook on a command that isn't a commit (runs before every Bash call) | 19 ms (Python startup alone: 16 ms) |
+| SessionStart hook | 55 ms |
+| Gate with nothing changed since its last run (the review and docs loop) | 92 ms |
+| Gate after a page edit, with the suites already green | 92 ms |
+| Stop hook, and the commit check, on a cached gate | 84 to 86 ms |
+| Gate cold, running the project's suites | 397 ms, of which 307 ms are the project's own lint, test, coverage and e2e |
+
+So on a cold run the gate's own share is about 90 ms; the rest is your suites, which the gate runs once per code change and then caches. Most of a cached run is five `git` subprocesses. In this repository, `make bench` reproduces the numbers into `output/bench.json`.
+
 ## Enforcement boundary
 
 `VERIFIED:` hooks prove command results, fingerprints, layout and commit gating, and the e2e suite drives the released zip's own hook adapter to show it.

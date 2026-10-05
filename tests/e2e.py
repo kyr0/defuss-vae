@@ -2,7 +2,8 @@
 """Dogfood e2e: install the release zip like a user and drive only its shipped entrypoints
 (CLI + hook adapter) against a fresh consumer project — never the source tree. Evidence → output/e2e.json.
 
-`--bench` reuses the same installed copy to time the gate cold (runs the suite) vs cached (review/docs loop)."""
+`--bench` reuses the same installed copy to time the hooks and the gate (cold, cached, pages only) against the
+consumer's own suites, so the gate's overhead is the difference. Evidence -> output/bench.json."""
 from __future__ import annotations
 
 import json
@@ -119,6 +120,49 @@ def fingerprint(text: str) -> str:
     return m.group(1)
 
 
+def timed(fn, n: int = 7) -> dict:
+    """Median, min and max wall time of n calls, in milliseconds."""
+    samples = []
+    for i in range(n):
+        t0 = time.perf_counter()
+        fn(i)
+        samples.append((time.perf_counter() - t0) * 1000)
+    samples.sort()
+    return {"median_ms": round(samples[n // 2], 1), "min_ms": round(samples[0], 1), "max_ms": round(samples[-1], 1), "n": n}
+
+
+def benchmark(root: Path, proj: Path, zip_name: str) -> dict:
+    """Gate and hook latency on the installed release; the consumer's own suites are timed apart to isolate overhead."""
+    def cmd(c: str) -> dict:
+        return {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": c}}
+
+    base = (proj / "calc.py").read_text()
+
+    def cold(i: int) -> None:  # a new fingerprint each time: the full verify runs
+        (proj / "calc.py").write_text(base + f"\n# bench {i} {time.time_ns()}\n")
+        gate(root, proj)
+
+    def pages(i: int) -> None:  # code unchanged since the last green suite: only the page checks run
+        (proj / "README.md").write_text(f"# calc\n\nAdds two numbers ({i} {time.time_ns()}).\n")
+        gate(root, proj)
+
+    result = {
+        "python3_startup": timed(lambda i: run([PY, "-c", "pass"], proj)),
+        "hook.pretooluse.other_command": timed(lambda i: hook(root, proj, cmd("ls -la"))),
+        "hook.session_start": timed(lambda i: hook(root, proj, {"hook_event_name": "SessionStart", "source": "startup"})),
+        "project_suites": timed(lambda i: [run(["make", "-s", v], proj) for v in ("lint", "test", "coverage", "e2e")]),
+        "gate.cold_verify": timed(cold),
+        "gate.cached": timed(lambda i: gate(root, proj)),
+        "hook.stop.cached": timed(lambda i: hook(root, proj, {"hook_event_name": "Stop", "stop_hook_active": False})),
+        "hook.pretooluse.commit": timed(lambda i: hook(root, proj, cmd("git " + "commit -am x"))),
+        "gate.pages_only": timed(pages),
+    }
+    result["gate.cold_overhead_ms"] = round(result["gate.cold_verify"]["median_ms"] - result["project_suites"]["median_ms"], 1)
+    result["zip"] = zip_name
+    (Path("output") / "bench.json").write_text(json.dumps(result, indent=2) + "\n")
+    return result
+
+
 def main() -> int:
     zip_path = Path(sys.argv[1]).resolve()
     bench = "--bench" in sys.argv
@@ -137,14 +181,7 @@ def main() -> int:
         edit_feature(proj)
 
         if bench:
-            timings = {}
-            for label in ("cold_verify", "cached_1", "cached_2"):
-                t0 = time.perf_counter()
-                gate(root, proj)
-                timings[label] = round(time.perf_counter() - t0, 3)
-            result = {"gate_seconds": timings, "zip": zip_path.name}
-            (out_dir / "bench.json").write_text(json.dumps(result, indent=2) + "\n")
-            print(json.dumps(result))
+            print(json.dumps(benchmark(root, proj, zip_path.name)))
             return 0
 
         blocked = hook(root, proj, {"hook_event_name": "Stop", "stop_hook_active": False})

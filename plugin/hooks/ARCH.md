@@ -13,7 +13,8 @@ The adapter reads the event, dispatches on `hook_event_name`, and prints the res
 ## Operations
 
 - **Timeouts:** 10 s for SessionStart and PreToolUse, 600 s for Stop, which may run the project's suites.
-- **Reliability:** fail closed. Any exception becomes a commit denial or one Stop block naming the error; input that is not JSON is ignored, since there is nothing to gate.
+- **Latency:** PreToolUse returns before loading the gate when a command does not contain `commit`: 19 ms per Bash call against 16 ms for Python startup alone; SessionStart 55 ms; Stop on a cached gate 86 ms (`make bench`, Apple M4).
+- **Reliability:** fail closed. Any exception, including a gate module that fails to import, becomes a commit denial or one Stop block naming the error; input that is not JSON is ignored, since there is nothing to gate.
 - **Observability:** the gate text the agent receives is the trace; the gate writes its own logs and state (see `../scripts/`).
 
 ## Security and privacy
