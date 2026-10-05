@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.1
 
 - Rules: CI runs async; after a push the agent reports the run URL and finishes instead of waiting for CI.
 
