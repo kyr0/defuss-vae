@@ -6,7 +6,12 @@ from pathlib import Path
 
 from vae_hooks import RULES_TEXT
 from vae_repo import PLUGIN_ROOT, run, walk_files
-from vae_state import STATE_BUDGET, ensure_from_template, memory_entries
+from vae_state import (
+    STATE_BUDGET,
+    ensure_from_template,
+    episode_entries,
+    memory_entries,
+)
 from vae_verify import (
     BASE_IGNORES,
     GITIGNORE,
@@ -74,6 +79,45 @@ def init_project(repo: Path, template_root: Path = PLUGIN_ROOT) -> list[str]:
     return changed
 
 
+# A repo-relative path with a directory part, optionally followed by `:line|symbol`.
+PATH_REF = re.compile(r"(?<![\w./<-])((?:[\w.-]+/)+[\w.-]+)(?=[:,;\s)`'\"]|$)")
+
+
+def memory_sources(repo: Path) -> list[tuple[str, str]]:
+    """(file, entry) for every agent memory entry, and every AGENTS.md bullet outside the managed block."""
+    out = [(f".agents/{n}", e) for n in STATE_BUDGET for e in memory_entries(repo / ".agents" / n)]
+    out += [(".agents/EPISODES.md", e) for e in episode_entries(repo)]
+    agents = repo / "AGENTS.md"
+    if agents.exists():
+        text = agents.read_text("utf-8", errors="replace")
+        if MANAGED_START in text and MANAGED_END in text:
+            text = text[:text.index(MANAGED_START)] + text[text.index(MANAGED_END) + len(MANAGED_END):]
+        out += [("AGENTS.md", ln) for ln in text.splitlines() if ln.lstrip().startswith("- ")]
+    return out
+
+
+def check_stale(repo: Path) -> Check:
+    """Entries citing repo paths that no longer exist: candidates for the finalize audit, never a verdict.
+
+    WHY conservative: only paths whose first segment exists at the repo root count, so prose like "agent/human" and
+    paths relative to another folder are not flagged; a missing path proves the entry needs a look, not that it is wrong."""
+    roots = {p.name for p in repo.iterdir()}
+    stale = []
+    for src, entry in memory_sources(repo):
+        for ref in PATH_REF.findall(entry):
+            if "*" in ref or ref.split("/", 1)[0] not in roots or (repo / ref).exists():
+                continue
+            stale.append(f"{src}: {ref} ({entry[:70]})")
+    stale = list(dict.fromkeys(stale))
+    nxt = None
+    if stale:
+        nxt = (f"AUDIT in finalize per {PLUGIN_ROOT}/references/CONSOLIDATION.md: rewrite to the new location, delete only "
+               "with evidence, keep and retag UNKNOWN when unsure")
+    return Check("state.stale", "agent memory cites only paths that exist", "VERIFIED", not stale,
+                 f"stale={stale[:10]}" + (f" (+{len(stale) - 10})" if len(stale) > 10 else "") if stale else "every cited path exists",
+                 required=False, next=nxt)
+
+
 def doctor_repo(repo: Path) -> list[Check]:
     """Deterministic memory hygiene: loadable policy, bounded + epistemically tagged state, layout."""
     init_cmd = f"RUN: python3 {PLUGIN_ROOT}/scripts/vae.py init --repo {repo}"
@@ -92,5 +136,5 @@ def doctor_repo(repo: Path) -> list[Check]:
             f"bytes={size}" + (f"; untagged={untagged[:5]}" if untagged else ""),
             next=None if ok else f"CONSOLIDATE .agents/{name}: merge, delete stale|derivable lines, tag every entry",
         ))
-    checks += [check_layout(repo), check_gitignore(repo, config), check_wiring(repo, config)]
+    checks += [check_stale(repo), check_layout(repo), check_gitignore(repo, config), check_wiring(repo, config)]
     return checks

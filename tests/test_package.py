@@ -67,6 +67,8 @@ class PackageTests(unittest.TestCase):
             self.assertIn(token, review)
         for token in ("../../references/PROSE.md", "Page rules first", "Mermaid", "mermaid-cli", "prose --repo . --fix", "NOT a character swap", "THEN ask, NOT invent"):
             self.assertIn(token, docs)
+        for token in ("../../references/CONSOLIDATION.md", "IF unsure THEN keep + retag UNKNOWN", "NOT delete on age alone", "NOT delete human-written content"):
+            self.assertIn(token, finalize)
         for token in ("Conventional Commits 1.0.0", ".agents/MEMORY.md", ".agents/CLI_GIST.md", ".agents/EPISODES.md", "doctor --repo", "LESSON"):
             self.assertIn(token, finalize)
 

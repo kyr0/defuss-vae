@@ -70,6 +70,21 @@ class InitDoctorTests(RepoCase):
         memory.write_text("- VERIFIED[x] " + "y" * STATE_BUDGET["MEMORY.md"] + "\n")
         self.assertFalse(passes()["state.MEMORY.md"])
 
+    def test_doctor_lists_memory_that_cites_missing_paths_without_blocking(self):
+        init_project(self.repo, ROOT)
+        self.write("src/kept.py", "")
+        self.write(".agents/MEMORY.md", "# Agent memory\n- VERIFIED[a] `src/old.py:load` validates input\n"
+                   "- VERIFIED[b] src/kept.py stays pure; agent/human split; see ../../references/X.md and src/*.py\n")
+        with (self.repo / "AGENTS.md").open("a") as f:
+            f.write("\n- Run src/gone.sh before release.\n")
+        stale = next(c for c in doctor_repo(self.repo) if c.id == "state.stale")
+        self.assertTrue(stale.passes() and stale.value is False, "a candidate list, never a blocker")
+        self.assertIn(".agents/MEMORY.md: src/old.py", stale.evidence)
+        self.assertIn("AGENTS.md: src/gone.sh", stale.evidence)
+        for fine in ("src/kept.py", "agent/human", "references/X.md", "src/*.py"):
+            self.assertNotIn(f": {fine} ", stale.evidence, fine)
+        self.assertIn("references/CONSOLIDATION.md", stale.next)
+
 
 @unittest.skipUnless(shutil.which("make"), "make not installed")
 class MakefileTemplateTests(unittest.TestCase):

@@ -17,12 +17,10 @@ CLI = `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py` (other hosts: plugin root =
 3. **Partition by causal concern.** EVERY commit independently understandable|revertible AND leaves the repo coherent. Separate unrelated feat|fix|refactor|test|build; a regression test stays with the behavior it proves unless project convention differs. Conventional Commits 1.0.0: `type(scope): imperative description`; `feat` feature, `fix` bug fix, also `refactor|perf|test|docs|build|ci|chore`; `!`|`BREAKING CHANGE:` only for actual breaking API|behavior.
 4. **Commit implementation groups.** Stage exact paths|hunks; inspect staged diff before each commit. NOT `git add -A` IF unrelated changes exist. NOT `--no-verify`; NOT rewrite published history.
 5. **Init state.** `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py init --repo .` → missing `.agents/*`, `Makefile`, default `.gitignore` lines, managed `AGENTS.md` block; never overwrites.
-6. **Consolidate memory; replace stale, NOT append-only.** Hierarchy: test|`VERIFY.py` rule > MEMORY line > EPISODES line.
-   - `CHANGELOG.md`: concise `Unreleased` user-visible changes; keep project format.
-   - `.agents/MEMORY.md`: one tagged line per durable decision|invariant|constraint NOT derivable from code|git|docs; delete superseded lines.
-   - `.agents/EPISODES.md`: gate writes `FAIL|DONE|FINDING`; add ≤1 `LESSON` line per falsified HYPOTHESIS|dead end|root cause not yet captured. IF a lesson recurs ≥2 THEN promote it (test|rule|MEMORY) AND delete its lines.
-   - `.agents/CLI_GIST.md`: shortest non-Makefile setup|dev|data|release commands; `VERIFIED` only IF observed success ELSE `UNKNOWN`; delete stale.
-   - `AGENTS.md`: preserve human content; managed block bounded; add only rules that prevent repeat mistakes.
+6. **Consolidate memory** per `../../references/CONSOLIDATION.md`; hierarchy test|`VERIFY.py` rule > MEMORY line > EPISODES line. `CHANGELOG.md`: concise `Unreleased` user-visible changes.
+   - Audit EVERY `.agents/MEMORY.md`|`.agents/CLI_GIST.md`|`.agents/EPISODES.md` entry (`LESSON` lines too) + agent-added `AGENTS.md` rule against current code|tests|commands; `doctor --repo .` lists entries citing missing paths.
+   - delete|rewrite only BC evidence: contradicted, superseded by test|rule, derivable, target moved|removed, duplicate. IF unsure THEN keep + retag UNKNOWN; NOT delete on age alone; NOT delete human-written content, propose it.
+   - Report EVERY removal|rewrite + its evidence.
 7. **Check state.** CLI `doctor --repo .` → budgets, epistemic tags, layout. IF production|test code changed during finalize THEN gate before the next commit.
 8. **Commit metadata** coherently (`docs(...)`|`chore(...)`). Final `git status` = only intentionally untouched unrelated changes; NOT call it clean IF such remain.
 9. **Report** ordered SHAs|messages, exact verification commands|results, remaining UNKNOWN, intentionally uncommitted paths. NOT push unless requested.

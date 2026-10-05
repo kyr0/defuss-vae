@@ -99,6 +99,8 @@ Best elements combined:
 - Anthropic long-horizon guidance: filesystem/git are persistent state; durable agent state should be structured and corrected, not an append-only diary.
 - Episodic → semantic consolidation: the gate writes a bounded episode log for free; finalize promotes recurring lessons to tests, rules or MEMORY lines and deletes the episodes. Memory and CLI gist are injected at session start under byte budgets that `doctor --repo` enforces.
 
+- Evidence-based forgetting: memory is injected into every session, so an outdated entry misleads every agent after it, while a wrongly deleted lesson is lost silently. Finalize audits every entry against the current repo and deletes or rewrites only with evidence (contradicted, superseded by a test or rule, derivable, moved or removed target, duplicate); an unsure entry is kept and retagged `UNKNOWN`, age alone is never a reason, and human-written `AGENTS.md` content is only proposed for change. `doctor --repo` lists entries that cite missing paths as candidates. The procedure lives in `references/CONSOLIDATION.md` and is read on demand, so the skill stays within budget.
+
 Result: finalize creates a reconstructable history plus minimal durable state, without pushing or rewriting history implicitly.
 
 ## Deliberate exclusions

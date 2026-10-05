@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- finalize: audits every memory, episode and agent-added AGENTS.md entry against the current repo and removes or rewrites one only with evidence; unsure entries stay, retagged `UNKNOWN`; human-written content is only proposed for change. Procedure in `references/CONSOLIDATION.md`.
+- doctor: non-blocking `state.stale` lists memory entries that cite repo paths which no longer exist.
+- Fix: the gate logs each distinct finding once; a review carried across fingerprints had re-logged its findings (71 of 100 episode entries in this repository).
+
 ## 0.5.2
 
 - Hooks: PreToolUse returns before loading the gate for a command that cannot be a commit, cutting the cost per Bash call from 35 ms to 19 ms (Apple M4). A gate module that fails to import now denies the commit instead of crashing the hook.

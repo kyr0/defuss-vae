@@ -33,7 +33,8 @@ def repo_from(raw: str) -> Path:
 
 def doctor_plugin() -> list[str]:
     required = [ROOT / p for p in ("plugin.json", ".claude-plugin/plugin.json", ".codex-plugin/plugin.json",
-                                   "hooks/hooks.json", "hooks/lifecycle.py", "references/VAE-DIALECT.md", "references/PROSE.md")]
+                                   "hooks/hooks.json", "hooks/lifecycle.py", "references/VAE-DIALECT.md", "references/PROSE.md",
+                                   "references/CONSOLIDATION.md")]
     required += [ROOT / "templates" / n for n in ("VERIFY.py", "MEMORY.md", "CLI_GIST.md", "EPISODES.md", "Makefile", "verify.yml",
                                                    "README.md.tmpl", "ARCH.md.tmpl", "package.json.tmpl")]
     required += [ROOT / "skills" / n / "SKILL.md" for n in SKILLS]
