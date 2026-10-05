@@ -4,6 +4,7 @@ from __future__ import annotations
 import dataclasses
 import fnmatch
 import importlib.util
+import json
 import re
 import subprocess
 from collections.abc import Iterable
@@ -12,24 +13,34 @@ from typing import Any
 
 from vae_prose import Finding, fix, scan
 from vae_repo import (
+    MANIFESTS,
     PLUGIN_ROOT,
     SOURCE_EXT,
     code_fingerprint,
     dirty_paths,
     find_test_files,
+    is_arch_source,
     is_code,
     is_doc,
+    is_interface,
+    is_library,
     make_graph,
     make_reach,
     now_iso,
     run,
     runtime_dir,
     safe_name,
+    stacks,
+    walk_files,
 )
 
 # Markers of toolchains new projects must not start on (bun for JS/TS, uv for Python instead).
 FOREIGN_LOCKS = {"package-lock.json": "npm", "npm-shrinkwrap.json": "npm", "yarn.lock": "yarn", "pnpm-lock.yaml": "pnpm",
                  "poetry.lock": "poetry", "Pipfile.lock": "pipenv", "pdm.lock": "pdm", "requirements.txt": "pip"}
+# The manifest a lockfile belongs to: tracked in HEAD means an existing project on that toolchain, not a new one.
+NATIVE_LOCKS = {"package.json": ("bun.lock", "bun.lockb"), "pyproject.toml": ("uv.lock",)}
+LOCK_MANIFEST = {"package-lock.json": "package.json", "npm-shrinkwrap.json": "package.json", "yarn.lock": "package.json",
+                 "pnpm-lock.yaml": "package.json", "poetry.lock": "pyproject.toml", "pdm.lock": "pyproject.toml", "Pipfile.lock": "Pipfile"}
 MAKE_TARGETS = ("setup", "start", "stop", "status", "log", "metrics", "bench", "test", "coverage", "lint", "e2e", "verify")
 # What `make verify` (= CI) must run; the gate runs them one by one, so a hollow `verify` would pass locally only.
 VERIFY_VERBS = ("lint", "test", "coverage", "e2e")
@@ -50,9 +61,16 @@ BUILTIN_RULES = [{
 # `dir/*` (not `dir/`) ignores contents but not the dir, so `!input/<file>` can still commit an e2e fixture.
 GITIGNORE = {".env": ".env", ".venv/x": ".venv/", "__pycache__/x": "__pycache__/", ".pytest_cache/x": ".pytest_cache/",
              ".ruff_cache/x": ".ruff_cache/", "node_modules/x": "node_modules/", "x.pyc": "*.pyc",
-             "var/x": "var/*", "tmp/x": "tmp/*", "output/x": "output/*", "input/x": "input/*", ".DS_Store": ".DS_Store"}
-# The layout check requires only what protects runtime state and secrets; the rest are defaults.
+             "var/x": "var/*", "tmp/x": "tmp/*", "output/x": "output/*", "input/x": "input/*", ".DS_Store": ".DS_Store",
+             "dist/x": "dist/", "coverage/x": "coverage/", ".coverage": ".coverage", ".cache/x": ".cache/"}
+# Required: secrets, runtime state, consumer output and build artifacts always; caches and package folders per toolchain.
 LAYOUT_IGNORES = ("var/x", "tmp/x", ".env")
+BUILD_IGNORES = ("output/x", "dist/x")
+BASE_IGNORES = (".env", "var/x", "tmp/x", "output/x", "input/x", ".DS_Store", "dist/x")
+STACK_IGNORES = {
+    "js": ("node_modules/x", "coverage/x", ".cache/x"),
+    "python": (".venv/x", "__pycache__/x", "x.pyc", ".pytest_cache/x", ".ruff_cache/x", ".coverage"),
+}
 # Direct env var reads (JS/TS, Python, Go, Rust); escapes keep this source from matching itself. OS-provided names are exempt.
 ENV_REF = re.compile(r"""(?:process\.env\.|Bun\.env\.|import\.meta\.env\.|process\.env\[["']|os\.environ\[["']|"""
                      r"""os\.environ\.get\(\s*["']|os\.(?:getenv|Getenv)\(\s*["']|env::var\(\s*")([A-Z][A-Z0-9_]*)""")
@@ -251,6 +269,35 @@ def tree_state(root: Path) -> dict[str, tuple[int, int]]:
             for p in (root.rglob("*") if root.is_dir() else ()) if p.is_file() for s in (p.stat(),)}
 
 
+def stack_ignores(files: Iterable[str], config: dict[str, Any], base: Iterable[str]) -> list[str]:
+    """Ignore probes for `base` plus every detected toolchain, minus CONFIG["gitignore_exempt"] lines."""
+    exempt = set(config.get("gitignore_exempt") or [])
+    probes = list(base) + [p for s in sorted(stacks(files)) for p in STACK_IGNORES[s]]
+    return [p for p in probes if GITIGNORE[p] not in exempt]
+
+
+def strict(config: dict[str, Any]) -> bool:
+    """Checks added in 0.5.0 warn until 0.6.0 unless CONFIG["strict"] is True.
+
+    WHY: they fail existing repos on their next gate run; a warning release lets projects catch up (`init`, templates)
+    instead of blocking them mid-task."""
+    return bool(config.get("strict", False))
+
+
+def check_gitignore(repo: Path, config: dict[str, Any], files: list[str] | None = None) -> Check:
+    """Build output and each present toolchain's caches and package folders are gitignored."""
+    ignored = ignored_probes(repo)
+    required = stack_ignores(walk_files(repo) if files is None else files, config, BUILD_IGNORES)
+    gaps = [GITIGNORE[probe] for probe in required if probe not in ignored]
+    nxt = None
+    if gaps:
+        nxt = (f"RUN: python3 {PLUGIN_ROOT}/scripts/vae.py init --repo {repo} (appends {', '.join(gaps)} to .gitignore); "
+               "a project that must commit one (e.g. a built dist/ for a GitHub Action): CONFIG['gitignore_exempt']")
+    return Check("gitignore", "build output, caches and package folders of every toolchain present are gitignored", "VERIFIED",
+                 not gaps, "gaps=" + ",".join(gaps) if gaps else "build output, caches and package folders ignored",
+                 required=strict(config), next=nxt)
+
+
 def check_layout(repo: Path) -> Check:
     graph = make_graph(repo)
     verbs = [t for t in MAKE_TARGETS if t not in graph]
@@ -294,14 +341,18 @@ def check_toolchain(repo: Path, changed: Iterable[str]) -> Check:
             continue
         if f.name == "requirements.txt" and ((repo / "uv.lock").exists() or (f.parent / "uv.lock").exists()):
             continue  # `uv export` output beside a uv lock is fine
-        if run(["git", "cat-file", "-e", f"HEAD:{rel}"], repo, timeout=5, shell=False).returncode != 0:
+        manifest, folder = LOCK_MANIFEST.get(f.name), Path(rel).parent
+        native = NATIVE_LOCKS.get(manifest or "", ())
+        if manifest and tracked(repo, str(folder / manifest)) and not any(tracked(repo, str(folder / n)) for n in native):
+            continue  # an existing project on that toolchain, only its lockfile was never committed; a bun|uv project stays one
+        if not tracked(repo, rel):
             new.append(f"{rel}({FOREIGN_LOCKS[f.name]})")
     return Check(
         "toolchain", "new (sub)projects start on bun (JS/TS) or uv (Python)", "VERIFIED", not new,
         f"newly introduced foreign lockfiles={new}" if new else "no npm/yarn/pnpm/poetry/pipenv/pdm/pip lockfile introduced",
         next=None if not new else (
-            f"IF new (sub)project THEN delete {', '.join(new)} and start on `bun install` | `uv init` + `uv add` "
-            "ELSE ask the human to commit the existing lockfile OR set .agents/VERIFY.py CONFIG['toolchain']=False"
+            f"new (sub)project: delete {', '.join(new)} and start it on `bun install` | `uv init` + `uv add` yourself; "
+            "keeping the foreign toolchain for a new project is the human's decision (then CONFIG['toolchain']=False)"
         ),
     )
 
@@ -380,7 +431,122 @@ def check_prose(repo: Path, pages: list[str], config: dict[str, Any]) -> Check:
     return Check("prose", claim, "VERIFIED", not found, f"pages={len(pages)}" + (f"; hits={hits[:20]}" if hits else ""), next=nxt)
 
 
-def verify(repo: Path, changed_paths: list[str] | None = None) -> VerifyReport:
+def tracked(repo: Path, rel: str) -> bool:
+    return run(["git", "cat-file", "-e", f"HEAD:{rel}"], repo, timeout=5, shell=False).returncode == 0
+
+
+def package_gaps(pkg: dict[str, Any], new: bool, foreign: str | None, cfg: dict[str, Any]) -> list[str]:
+    """Missing defaults of one package.json. An existing package (tracked in HEAD) only needs additive metadata.
+
+    WHY: type, build tool and linter are migrations for a legacy package (CJS consumers, eslint config), so they are
+    required of new packages and proposed for old ones, the same policy as the toolchain check."""
+    gaps = [k for k in ("description", "license", "author") if not pkg.get(k)]
+    manager = str(pkg.get("packageManager") or "")
+    want = cfg.get("manager", "bun")
+    if not manager and want:  # a falsy CONFIG manager drops the requirement
+        gaps.append(f"packageManager ({FOREIGN_LOCKS[foreign] if foreign else want}@<version>)")
+    elif want and not foreign and not manager.startswith(f"{want}@"):
+        gaps.append(f"packageManager={manager!r}, expected {want}@<version>")
+    if "TODO(" in json.dumps(pkg):
+        gaps.append("template placeholder TODO(...) left")
+    if not new:
+        return gaps
+    if cfg.get("type", "module") and pkg.get("type") != cfg.get("type", "module"):
+        gaps.append(f"type={cfg.get('type', 'module')!r}")
+    dev = {**(pkg.get("dependencies") or {}), **(pkg.get("devDependencies") or {})}
+    scripts = pkg.get("scripts") or {}
+    lint = cfg.get("lint", "oxlint")
+    if lint and lint not in dev:
+        gaps.append(f"devDependency {lint} (bun add -d {lint})")
+    if lint == "oxlint" and any("oxlint" in str(s) and "--deny-warnings" not in str(s) for s in scripts.values()):
+        gaps.append("oxlint script without --deny-warnings (plain oxlint exits 0 on findings)")
+    build = cfg.get("library_build", "pkgroll")
+    library = is_library(pkg)
+    if build and library and (build not in dev or build not in str(scripts.get("build", ""))):
+        gaps.append(f"library build via {build} (devDependency + scripts.build)")
+    return gaps
+
+
+def check_package(repo: Path, changed: Iterable[str], config: dict[str, Any]) -> Check:
+    """Every changed package.json carries the JS/TS defaults. CONFIG["package"]: {"manager", "type", "lint",
+    "library_build"} (a falsy value drops that requirement) or False."""
+    claim = "changed package.json files declare manager, metadata, module type, linter and library build"
+    cfg = config.get("package", {})
+    if cfg is False:
+        return Check("package", claim, "VERIFIED", True, "disabled by CONFIG['package']=False", required=False)
+    cfg = cfg if isinstance(cfg, dict) else {}
+    gaps: list[str] = []
+    for rel in (p for p in changed if Path(p).name == "package.json" and is_code(p) and (repo / p).is_file()):
+        try:
+            pkg = json.loads((repo / rel).read_text("utf-8"))
+        except (OSError, ValueError) as e:
+            gaps.append(f"{rel}: unreadable ({e})")
+            continue
+        folder = (repo / rel).parent
+        foreign = next((n for n in ("package-lock.json", "yarn.lock", "pnpm-lock.yaml") if (folder / n).is_file()), None)
+        gaps += [f"{rel}: {g}" for g in package_gaps(pkg if isinstance(pkg, dict) else {}, not tracked(repo, rel), foreign, cfg)]
+    nxt = None
+    if gaps:
+        nxt = (f"EDIT package.json (template {PLUGIN_ROOT}/templates/package.json.tmpl; app: drop exports/files/build); "
+               "an existing package keeps its module type, build and linter unless the human approves migrating")
+    return Check("package", claim, "VERIFIED", not gaps, f"gaps={gaps[:20]}" if gaps else "package.json defaults present",
+                 required=strict(config), next=nxt)
+
+
+def coverage_chain(repo: Path, folder: str) -> list[str]:
+    """`folder` and its ancestors up to the nearest one holding a package manifest, else up to the root."""
+    chain, d = [], Path(folder)
+    while True:
+        chain.append(str(d))
+        if str(d) == "." or any((repo / d / m).is_file() for m in MANIFESTS):
+            return chain
+        d = d.parent
+
+
+def uncovered(repo: Path, folders: Iterable[str], page: str) -> list[str]:
+    """Where `page` is missing: a page covers its folder and every folder below it up to the next package manifest.
+
+    WHY: one page per leaf folder (every component directory) is sprawl that goes stale; a package is the unit that
+    ships, deploys and is documented on its own, so it is the boundary that needs its own page."""
+    out = set()
+    for d in folders:
+        chain = coverage_chain(repo, d)
+        if not any((repo / c / page).is_file() for c in chain):
+            out.add(str(Path(chain[-1]) / page))
+    return sorted(out)
+
+
+def page_folders(changed: Iterable[str], keep: Any, cfg: Any) -> list[str]:
+    """Folders of changed files that `keep` selects, minus CONFIG globs; empty when the CONFIG key is False."""
+    if cfg is False:
+        return []
+    exclude = (cfg.get("exclude") or []) if isinstance(cfg, dict) else []
+    folders = sorted({str(Path(p).parent) for p in changed if keep(p)})
+    return [d for d in folders if not any(fnmatch.fnmatchcase(d, g) for g in exclude)]
+
+
+def check_doc_pages(repo: Path, changed: Iterable[str], config: dict[str, Any]) -> Check:
+    """README.md at the root and beside every changed interface (CLI, API); ARCH.md beside changed production code.
+
+    WHY the root always: the layout requires a root Makefile, the project's developer interface. WHY changed folders
+    only: like the glob rules, the policy reaches legacy folders as they are touched instead of failing an existing
+    repo at once. CONFIG["readme"] and CONFIG["arch"]: {"exclude": [folder globs]} or False."""
+    changed = [p for p in changed if (repo / p).is_file()]  # a deleted file or folder needs no page
+    readme = {"."} | set(page_folders(changed, lambda p: is_interface(repo, p), config.get("readme", {})))
+    missing = uncovered(repo, readme, "README.md") + uncovered(repo, page_folders(changed, is_arch_source, config.get("arch", {})), "ARCH.md")
+    tpl = PLUGIN_ROOT / "templates"
+    nxt = None
+    if missing:
+        nxt = (f"WRITE {', '.join(missing)} from {tpl}/README.md.tmpl | {tpl}/ARCH.md.tmpl (only VERIFIED facts): README = how to use "
+               "that folder's CLI|API; ARCH.md = why + how of its architecture, NOT a copy of README|docs; "
+               "a folder that needs neither: CONFIG['readme'|'arch']['exclude']")
+    return Check("docs.pages", "README.md covers the root and every changed CLI|API; ARCH.md covers every changed production folder", "VERIFIED",
+                 not missing, f"missing={missing[:20]}" if missing else "README.md + ARCH.md present", required=strict(config), next=nxt)
+
+
+def verify(repo: Path, changed_paths: list[str] | None = None, suites: bool = True) -> VerifyReport:
+    """All checks for the changed paths. `suites=False` (or a change of pages only) runs just the page checks and
+    project rules: the gate uses it when code already passed and only pages changed since."""
     repo = repo.resolve()
     if changed_paths is None:
         changed_paths = sorted(dirty_paths(repo))
@@ -391,9 +557,10 @@ def verify(repo: Path, changed_paths: list[str] | None = None) -> VerifyReport:
     verifier, config, rules = check_verifier(repo, "verifier.config")
     checks.append(verifier)
     timeout = int(config.get("timeout_s", 180))
+    checks.append(check_doc_pages(repo, changed_paths, config))
     if doc_paths:
         checks.append(check_prose(repo, doc_paths, config))
-    if doc_paths and not code_paths:
+    if not suites or (doc_paths and not code_paths):
         # WHY prose-only: a page edit cannot change what lint, tests or e2e prove; rerunning the suites for a typo
         # would only make the gate slower. Project rules still run, so page-specific invariants hold.
         checks += [run_custom_rule(r, repo, timeout, (), doc_paths) if isinstance(r, dict) else invalid_rule(r) for r in rules]
@@ -401,11 +568,14 @@ def verify(repo: Path, changed_paths: list[str] | None = None) -> VerifyReport:
     coverage_min = float(config.get("coverage_min", 60.0))
     if config.get("layout", True):
         checks.append(check_layout(repo))
+    files = walk_files(repo)  # one walk for the ignore and test checks
+    checks.append(check_gitignore(repo, config, files))
     checks.append(check_wiring(repo, config))
     if config.get("toolchain", True):
         checks.append(check_toolchain(repo, code_paths))
     checks.append(check_env(repo, code_paths))
-    tests = find_test_files(repo)
+    checks.append(check_package(repo, code_paths, config))
+    tests = find_test_files(repo, files)
     checks.append(Check(
         "tests.exist", "repository has tests", "VERIFIED", bool(tests),
         f"count={len(tests)}" + (f"; sample={tests[:5]}" if tests else ""),
@@ -489,6 +659,7 @@ def render_checks(checks: list[Check], evidence_max: int = 1200) -> list[str]:
     lines: list[str] = []
     proven: list[str] = []
     remains: list[str] = []
+    warns: list[str] = []
     nexts: list[str] = []
     for c in checks:
         val = "=?" if c.value is None else ("=true" if c.value else "=false")
@@ -498,10 +669,14 @@ def render_checks(checks: list[Check], evidence_max: int = 1200) -> list[str]:
             proven.append(c.id)
         elif c.required:
             remains.append(c.id)
+        elif c.value is not True:
+            warns.append(c.id)
         if c.next:
             nexts.append(c.next)
     lines.append("PROVEN: " + (", ".join(proven) or "∅"))
     lines.append("REMAINS: " + (", ".join(remains) or "∅"))
+    if warns:
+        lines.append("WARNS: " + ", ".join(warns) + " (non-blocking until 0.6.0; fix now, or CONFIG['strict']=True to block)")
     lines += ["AGENT_CMD: " + n for n in dict.fromkeys(nexts)] or ["AGENT_CMD: ∅"]
     return lines
 

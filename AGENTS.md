@@ -7,7 +7,7 @@ This repository implements defuss-vae itself. `plugin/` is exactly what users in
 - Hook behavior is correctness-critical; test fail-closed behavior, fingerprint invalidation, and Claude Code's once-per-turn Stop block against the current hooks docs.
 - Tests use real git repos, processes and files; no mocks or monkeypatching. `plugin/scripts/` modules import only lower layers (`vae_repo` → `vae_prose` → `vae_verify` → `vae_state` → `vae_gate` → `vae_hooks` → `vae_project`); tests mirror them.
 - Keep each runtime `SKILL.md` <5.5 KiB and the pack <21.5 KiB; move provenance/background/examples to `docs/` or `plugin/references/`.
-- Skill changes must preserve human-only invocation and the self-contained Signan core; `plugin/references/SIGNAN.md` is canonical for the full dialect. Uppercase in skill prose is operators/tags only (tested).
+- Skill changes must preserve human-only invocation and the self-contained VAE-DIALECT core; `plugin/references/VAE-DIALECT.md` is canonical for the full dialect. Uppercase in skill prose is operators/tags only (tested).
 - Plugin code never contains the literal probe tag (tested); build it from parts, as `vae_verify.PROBE_TAG` does.
 - `implement` must retain Ponytail's understand-first + root-cause + YAGNI/reuse/stdlib/native/dependency/minimum-code discipline.
 - Documentation explains WHY, with `VERIFIED:`, `HYPOTHESIS:`, `UNKNOWN:` for material claims.

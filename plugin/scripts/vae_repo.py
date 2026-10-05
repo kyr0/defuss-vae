@@ -26,6 +26,13 @@ ENGINEERING_EXT = SOURCE_EXT | {
 }
 TEST_EXT = SOURCE_EXT
 DOC_EXT = {".md", ".mdx", ".markdown"}
+# Architecture definitions besides production source: deployment, infrastructure, schemas, service contracts.
+ARCH_NAMES = {"Dockerfile", "Containerfile", "docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"}
+ARCH_EXT = {".tf", ".sql", ".proto", ".graphql", ".gql"}
+# A folder holding one of these is a package: the boundary where README.md and ARCH.md coverage restarts.
+MANIFESTS = {"package.json", "pyproject.toml", "Cargo.toml", "go.mod", "setup.py", "pom.xml", "build.gradle", "build.gradle.kts"}
+# Folders that illustrate or exercise the architecture instead of being part of it.
+NON_ARCH_DIRS = {"fixtures", "examples", "example", "samples", "demo", "demos", "docs", "__snapshots__"}
 CODE_CONFIG = {
     "package.json", "pyproject.toml", "setup.py", "setup.cfg", "tox.ini", "pytest.ini",
     "go.mod", "go.sum", "Cargo.toml", "Cargo.lock", "bun.lock", "bun.lockb", "uv.lock",
@@ -147,12 +154,73 @@ def is_code(path: str) -> bool:
     p = Path(path)
     if not in_scope(path):
         return False
-    return p.suffix.lower() in ENGINEERING_EXT or p.name in CODE_CONFIG or p.name in {"Dockerfile", "Containerfile", "docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"}
+    return p.suffix.lower() in ENGINEERING_EXT or p.name in CODE_CONFIG or p.name in ARCH_NAMES
 
 
 def is_doc(path: str) -> bool:
     # WHY Markdown only: the static prose checks parse fences, links and Mermaid blocks, which only Markdown defines.
     return in_scope(path) and Path(path).suffix.lower() in DOC_EXT
+
+
+def outside_arch(path: str) -> bool:
+    """Tests, fixtures, examples, docs and hidden directories (`.github/`, `.claude-plugin/`): never architecture."""
+    parts = Path(path).parts[:-1]
+    return is_test(path) or any(p.startswith(".") or p.lower() in NON_ARCH_DIRS for p in parts)
+
+
+def is_arch_source(path: str) -> bool:
+    """Production code or an architecture definition: its folder needs an ARCH.md. Pure config and data do not."""
+    p = Path(path)
+    if not in_scope(path) or outside_arch(path):
+        return False
+    return is_production_source(path) or p.name in ARCH_NAMES or p.suffix.lower() in ARCH_EXT
+
+
+def is_interface(repo: Path, path: str) -> bool:
+    """An asset someone calls: a CLI (executable with a shebang, `__main__.py`, package `bin`) or an API
+    (public package manifest, OpenAPI|proto|GraphQL definition). Its folder needs a README.md.
+
+    WHY manifests and shebangs, not source scanning: they are how registries and shells find an interface, so they
+    decide without guessing frameworks; an HTTP server without a spec gets a README via a `file_exists` rule."""
+    p, f = Path(path), repo / path
+    if not in_scope(path) or outside_arch(path) or not f.is_file():
+        return False
+    if p.name == "package.json":
+        try:
+            pkg = json.loads(f.read_text("utf-8"))
+        except (OSError, ValueError):
+            return False
+        return isinstance(pkg, dict) and (bool(pkg.get("bin")) or is_library(pkg))
+    if p.name == "pyproject.toml":
+        return "[project]" in f.read_text("utf-8", errors="replace")
+    if p.name in {"Cargo.toml", "go.mod", "setup.py", "__main__.py"} or p.suffix.lower() in {".proto", ".graphql", ".gql"}:
+        return True
+    if p.name.lower().startswith(("openapi.", "swagger.")):
+        return True
+    if not os.access(f, os.X_OK):
+        return False
+    with f.open("rb") as fh:
+        return fh.read(2) == b"#!"
+
+
+def is_library(pkg: dict[str, Any]) -> bool:
+    """A package.json that publishes an API: not private and declares an entry point."""
+    return not pkg.get("private") and any(k in pkg for k in ("exports", "main", "module"))
+
+
+def stacks(files: Iterable[str]) -> set[str]:
+    """Toolchains the project's own files use. WHY in_scope and no hidden dirs: `.agents/VERIFY.py` is defuss-vae's
+    policy, not the project's code, and would make every initialized repo look like a Python project."""
+    found = set()
+    for f in files:
+        p = Path(f)
+        if not in_scope(f) or any(part.startswith(".") for part in p.parts[:-1]):
+            continue
+        if p.name in {"package.json", "bun.lock", "bun.lockb"}:
+            found.add("js")
+        elif p.suffix == ".py" or p.name in {"pyproject.toml", "uv.lock"}:
+            found.add("python")
+    return found
 
 
 def is_gated(path: str) -> bool:
@@ -198,8 +266,8 @@ def walk_files(repo: Path, limit: int = 50000) -> list[str]:
     return out
 
 
-def find_test_files(repo: Path) -> list[str]:
-    return [p for p in walk_files(repo) if is_test(p) and Path(p).suffix.lower() in TEST_EXT]
+def find_test_files(repo: Path, files: list[str] | None = None) -> list[str]:
+    return [p for p in (walk_files(repo) if files is None else files) if is_test(p) and Path(p).suffix.lower() in TEST_EXT]
 
 
 # Rule lines only (`a b: deps`, `a::`); `:=` and `::=` assignments are excluded by the lookahead.

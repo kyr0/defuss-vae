@@ -1,4 +1,4 @@
-"""Package contracts: manifests, skill budgets, Signan discipline, probe-tag hygiene."""
+"""Package contracts: manifests, skill budgets, VAE-DIALECT discipline, probe-tag hygiene."""
 from __future__ import annotations
 
 import ast
@@ -14,9 +14,9 @@ from vae_verify import PROBE_TAG
 
 class PackageTests(unittest.TestCase):
     SKILLS = ("plan", "implement", "review", "docs", "finalize")
-    # Uppercase tokens that are identifiers or record keys, not Signan operators.
+    # Uppercase tokens that are identifiers or record keys, not VAE-DIALECT operators.
     NAMES = frozenset({"VERIFIED", "HYPOTHESIS", "UNKNOWN", "YAGNI", "REPL", "API", "JS", "TS", "ISO", "UTC", "RED", "GREEN", "REFACTOR", "MEMORY",
-             "AGENTS", "VERIFY", "EPISODES", "CLI", "GIST", "CHANGELOG", "SIGNAN", "PRIOR_ART", "DECISION", "PLAN",
+             "AGENTS", "VERIFY", "EPISODES", "CLI", "GIST", "CHANGELOG", "README", "VAE", "DIALECT", "PRIOR_ART", "DECISION", "PLAN",
              "UNCOMMITTED", "REMAINS", "FAIL", "DONE", "FINDING", "LESSON", "BREAKING", "CHANGE", "AGENT_CMD", "CLAUDE_PLUGIN_ROOT",
              "CLAUDE_SESSION_ID", "CONFIG", "RULES"})
     OPERATORS = frozenset({"NOT", "AND", "OR", "IF", "THEN", "ELSE", "WHEN", "CAUSES", "SAYS", "BC", "EVERY", "SOME", "ONE", "REQUIRES", "MAY"})
@@ -35,10 +35,10 @@ class PackageTests(unittest.TestCase):
         self.assertEqual((REPO / market["plugins"][0]["source"]).resolve(), ROOT)
         self.assertEqual((ROOT / "LICENSE").read_text(), (REPO / "LICENSE").read_text())
 
-    def test_skills_are_human_only_and_define_signan(self):
+    def test_skills_are_human_only_and_define_the_dialect(self):
         for name in self.SKILLS:
             text = self.skill(name)
-            for token in ("disable-model-invocation: true", "## Signan core", "VERIFIED", "HYPOTHESIS", "UNKNOWN", "IF … THEN … ELSE", "../../references/SIGNAN.md"):
+            for token in ("disable-model-invocation: true", "## VAE-DIALECT core", "VERIFIED", "HYPOTHESIS", "UNKNOWN", "IF … THEN … ELSE", "../../references/VAE-DIALECT.md"):
                 self.assertIn(token, text, name)
 
     def test_skill_frontmatter_is_strict_yaml(self):
@@ -48,9 +48,9 @@ class PackageTests(unittest.TestCase):
                 value = line.split(": ", 1)[1]
                 self.assertTrue(": " not in value or value[0] == value[-1] == '"', f"{name}: quote {line!r}")
 
-    def test_skills_use_signan_operators_strictly(self):
+    def test_skills_use_dialect_operators_strictly(self):
         for name in self.SKILLS:
-            body = self.skill(name).split("## Signan core")[0].split("---", 2)[2]
+            body = self.skill(name).split("## VAE-DIALECT core")[0].split("---", 2)[2]
             body = re.sub(r"(?s)```.*?```|`[^`]*`", "", body)  # prose only; code spans hold identifiers
             words = set(re.findall(r"\b[A-Z][A-Z_]{1,}\b", body))
             self.assertEqual(words - self.OPERATORS - self.NAMES, set(), f"{name}: uppercase non-operators")
@@ -70,8 +70,8 @@ class PackageTests(unittest.TestCase):
         for token in ("Conventional Commits 1.0.0", ".agents/MEMORY.md", ".agents/CLI_GIST.md", ".agents/EPISODES.md", "doctor --repo", "LESSON"):
             self.assertIn(token, finalize)
 
-    def test_signan_reference_defines_every_operator(self):
-        text = (ROOT / "references/SIGNAN.md").read_text()
+    def test_dialect_reference_defines_every_operator(self):
+        text = (ROOT / "references/VAE-DIALECT.md").read_text()
         for token in self.OPERATORS | {"→", "∅", "P=?", "A REQUIRES B"}:
             self.assertIn(token, text)
 

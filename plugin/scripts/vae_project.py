@@ -5,15 +5,19 @@ import re
 from pathlib import Path
 
 from vae_hooks import RULES_TEXT
-from vae_repo import PLUGIN_ROOT, run
+from vae_repo import PLUGIN_ROOT, run, walk_files
 from vae_state import STATE_BUDGET, ensure_from_template, memory_entries
 from vae_verify import (
+    BASE_IGNORES,
     GITIGNORE,
     Check,
+    check_gitignore,
     check_layout,
     check_verifier,
     check_wiring,
     ignored_probes,
+    load_project_verifier,
+    stack_ignores,
 )
 
 MANAGED_START = "<!-- defuss-vae:start -->"
@@ -54,7 +58,10 @@ def init_project(repo: Path, template_root: Path = PLUGIN_ROOT) -> list[str]:
     ignored = ignored_probes(repo)
     gi = repo / ".gitignore"
     text = gi.read_text("utf-8") if gi.exists() else ""
-    add = [line for probe, line in GITIGNORE.items() if probe not in ignored]
+    config = load_project_verifier(repo)[0]
+    # WHY detected stacks only. VERIFIED: (test_project) a Python repo gets no node_modules/ line, and an exempt dist/
+    # (a committed build) is never appended.
+    add = [GITIGNORE[probe] for probe in stack_ignores(walk_files(repo), config, BASE_IGNORES) if probe not in ignored]
     if add:
         gi.write_text(text + ("\n" if text and not text.endswith("\n") else "") + "\n".join(add) + "\n", "utf-8")
         changed.append(".gitignore")
@@ -85,5 +92,5 @@ def doctor_repo(repo: Path) -> list[Check]:
             f"bytes={size}" + (f"; untagged={untagged[:5]}" if untagged else ""),
             next=None if ok else f"CONSOLIDATE .agents/{name}: merge, delete stale|derivable lines, tag every entry",
         ))
-    checks += [check_layout(repo), check_wiring(repo, config)]
+    checks += [check_layout(repo), check_gitignore(repo, config), check_wiring(repo, config)]
     return checks

@@ -12,6 +12,7 @@ from vae_repo import (
     changed_since,
     code_fingerprint,
     file_hash,
+    is_code,
     is_doc,
     is_gated,
     is_production_source,
@@ -115,7 +116,10 @@ def validate_docs(path: Path, fp: str, changed_paths: list[str], repo: Path | No
 VERIFY_NEXT = (
     "NEXT: fix the lowest causal failure; rerun only needed scope. IF cause=? THEN probe before editing "
     f"(smallest discriminating observation; temporary lines tagged `{PROBE_TAG}`). "
-    "IF a new deterministic failure class is not yet encoded THEN add a test OR .agents/VERIFY.py rule. NOT claim VERIFIED from inference."
+    "IF a new deterministic failure class is not yet encoded THEN add a test OR .agents/VERIFY.py rule. NOT claim VERIFIED from inference.\n"
+    "HARNESS: a FAIL is your work, NOT a reason to end the turn or hand off: apply the failing check's fix yourself, then rerun LOOP. "
+    "NOT propose bypassing the gate (`! git commit`, `--no-verify`, a `CONFIG` switch that disables a check) as the way out. "
+    "ONLY IF a check's fix says the decision is the human's THEN ask for exactly that decision with its options, after fixing everything else."
 )
 
 
@@ -131,7 +135,8 @@ def review_instruction(fp: str, path: Path, changed: list[str], plugin_root: Pat
         "defuss-vae GATE 2/3 review: REQUIRED (verify=VERIFIED). Do NOT invoke a skill.\n"
         "Review requirements|plan + current diff + EVERY changed code path + relevant callers|callees|tests.\n"
         "PASS1 requirements, correctness, error paths, state|concurrency|resources, security, API|schema compat, "
-        "tests (real subsystems in isolation, NOT mocks), e2e (consumes the built artifact; web frontend → Playwright browser with WebGL2|network|permissions it needs), observability (no leftover probe|debug spam; logs ISO-8601 UTC first + level).\n"
+        "tests (real subsystems in isolation, NOT mocks, NOT live|production data; every public behavior + its main error path), "
+        "e2e (consumes the built artifact; EVERY page|route|screen|component of a UI at least once in a real Playwright browser with WebGL2|network|permissions it needs; EVERY CLI command|API endpoint at least once), observability (no leftover probe|debug spam; logs ISO-8601 UTC first + level).\n"
         "PASS2 structure + Ponytail: separated concerns in small testable modules; delete|reuse → stdlib → native → installed dependency → minimum code; NOT duplicate machinery, speculative config|abstraction, unmeasured optimization.\n"
         "Actionable finding REQUIRES location + causal evidence + minimal fix; fix EVERY one. "
         "IF recurrence mechanically checkable THEN regression test OR .agents/VERIFY.py rule ELSE learning.status=UNKNOWN + why.\n"
@@ -194,31 +199,45 @@ def gate(repo: Path, session_id: str, plugin_root: Path = PLUGIN_ROOT) -> Gate:
         return Gate(True, "VERIFIED[gate]=true BC ∅ code|doc changes since session baseline")
     bootstrap(repo, plugin_root)
     fp = code_fingerprint(repo, code)
+    code_key = verify_key(repo, code_fingerprint(repo, [p for p in code if is_code(p)]))
+    pages_key = verify_key(repo, code_fingerprint(repo, [p for p in code if is_doc(p)]))
     loop = (f"LOOP: python3 {plugin_root}/scripts/vae.py gate --repo {repo} --session {session_id} "
             "→ repeat until VERIFIED[gate]=true; git commit stays denied until then.")
-    # WHY cache: fingerprint + policy hashes identify the verified content, so review/docs loop turns skip re-running suites.
-    if state.get("verified_key") != verify_key(repo, fp):
-        report = verify(repo, changed)
+    # WHY two cache keys: code + policy hashes decide whether the suites must run again, pages + policy whether the page
+    # checks must; a README typo after a green suite reruns only the prose check, and review/docs loops rerun nothing.
+    code_ok = state.get("verified_key") == code_key or not any(is_code(p) for p in code)
+    if not code_ok or state.get("pages_key") != pages_key:
+        report = verify(repo, changed, suites=not code_ok)
         if not report.verified:
-            state["verified_fp"] = state["verified_key"] = None
+            state["verified_fp"] = state["pages_key"] = None
+            if not code_ok:  # a page failure leaves the green suites cached
+                state["verified_key"] = None
             failing = ",".join(c.id + ("=?" if c.status != "VERIFIED" else "") for c in report.checks if not c.passes())
             if state.get("last_fail") != failing:
                 append_episodes(repo, session_id, [f"FAIL {failing}"], plugin_root)
                 state["last_fail"] = failing
             write_json(sp, state)
             return Gate(False, bounded(repo, session_id, "defuss-vae GATE 1/3 verify: FAIL\n" + render_report(report) + "\n" + VERIFY_NEXT + "\n" + loop))
-        cov = next((c.metric for c in report.checks if c.id == "coverage"), None)
-        state.update(verified_fp=fp, verified_key=verify_key(repo, fp), last_fail=None, coverage=cov)
+        cov = next((c.metric for c in report.checks if c.id == "coverage"), state.get("coverage"))
+        # Merged per check: a page-only rerun replaces only the warnings of the checks it ran.
+        old = state.get("warns") if isinstance(state.get("warns"), dict) else {}
+        ran = {c.id for c in report.checks}
+        warns = {k: v for k, v in old.items() if k not in ran}
+        warns.update({c.id: c.next or c.evidence for c in report.checks if not c.required and c.value is not True})
+        state.update(verified_fp=fp, verified_key=code_key, pages_key=pages_key, last_fail=None, coverage=cov, warns=warns)
+    # The review and docs texts are what the agent reads after verify, so warnings ride on them and on the green text.
+    warns = state.get("warns") if isinstance(state.get("warns"), dict) else {}
+    note = "".join(f"\nWARNS {k}: {v}" for k, v in sorted(warns.items())) + ("\n(non-blocking until 0.6.0; fix now)" if warns else "")
     rp = attestation_path(repo, session_id, "review")
     ok, why = validate_review(rp, fp, changed)
     if not ok:
         write_json(sp, state)
-        return Gate(False, bounded(repo, session_id, review_instruction(fp, rp, changed, plugin_root) + f"\nSTATE: {why}\n" + loop))
+        return Gate(False, bounded(repo, session_id, review_instruction(fp, rp, changed, plugin_root) + f"\nSTATE: {why}{note}\n" + loop))
     dp = attestation_path(repo, session_id, "docs")
     ok, why = validate_docs(dp, fp, changed, repo)
     if not ok:
         write_json(sp, state)
-        return Gate(False, bounded(repo, session_id, docs_instruction(fp, dp, changed) + f"\nSTATE: {why}\n" + loop))
+        return Gate(False, bounded(repo, session_id, docs_instruction(fp, dp, changed) + f"\nSTATE: {why}{note}\n" + loop))
     if state.get("completed_fp") != fp:
         state["completed_fp"] = fp
         cov = state.get("coverage")
@@ -230,4 +249,4 @@ def gate(repo: Path, session_id: str, plugin_root: Path = PLUGIN_ROOT) -> Gate:
             entries.append(f"FINDING {f.get('location')} learn={learning.get('kind')}: {lesson}")
         append_episodes(repo, session_id, entries, plugin_root)
     write_json(sp, state)
-    return Gate(True, f"VERIFIED[gate]=true BC verify+review+docs@fp={fp[:12]}")
+    return Gate(True, f"VERIFIED[gate]=true BC verify+review+docs@fp={fp[:12]}{note}")

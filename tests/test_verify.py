@@ -22,7 +22,10 @@ from vae_repo import is_code, make_graph, make_reach, run
 from vae_verify import (
     NO_SERVICE_STUB,
     PROBE_TAG,
+    check_doc_pages,
+    check_gitignore,
     check_layout,
+    check_package,
     check_wiring,
     parse_coverage,
     remedy,
@@ -138,6 +141,59 @@ class VerifyTests(RepoCase):
         self.assertIn("docs/a.md:1 T02 em dash", p.stdout)
         self.write("docs/a.md", '"Hi"... now, later\n')
         self.assertIn("VERIFIED[prose]=true", sh(f"{PY} {ROOT}/scripts/vae.py prose --repo {self.repo}", self.repo).stdout)
+
+    def test_doc_pages_follow_interfaces_and_production_code_only(self):
+        self.make_python_project()  # root README.md + ARCH.md cover every folder up to the next package manifest
+        files = {
+            "src/components/button/x.py": "x = 1\n", "infra/main.tf": "", "tests/test_x.py": "", "examples/demo.py": "",
+            "config/app.yaml": "", "data/a.csv": "", ".github/workflows/ci.yml": "", "docs/guide.md": "",
+            "tools/cli.sh": "#!/bin/sh\necho hi\n", "tests/e2e.py": "#!/usr/bin/env python3\n",
+            "packages/lib/package.json": '{"name": "l", "exports": "./dist/index.js"}', "packages/lib/src/index.ts": "",
+            "apps/web/package.json": '{"private": true}', "apps/web/src/main.ts": "",
+        }
+        for rel, text in files.items():
+            self.write(rel, text)
+        for rel in ("tools/cli.sh", "tests/e2e.py"):
+            os.chmod(self.repo / rel, 0o755)
+        c = check_doc_pages(self.repo, list(files), {})
+        self.assertEqual(c.evidence, "missing=['packages/lib/README.md', 'apps/web/ARCH.md', 'packages/lib/ARCH.md']",
+                         "a package restarts coverage; everything else is covered by the root pages")
+        self.assertFalse(c.required, "warning-first until 0.6.0")
+        self.assertTrue(check_doc_pages(self.repo, list(files), {"strict": True}).required)
+        self.write("packages/lib/src/README.md", "x")
+        self.assertIn("packages/lib/README.md", check_doc_pages(self.repo, list(files), {}).evidence, "a page below the boundary does not cover it")
+        (self.repo / "ARCH.md").unlink()
+        self.assertIn("'ARCH.md'", check_doc_pages(self.repo, ["src/components/button/x.py"], {}).evidence, "missing pages are named at the boundary")
+        cfg = {"readme": {"exclude": ["packages/*"]}, "arch": {"exclude": ["apps/*", "packages/*"]}}
+        self.assertTrue(check_doc_pages(self.repo, ["packages/lib/package.json", "packages/lib/src/index.ts", "apps/web/src/main.ts"], cfg).value)
+        self.assertTrue(check_doc_pages(self.repo, ["gone/old.py"], {}).value, "a deleted folder needs no page")
+        (self.repo / "README.md").unlink()
+        self.assertEqual(check_doc_pages(self.repo, ["calc.py"], {"readme": False, "arch": False}).evidence, "missing=['README.md']", "the root always")
+
+    def test_package_json_defaults_for_new_packages_and_metadata_for_existing_ones(self):
+        self.make_python_project()
+        gaps = lambda rel="package.json", cfg={}: check_package(self.repo, [rel], cfg).evidence
+        self.write("package.json", '{"name": "x", "exports": "./dist/index.js", "scripts": {"lint": "oxlint ."}}')
+        for gap in ("description", "license", "author", "packageManager (bun@<version>)", "type='module'",
+                    "devDependency oxlint", "oxlint script without --deny-warnings", "library build via pkgroll"):
+            self.assertIn(gap, gaps())
+        tpl = (ROOT / "templates/package.json.tmpl").read_text()
+        self.write("package.json", tpl)
+        self.assertIn("template placeholder TODO(...) left", gaps())
+        self.write("package.json", tpl.replace("TODO(", "filled ("))
+        self.assertTrue(check_package(self.repo, ["package.json"], {}).value, gaps())
+        # An existing CJS package on npm keeps its module type, build and linter; only metadata is required.
+        self.write("legacy/package.json", '{"name": "l", "main": "index.js", "packageManager": "npm@10.9.0"}')
+        self.write("legacy/package-lock.json", "{}")
+        self.commit_all("legacy")
+        self.assertEqual(gaps("legacy/package.json"), "gaps=['legacy/package.json: description', 'legacy/package.json: license', 'legacy/package.json: author']")
+        self.assertTrue(check_package(self.repo, ["legacy/package.json"], {"package": False}).value)
+        self.write("legacy/package.json", '{"name": "l", "description": "d", "license": "MIT", "author": "a"}')
+        self.commit_all("legacy-meta")
+        self.assertTrue(check_package(self.repo, ["legacy/package.json"], {"package": {"manager": None}}).value)
+        self.assertIn("packageManager (npm@<version>)", gaps("legacy/package.json"), "an npm package is asked for npm, not a migration")
+        (self.repo / "legacy/package.json").unlink()
+        self.assertTrue(check_package(self.repo, ["legacy/package.json"], {}).value, "a deleted manifest is not 'unreadable'")
 
     def test_template_mock_rule_catches_mocks_but_not_itself(self):
         namespace = runpy.run_path(str(ROOT / "templates/VERIFY.py"))
@@ -255,7 +311,7 @@ class VerifyTests(RepoCase):
         self.assertEqual(make_reach(make_graph(self.repo), "verify"), {"ci", "lint", "test", "coverage", "e2e"})
 
     def test_library_without_service_keeps_layout_with_one_stub_line(self):
-        self.write(".gitignore", "var/*\ntmp/*\n.env\n")
+        self.write(".gitignore", "var/*\ntmp/*\n.env\noutput/*\ndist/\n")
         self.write("Makefile", "setup metrics bench lint test coverage e2e:\n\t@true\nverify: lint test coverage e2e\n")
         c = check_layout(self.repo)
         self.assertEqual(c.evidence, "gaps=Makefile:start,Makefile:stop,Makefile:status,Makefile:log")
@@ -269,6 +325,52 @@ class VerifyTests(RepoCase):
         # An existing service verb is never redefined by the suggested line.
         self.write("Makefile", "setup metrics bench lint test coverage e2e verify log:\n\t@true\n")
         self.assertIn("`start stop restart status: ;", check_layout(self.repo).next)
+
+    def test_required_ignores_follow_the_toolchains_present(self):
+        self.write(".gitignore", "var/*\ntmp/*\n.env\noutput/*\n")
+        self.assertEqual(check_gitignore(self.repo, {}).evidence, "gaps=dist/")
+        self.write("app/package.json", "{}")
+        self.write("tool.py", "")
+        c = check_gitignore(self.repo, {})
+        for line in ("node_modules/", "coverage/", ".cache/", ".venv/", "__pycache__/", "*.pyc", ".pytest_cache/", ".ruff_cache/", ".coverage"):
+            self.assertIn(line, c.evidence)
+        self.assertTrue(c.passes() and not c.value, "a gap warns but does not block until 0.6.0")
+        self.assertFalse(check_gitignore(self.repo, {"strict": True}).passes())
+        self.assertIn("CONFIG['gitignore_exempt']", c.next)
+        self.write(".gitignore", "var/*\ntmp/*\n.env\noutput/*\nnode_modules/\ncoverage/\n.cache/\n.venv/\n__pycache__/\n*.pyc\n.pytest_cache/\n.ruff_cache/\n.coverage\n")
+        self.assertTrue(check_gitignore(self.repo, {"gitignore_exempt": ["dist/"]}).value, "a GitHub Action may commit dist/")
+        self.assertTrue(check_layout(self.repo).evidence.startswith("gaps=Makefile:"), "layout keeps its own required ignores only")
+
+    def test_defuss_vae_policy_file_does_not_make_a_repo_python(self):
+        self.write(".gitignore", "var/*\ntmp/*\n.env\noutput/*\ndist/\nnode_modules/\ncoverage/\n.cache/\n")
+        self.write("package.json", "{}")
+        self.write(".agents/VERIFY.py", "CONFIG = {}\n")
+        self.write(".github/scripts/release.py", "")
+        self.assertTrue(check_gitignore(self.repo, {}).value, check_gitignore(self.repo, {}).evidence)
+
+    def test_warnings_are_listed_but_do_not_block(self):
+        self.make_python_project()
+        report = verify(self.repo, ["calc.py"])
+        self.assertTrue(report.verified, render_report(report))
+        self.assertIn("WARNS: gitignore", render_report(report))
+
+    def test_existing_npm_project_with_an_untracked_lockfile_is_not_a_new_toolchain(self):
+        self.make_python_project()
+        self.write("web/package.json", '{"name": "w"}')
+        self.commit_all("web")
+        self.write("web/package-lock.json", "{}")
+        self.write("new/package.json", '{"name": "n"}')
+        self.write("new/package-lock.json", "{}")
+        c = self.check(verify(self.repo, ["web/package-lock.json", "new/package.json", "new/package-lock.json"]), "toolchain")
+        self.assertEqual(c.evidence, "newly introduced foreign lockfiles=['new/package-lock.json(npm)']",
+                         "a lockfile beside a tracked manifest is an existing project, so the agent never has to commit it first")
+        self.assertIn("yourself", c.next)
+        # A bun project stays one: a tracked bun.lock beside the manifest makes a new npm lockfile a toolchain switch.
+        self.write("bunapp/package.json", '{"name": "b"}')
+        self.write("bunapp/bun.lock", "{}")
+        self.commit_all("bunapp")
+        self.write("bunapp/package-lock.json", "{}")
+        self.assertIn("bunapp/package-lock.json(npm)", self.check(verify(self.repo, ["bunapp/package-lock.json"]), "toolchain").evidence)
 
     def test_layout_gaps_then_init_closes_them(self):
         self.make_python_project(layout=True)

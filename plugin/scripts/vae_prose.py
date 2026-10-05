@@ -44,9 +44,16 @@ PHRASES = [
 ]
 # Case-sensitive: "a todo app" is prose, `TODO` is a leftover.
 PLACEHOLDER = re.compile(r"\b(?:TODO|TBD|FIXME)\b|(?i:lorem ipsum)")
+# README.md and ARCH.md state only verified facts; an open hypothesis or unknown belongs in docs/ until it is settled.
+VERIFIED_ONLY = {"README.md", "ARCH.md"}
+# Label forms only: `UNKNOWN:` also inside a code span (where labels are usually written), VAE-DIALECT `HYPOTHESIS[x]` in
+# prose only (in a code span it quotes tool output). Naming a status ("counts as UNKNOWN") is not a claim.
+UNVERIFIED_LABEL = re.compile(r"\b(?:HYPOTHESIS|UNKNOWN):")
+UNVERIFIED_TAG = re.compile(r"\b(?:HYPOTHESIS|UNKNOWN)\[")
 FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
 INLINE_CODE = re.compile(r"(`+)(?:(?!\1).)+?\1")
-LINK = re.compile(r"!?\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+\"[^\"]*\")?\s*\)")
+# Any `](target)`: also reaches the outer target of a badge link `[![alt](img)](target)`.
+LINK = re.compile(r"\]\(\s*<?([^)\s>]+)>?(?:\s+\"[^\"]*\")?\s*\)")
 SCHEME = re.compile(r"^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|//|#)")
 WORD = re.compile(r"[^\W\d_]{2,}")
 SCRIPTS = ("LATIN", "CYRILLIC", "GREEK")
@@ -132,6 +139,9 @@ def scan(text: str, path: str = "", root: Path | None = None, allow: str = "", p
             hit = rx.search(prose)
             if hit:
                 add(n, rule, f"{why}: {hit.group()!r}")
+        hit = (UNVERIFIED_LABEL.search(line) or UNVERIFIED_TAG.search(prose)) if Path(path).name in VERIFIED_ONLY else None
+        if hit:
+            add(n, "B01", f"{hit.group()} claim in a verified-only page: verify it or move it to docs/")
         hit = PLACEHOLDER.search(prose)
         if hit:
             add(n, "T04", f"placeholder left in page: {hit.group()!r}")

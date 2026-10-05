@@ -23,7 +23,8 @@ class InitDoctorTests(RepoCase):
         first = init_project(self.repo, ROOT)
         self.assertEqual(set(first), {".agents/VERIFY.py", ".agents/EPISODES.md", ".agents/MEMORY.md", ".agents/CLI_GIST.md", "Makefile", ".gitignore", "AGENTS.md"})
         # `/tmp/` already covers tmp/*, so only the missing defaults are appended, in order.
-        self.assertEqual((self.repo / ".gitignore").read_text(), "/tmp/\n.env\n.venv/\n__pycache__/\n.pytest_cache/\n.ruff_cache/\nnode_modules/\n*.pyc\nvar/*\noutput/*\ninput/*\n.DS_Store\n")
+        self.assertEqual((self.repo / ".gitignore").read_text(), "/tmp/\n.env\nvar/*\noutput/*\ninput/*\n.DS_Store\ndist/\n",
+                         "no toolchain yet: base lines only; init adds each stack's lines once its files exist")
         text = (self.repo / "AGENTS.md").read_text()
         self.assertIn("Keep me.", text)
         self.assertIn(PROBE_TAG, text)
@@ -31,6 +32,16 @@ class InitDoctorTests(RepoCase):
         for token in ("real Playwright browser", "WebGL2", "--enable-unsafe-swiftshader", "grantPermissions", "real network"):
             self.assertIn(token, text)
         self.assertEqual(init_project(self.repo, ROOT), [])
+        # Stack lines arrive with the stack; an exempt line (a committed build) is never appended.
+        (self.repo / ".gitignore").write_text("/tmp/\n.env\nvar/*\noutput/*\ninput/*\n.DS_Store\n")
+        self.write("app.py", "")
+        with (self.repo / ".agents/VERIFY.py").open("a") as f:
+            f.write("CONFIG['gitignore_exempt'] = ['dist/']\n")
+        init_project(self.repo, ROOT)
+        text = (self.repo / ".gitignore").read_text()
+        self.assertIn(".venv/\n", text)
+        self.assertNotIn("dist/", text)
+        self.assertNotIn("node_modules/", text)
         self.assertEqual((self.repo / "AGENTS.md").read_text().count(MANAGED_START), 1)
 
     def test_ci_scaffold_needs_a_github_remote_and_never_duplicates(self):

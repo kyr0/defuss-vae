@@ -45,6 +45,12 @@ class ScanTests(unittest.TestCase):
         self.assertEqual(rules(f"{FENCE}mermaid\n---\ntitle: t\n---\nsequenceDiagram\n  A->>B: hi\n{FENCE}\n"), [])
         self.assertEqual(rules(f"{FENCE}mermaid\n{FENCE}\n"), [(1, "T07")])
 
+    def test_readme_and_arch_state_only_verified_facts(self):
+        text = "HYPOTHESIS: it scales; a gap counts as `UNKNOWN`.\n`UNKNOWN:` why.\nVERIFIED: tested; HYPOTHESIS[x] BC y\nPrints `UNKNOWN[metrics]` and exits 2.\n"
+        self.assertEqual([(f.line, f.rule) for f in scan(text, "src/ARCH.md")], [(1, "B01"), (2, "B01"), (3, "B01")])
+        self.assertEqual([(f.line, f.rule) for f in scan(text, "README.md")], [(1, "B01"), (2, "B01"), (3, "B01")])
+        self.assertEqual(rules(text), [], "other pages may carry open hypotheses")
+
     def test_project_phrases(self):
         self.assertEqual(rules("Ein bahnbrechendes Werkzeug.\n", phrases=[r"bahnbrechend\w*"]), [(1, "S02")])
 

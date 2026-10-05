@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- Renamed the engineering dialect from Signan to VAE-DIALECT; its spec moved from `references/SIGNAN.md` to `references/VAE-DIALECT.md`, and each skill's core section is now `## VAE-DIALECT core`.
+- Gate, warning until 0.6.0 (`CONFIG["strict"]=True` blocks now): `docs.pages` requires `README.md` at the root and for every package with a changed CLI or API (executable scripts, `__main__.py`, package manifests, API definitions), and `ARCH.md` for every package with changed production code or deployment and schema definitions. A page covers the folders below it up to the next package manifest. Templates `README.md.tmpl` (with badges) and `ARCH.md.tmpl`; exempt folders via `CONFIG["readme"|"arch"]["exclude"]`.
+- Prose check: `README.md` and `ARCH.md` state only verified facts; `HYPOTHESIS:`/`UNKNOWN:` labels there are findings.
+- Gate, warning until 0.6.0: `package` checks every changed `package.json`: `packageManager` (bun), description, license, author; new packages also `"type": "module"`, oxlint with `--deny-warnings`, and pkgroll for libraries. Template `package.json.tmpl`; configure or disable via `CONFIG["package"]`.
+- Gate, warning until 0.6.0: a new `gitignore` check wants `output/` and `dist/`, and the cache and package folders of each toolchain present (`node_modules/`, `coverage/`, `.cache/` for JS; `.venv/`, `__pycache__/`, `*.pyc`, `.pytest_cache/`, `.ruff_cache/`, `.coverage` for Python). `init` appends them; `CONFIG["gitignore_exempt"]` skips a line.
+- Fix: an existing npm, poetry or pipenv project with a never-committed lockfile no longer fails `toolchain`; a tracked manifest beside it marks the toolchain as existing, while a project with a tracked bun or uv lockfile still fails on a new foreign one. This removes a deadlock where the fix (commit the lockfile) was blocked by the commit gate.
+- Gate text: tells the agent to fix a failing check itself instead of ending the turn or proposing a bypass; the user-facing message on a repeat stop names the failing checks, the gate command and what to reply.
+- Rules: tests use throwaway real systems, never live or production data, with Pareto coverage; e2e reaches every UI page, route or component and every CLI command or API endpoint at least once.
+- Gate: suites are cached on code and policy, page checks on pages and policy, so a page edit after a green suite reruns only the page checks.
+- Session rules carry principles only; the failing check's hint carries the exact gaps and template.
+- Prose check: badge links (`[![alt](img)](target)`) have their outer target checked too.
+
 ## 0.4.0
 
 - Docs skill (`/defuss-vae:docs`): grounded claims, the universal prose catalog (`references/PROSE.md`), Mermaid for schematic content, page rules declared before writing.

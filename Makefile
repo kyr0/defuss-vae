@@ -19,7 +19,7 @@ start stop restart status log:
 	@echo "∅ $@: defuss-vae runs no service"
 
 metrics:  # runtime prompt budget: bytes per skill (each < 5500)
-	@wc -c $(PLUGIN)/skills/*/SKILL.md $(PLUGIN)/references/SIGNAN.md
+	@wc -c $(PLUGIN)/skills/*/SKILL.md $(PLUGIN)/references/VAE-DIALECT.md
 
 bench: dist  # gate latency on the installed release: cold verify vs cached review/docs loop
 	$(PYTHON) tests/e2e.py $(DIST) --bench

@@ -47,6 +47,8 @@ def consumer(root: Path, td: Path) -> Path:
         "import unittest\nfrom calc import add\n\n\nclass T(unittest.TestCase):\n"
         "    def test_add(self):\n        self.assertEqual(add(2, 3), 5)\n"
     )
+    (proj / "README.md").write_text("# calc\n\nAdds two numbers read from `input/pair.txt`.\n")
+    (proj / "ARCH.md").write_text("# Architecture: calc\n\nOne pure function, shipped as a zip; no network, no personal data.\n")
     (proj / "input").mkdir()
     (proj / "input/pair.txt").write_text("2 3\n")
     out = run([PY, str(root / "scripts/vae.py"), "init", "--repo", str(proj)], proj).stdout

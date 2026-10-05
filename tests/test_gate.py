@@ -63,8 +63,10 @@ class GateTests(RepoCase):
         self.attest(sid, fp, [finding])
         self.assertIn("GATE 3/3 docs", self.stop(sid)["reason"])
         self.attest_docs(sid, fp)
-        self.assertIsNone(self.stop(sid))
-        self.assertIsNone(self.stop(sid))
+        self.assertIn("WARNS gitignore:", gate(self.repo, sid, ROOT).text, "a green gate still shows warnings with their fix")
+        green = self.stop(sid)
+        self.assertEqual(set(green), {"systemMessage"}, "warnings never block the stop")
+        self.assertIn("warnings that block from 0.6.0: gitignore:", green["systemMessage"])
         self.assertIsNone(self.commit(sid))
         entries = episode_entries(self.repo)
         self.assertEqual(sum(" DONE " in e for e in entries), 1, entries)
@@ -78,6 +80,7 @@ class GateTests(RepoCase):
         out = self.stop(sid)
         self.assertIn("GATE 1/3 verify: FAIL", out["reason"])
         self.assertIn("README.md:1 T02", out["reason"])
+        self.assertIn("HARNESS: a FAIL is your work, NOT a reason to end the turn", out["reason"])
         self.assertEqual(self.commit(sid)["hookSpecificOutput"]["permissionDecision"], "deny")
         self.write("README.md", "Fast, really.\n")
         reason = self.stop(sid)["reason"]
@@ -104,6 +107,8 @@ class GateTests(RepoCase):
         # Stop decision/additionalContext both continue the turn; only user-facing systemMessage may remain.
         self.assertEqual(set(out), {"systemMessage"})
         self.assertIn("GATE 2/3 review", out["systemMessage"])
+        self.assertIn(f"gate --repo {self.repo} --session s2", out["systemMessage"])
+        self.assertIn("Agent: fix the failing check yourself", out["systemMessage"])
         self.assertEqual(self.commit("s2")["hookSpecificOutput"]["permissionDecision"], "deny")
 
     def test_verification_is_cached_by_fingerprint_and_policy(self):
@@ -121,6 +126,26 @@ class GateTests(RepoCase):
             f.write("# policy edit\n")
         gate(self.repo, "s3", ROOT)
         self.assertEqual(runs(), 3)
+
+    def test_page_edit_after_green_suite_reruns_only_page_checks(self):
+        self.make_python_project(test_command=f"echo run >> runs.txt && {TEST_CMD}")
+        init_session(self.repo, "s3b")
+        self.write("calc.py", "def add(a, b):\n    return b + a\n")
+        runs = lambda: (self.repo / "runs.txt").read_text().count("run")
+        gate(self.repo, "s3b", ROOT)
+        self.assertEqual(runs(), 1)
+        self.write("README.md", "# calc\n\nAdds numbers \u2014 fast.\n")
+        g = gate(self.repo, "s3b", ROOT)
+        self.assertIn("README.md:3 T02", g.text, "the page is still checked")
+        self.assertEqual(runs(), 1, "but the suites do not rerun for it")
+        self.write("README.md", "# calc\n\nAdds numbers, fast.\n")
+        review = gate(self.repo, "s3b", ROOT).text
+        self.assertIn("GATE 2/3 review", review)
+        self.assertIn("WARNS gitignore:", review, "a page-only rerun keeps the warnings of checks it did not run")
+        self.assertEqual(runs(), 1)
+        self.write("calc.py", "def add(a, b):\n    return a + b + 0\n")
+        gate(self.repo, "s3b", ROOT)
+        self.assertEqual(runs(), 2, "a code edit reruns the suites")
 
     def test_failures_logged_once_per_distinct_set(self):
         self.make_python_project()

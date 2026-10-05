@@ -1,4 +1,4 @@
-# Signan engineering dialect
+# VAE-DIALECT
 
 Purpose: minimum-token technical text that is still uniquely decodable, for agent output and for defuss-vae's own skill prompts. Compression never outranks correctness.
 
@@ -38,11 +38,11 @@ Semantics:
 
 Preserve every material proposition/referent plus scope, polarity, modality, quantification, attribution, comparison, causality, order, context, numbers, units, code, notation, and requested verbatim text. Unsupported meaning stays lexical/conventional prose. Never compress code, commands, identifiers, paths, commit messages, or quotations.
 
-Before emitting compressed text, mentally expand it. IF expansion is not unique OR semantic loss > negligible THEN use the shortest longer form that is unique. User-requested format overrides Signan.
+Before emitting compressed text, mentally expand it. IF expansion is not unique OR semantic loss > negligible THEN use the shortest longer form that is unique. User-requested format overrides VAE-DIALECT.
 
 ## Instruction pattern
 
-defuss-vae skills are written in Signan: one imperative clause per line or bullet; conditions `IF … THEN … ELSE`; prohibitions `NOT`; ladders `→`; priorities `>`; exact commands, paths and identifiers in backticks. A persona line or quoted rule MAY stay verbatim prose.
+defuss-vae skills are written in VAE-DIALECT: one imperative clause per line or bullet; conditions `IF … THEN … ELSE`; prohibitions `NOT`; ladders `→`; priorities `>`; exact commands, paths and identifiers in backticks. A persona line or quoted rule MAY stay verbatim prose.
 
 ## Engineering output pattern
 

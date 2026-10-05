@@ -26,15 +26,23 @@ def stop_gate(event: dict[str, Any], plugin_root: Path = PLUGIN_ROOT) -> dict[st
     repo = git_root(Path(event.get("cwd") or os.getcwd()).resolve())
     if not repo:
         return None
-    g = gate(repo, str(event.get("session_id") or "unknown"), plugin_root)
+    sid = str(event.get("session_id") or "unknown")
+    g = gate(repo, sid, plugin_root)
     if g.done:
-        return None
+        warns = [ln[len("WARNS "):] for ln in g.text.splitlines() if ln.startswith("WARNS ")]
+        # Non-blocking: a systemMessage ends the turn normally; the agent already saw these in the review|docs text.
+        return {"systemMessage": "defuss-vae: gate green; warnings that block from 0.6.0: " + "; ".join(warns)} if warns else None
     # VERIFIED: (hooks reference, checked 2026-10-05) Stop additionalContext continues the turn like a block, so
     # answering stop_hook_active with it re-invoked the model until the 8-continuation cap. Block once per turn; later
     # stops only tell the human (systemMessage) that the gate is open. The commit gate stays closed either way.
     if event.get("stop_hook_active"):
         head = g.text.splitlines()[0]
-        return {"systemMessage": f"defuss-vae: turn ended with the gate open ({head}); git commit stays denied until vae.py gate reports VERIFIED[gate]=true."}
+        remains = next((ln for ln in g.text.splitlines() if ln.startswith("REMAINS:")), "")
+        return {"systemMessage": (
+            f"defuss-vae: turn ended with the gate open ({head}{'; ' + remains if remains else ''}). git commit stays denied until "
+            f"`python3 {plugin_root}/scripts/vae.py gate --repo {repo} --session {sid}` reports "
+            "VERIFIED[gate]=true. Agent: fix the failing check yourself and rerun the gate; do not bypass it. "
+            "Human: reply \"continue\" to let the agent fix it, or answer the one decision it asked you for.")}
     return {"decision": "block", "reason": g.text}
 
 
@@ -76,13 +84,13 @@ def deny(reason: str) -> dict[str, Any]:
 RULES_TEXT = f"""Skills `plan` `implement` `review` `finalize` are human-triggered only; never auto-invoke them. Outside skills write plain concise prose.
 Evidence > assumption: IF a runtime fact is unknown THEN observe before editing (read → existing test/command → smallest discriminating probe → ask). Temporary probe lines carry `{PROBE_TAG}` and the gate rejects leftovers; read logs bounded (`make log`, tail, grep); no log spraying.
 Layout: `.agents/` agent state; `Makefile` verbs setup start stop status log metrics bench test coverage lint e2e verify; services only via `make start` → `var/log/<svc>.stdout|.stderr`, `tmp/<svc>.pid` (gitignored); programs read `input/`, write `output/` (both gitignored; commit e2e fixtures via `!input/<file>`).
-test = real subsystems in isolation, no mocks; e2e = build the publishable artifact and consume it like a user; a web frontend's e2e drives the built app, served via `make start`, in a real Playwright browser (`bun add -d playwright` + `bunx playwright install --with-deps chromium` | `uv add --dev playwright` + `uv run playwright install --with-deps chromium`) with what the app needs enabled: WebGL2 (GPU-less CI: launch args `--use-angle=swiftshader --enable-unsafe-swiftshader`), real network, permissions via `context.grantPermissions([...])` (Python `grant_permissions`); assert rendered output, fail on console errors and failed requests, and write the report (`outputDir`) to `output/`. The gate fails closed without `.agents/VERIFY.py`, any verb, or `verify` running lint test coverage e2e, and when e2e leaves no fresh file in `output/`. A library without a service keeps the layout: `init` adds the ignores and one Makefile line `start stop restart status log: ; @echo "∅ $@: no service"` covers the service verbs; never disable `layout` for that. lint = `uv run ruff check .` (Python) | `bunx oxlint --deny-warnings` (JS/TS; plain oxlint exits 0 on findings). verify = lint + test + coverage + e2e; CI on a GitHub remote is `.github/workflows/verify.yml` running `make setup` then `make verify`.
+test = real subsystems in isolation (a throwaway database|queue|filesystem|local server process instead of a mock), never live|production data or services; coverage is Pareto: every public behavior + its main error path, not every line (gate floor 60%); e2e = build the publishable artifact and consume it like a user, covering EVERY page|route|screen|component of a UI and EVERY CLI command|API endpoint at least once; a web frontend's e2e drives the built app, served via `make start`, in a real Playwright browser (`bun add -d playwright` + `bunx playwright install --with-deps chromium` | `uv add --dev playwright` + `uv run playwright install --with-deps chromium`) with what the app needs enabled: WebGL2 (GPU-less CI: launch args `--use-angle=swiftshader --enable-unsafe-swiftshader`), real network, permissions via `context.grantPermissions([...])` (Python `grant_permissions`); assert rendered output, fail on console errors and failed requests, and write the report (`outputDir`) to `output/`. The gate fails closed without `.agents/VERIFY.py`, any verb, or `verify` running lint test coverage e2e, and when e2e leaves no fresh file in `output/`. A library without a service keeps the layout: `init` adds the ignores and one Makefile line `start stop restart status log: ; @echo "∅ $@: no service"` covers the service verbs; never disable `layout` for that. lint = `uv run ruff check .` (Python) | `bunx oxlint --deny-warnings` (JS/TS; plain oxlint exits 0 on findings). verify = lint + test + coverage + e2e; CI on a GitHub remote is `.github/workflows/verify.yml` running `make setup` then `make verify`.
 Toolchain: new projects and subprojects start on `bun` (JS/TS, `bun init`) or `uv` (Python, `uv init`), never npm/yarn/pnpm/pip/poetry; the gate rejects newly added foreign lockfiles. In uv projects use `uv run`/`uv add`, not venv activation, which agent shells do not keep. A repo already on another toolchain keeps it unless the human approves migrating; propose it. Missing uv/bun: `make setup` installs them with the official installers (brand-new project: `curl -LsSf https://astral.sh/uv/install.sh | sh`, `curl -fsSL https://bun.sh/install | bash`).
 Habits: separate concerns (pure core logic; I/O, config and framework glue at the edges) in small single-purpose modules testable with real inputs; split by responsibility, never speculatively. Logs: one line per event, ISO-8601 UTC timestamp first (`2026-10-01T12:00:00.123Z`), then level, message, key=value; never secrets. Config: env vars from a gitignored `.env` (bun loads it itself; Python `uv run --env-file .env`); every key the code reads stays in `.env.example` without secret values, updated in the same change (gate-checked); validate config once at startup and fail fast. Services exit cleanly on SIGTERM (`make stop`).
 Epistemics: `VERIFIED` = direct evidence; `HYPOTHESIS` = testable inference + falsifier; `UNKNOWN` = not established. Never promote by rhetoric.
 Ponytail: understand → YAGNI → reuse → stdlib → native → installed dependency → minimum code; bug fix = root cause + sibling callers.
 Docs: why this design beats a plausible alternative; prefix material claims `VERIFIED:`, `HYPOTHESIS:` or `UNKNOWN:`.
-Doc pages (`*.md|*.mdx`) are gated too: `vae.py prose --fix` + rewrite by meaning (em dashes, invisible|look-alike characters, broken links|fences|Mermaid), then review against the plugin's `references/PROSE.md`; schematic content (ordered steps, branches, states, components) → a rendered Mermaid diagram.
+Doc pages (`*.md|*.mdx`) are gated: `vae.py prose --fix`, rewrite the rest by meaning, review against the plugin's `references/PROSE.md`; schematic content → a rendered Mermaid diagram. `README.md` covers the root and each package with a CLI|API, `ARCH.md` (why + how, operations, security, privacy) each package with production code; both state only VERIFIED facts. New JS/TS packages start on bun, ESM, oxlint and (libraries) pkgroll. The failing check names the template and the exact gaps.
 Lessons: test | `.agents/VERIFY.py` rule > MEMORY line > EPISODES line."""
 
 
