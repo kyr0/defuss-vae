@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1
+
+- Stop hook: blocks once per turn, then ends the turn with a user-facing `systemMessage`. 0.3.0 answered repeat stops with `additionalContext`, which Claude Code also treats as a continuation, so a gate waiting on the human re-invoked the model up to the 8-continuation cap.
+
 ## 0.3.0
 
 - Rules: a web frontend's e2e drives the served build in a real Playwright browser with WebGL2, network and permissions enabled.

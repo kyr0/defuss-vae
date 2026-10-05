@@ -1,6 +1,6 @@
 {
   "name": "defuss-vae",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Verified agentic engineering: human-triggered lean planning/implementation/review/finalization with forced deterministic verification, review and docs gates.",
   "author": {
     "name": "defuss"
