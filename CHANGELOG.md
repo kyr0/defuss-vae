@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.3
 
 - finalize: audits every memory, episode and agent-added AGENTS.md entry against the current repo and removes or rewrites one only with evidence; unsure entries stay, retagged `UNKNOWN`; human-written content is only proposed for change. Procedure in `references/CONSOLIDATION.md`.
 - doctor: non-blocking `state.stale` lists memory entries that cite repo paths which no longer exist.
