@@ -15,7 +15,7 @@ Hooks run on plain `python3`, not `uv run`. `VERIFIED:` `uv run` adds 5.4 ms (+1
 
 ## Stop-hook semantics
 
-`VERIFIED:` Claude Code hooks reference (checked 2026-09-30): Stop `decision: "block"` + `reason` continues the turn once; `hookSpecificOutput.additionalContext` on Stop leaves the turn finished; hook strings over 10,000 characters are replaced by a file path plus a 2,000-character preview. Gate text is capped well below that.
+`VERIFIED:` Claude Code hooks reference (checked 2026-10-05): Stop `decision: "block"` + `reason` and `hookSpecificOutput.additionalContext` both continue the turn, under one shared cap (8 consecutive continuations, then the turn ends). So the hook blocks only while `stop_hook_active` is false, and otherwise returns just a user-facing `systemMessage`. Before this, answering `stop_hook_active` with `additionalContext` (the 2026-09-30 reading said that ended the turn) looped the model up to the cap whenever the gate waited on a human; hook strings over 10,000 characters are replaced by a file path plus a 2,000-character preview. Gate text is capped well below that.
 
 ## Template Makefile process groups
 

@@ -29,10 +29,12 @@ def stop_gate(event: dict[str, Any], plugin_root: Path = PLUGIN_ROOT) -> dict[st
     g = gate(repo, str(event.get("session_id") or "unknown"), plugin_root)
     if g.done:
         return None
-    # VERIFIED: Claude Code honors one Stop block per turn and additionalContext alone ends the turn;
-    # later stops leave the gate text for the next prompt while the commit gate stays closed.
+    # VERIFIED: (hooks reference, checked 2026-10-05) Stop additionalContext continues the turn like a block, so
+    # answering stop_hook_active with it re-invoked the model until the 8-continuation cap. Block once per turn; later
+    # stops only tell the human (systemMessage) that the gate is open. The commit gate stays closed either way.
     if event.get("stop_hook_active"):
-        return {"hookSpecificOutput": {"hookEventName": "Stop", "additionalContext": g.text}}
+        head = g.text.splitlines()[0]
+        return {"systemMessage": f"defuss-vae: turn ended with the gate open ({head}); git commit stays denied until vae.py gate reports VERIFIED[gate]=true."}
     return {"decision": "block", "reason": g.text}
 
 

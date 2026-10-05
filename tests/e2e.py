@@ -149,6 +149,8 @@ def main() -> int:
         reason = (blocked or {}).get("reason", "")
         step("hook.stop.blocks_for_review", (blocked or {}).get("decision") == "block" and "GATE 2/3 review" in reason, reason[:300])
         fp = fingerprint(reason)
+        again = hook(root, proj, {"hook_event_name": "Stop", "stop_hook_active": True}) or {}
+        step("hook.stop.ends_turn_when_active", set(again) == {"systemMessage"}, json.dumps(again)[:300])
         denied = hook(root, proj, {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "git commit -am feat"}})
         step("hook.commit.denied", denied["hookSpecificOutput"]["permissionDecision"] == "deny", denied["hookSpecificOutput"]["permissionDecisionReason"])
         attest(proj, fp)

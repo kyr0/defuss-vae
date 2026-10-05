@@ -38,7 +38,7 @@ Whether e2e consumes the built artifact is not decidable from outside, so the re
 
 ## Why a gate CLI and not only the Stop hook
 
-`VERIFIED:` (Claude Code hooks reference, checked 2026-09-30) a Stop hook can block once per turn; `hookSpecificOutput.additionalContext` on Stop does not continue the turn. A hook-only gate therefore gets one forced continuation per turn, not a loop.
+`VERIFIED:` (Claude Code hooks reference, checked 2026-10-05) `decision: "block"` and `hookSpecificOutput.additionalContext` on Stop both continue the turn, and `stop_hook_active` marks a continuation. The hook blocks only when `stop_hook_active` is false, so it forces one continuation per turn and never loops. A loop could not tell a fixable failure from one that waits on the human, and Claude Code cuts it off at 8 continuations anyway.
 
 Therefore the Stop hook blocks once with the gate text, which carries the exact `vae.py gate --repo … --session …` command; the agent loops that command in-turn. The commit gate remains the hard backstop.
 

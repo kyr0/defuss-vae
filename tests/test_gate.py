@@ -76,8 +76,10 @@ class GateTests(RepoCase):
         self.write("calc.py", "def add(a, b):\n    return b + a\n")
         self.assertEqual(self.stop("s2")["decision"], "block")
         out = self.stop("s2", active=True)
-        self.assertNotIn("decision", out)
-        self.assertIn("GATE 2/3 review", out["hookSpecificOutput"]["additionalContext"])
+        # Stop decision/additionalContext both continue the turn; only user-facing systemMessage may remain.
+        self.assertEqual(set(out), {"systemMessage"})
+        self.assertIn("GATE 2/3 review", out["systemMessage"])
+        self.assertEqual(self.commit("s2")["hookSpecificOutput"]["permissionDecision"], "deny")
 
     def test_verification_is_cached_by_fingerprint_and_policy(self):
         self.make_python_project(test_command=f"echo run >> runs.txt && {TEST_CMD}")
