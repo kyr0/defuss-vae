@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
 
 - Docs skill (`/defuss-vae:docs`): grounded claims, the universal prose catalog (`references/PROSE.md`), Mermaid for schematic content, page rules declared before writing.
 - Gate: doc pages (`*.md`, `*.mdx`, `*.markdown`) are gated. A docs-only session runs the static prose check, project rules and a catalog review, and skips the test suites. The docs attestation step is skipped when no production source changed.
