@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Rules: CI runs async; after a push the agent reports the run URL and finishes instead of waiting for CI.
+
 ## 0.5.0
 
 - Renamed the engineering dialect from Signan to VAE-DIALECT; its spec moved from `references/SIGNAN.md` to `references/VAE-DIALECT.md`, and each skill's core section is now `## VAE-DIALECT core`.

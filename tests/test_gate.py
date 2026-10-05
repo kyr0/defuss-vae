@@ -205,6 +205,7 @@ class GateTests(RepoCase):
         append_episodes(self.repo, "old", ["LESSON HYPOTHESIS[cache] falsified BC probe"], ROOT)
         event = {"hook_event_name": "SessionStart", "cwd": str(self.repo), "session_id": "same"}
         ctx = session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("CI runs async: after a push report the run URL and finish, NOT wait for it", ctx)
         self.assertIn("- VERIFIED[db] migrations run via `make migrate`", ctx)
         self.assertNotIn("VERIFIED[scope] fact", ctx)
         self.assertIn("LESSON HYPOTHESIS[cache]", ctx)
