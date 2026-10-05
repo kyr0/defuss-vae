@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import unittest
+from pathlib import Path
 
 from vae_testkit import (  # first: puts plugin/scripts on sys.path
     PY,
@@ -243,6 +245,22 @@ class GateTests(RepoCase):
         self.assertEqual(json.loads(hook({"hook_event_name": "Stop", "stop_hook_active": False}))["decision"], "block")
         self.assertEqual(hook({"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "ls"}}), "")
 
+
+    def test_adapter_fails_closed_when_the_install_is_broken(self):
+        # A copy of the payload whose gate modules cannot import: commits are still denied, other commands pass.
+        broken = Path(self.td.name) / "broken-plugin"
+        shutil.copytree(ROOT, broken, ignore=shutil.ignore_patterns("__pycache__"))
+        (broken / "scripts/vae_gate.py").write_text("this is not python\n")
+        self.make_python_project()
+
+        def hook(command: str) -> str:
+            event = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": command}, "cwd": str(self.repo), "session_id": "b"}
+            return subprocess.run([PY, str(broken / "hooks/lifecycle.py")], input=json.dumps(event), text=True, capture_output=True, check=False).stdout
+
+        denied = json.loads(hook("git -C . commit -m x"))
+        self.assertEqual(denied["hookSpecificOutput"]["permissionDecision"], "deny")
+        self.assertIn("could not run", denied["hookSpecificOutput"]["permissionDecisionReason"])
+        self.assertEqual(hook("ls -la"), "", "a command that cannot be a commit never loads the gate")
 
 if __name__ == "__main__":
     unittest.main()
