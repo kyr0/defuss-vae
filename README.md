@@ -1,20 +1,24 @@
 # defuss-vae
 
+[![CI](https://github.com/kyr0/defuss-vae/actions/workflows/verify.yml/badge.svg)](https://github.com/kyr0/defuss-vae/actions/workflows/verify.yml)
+[![License](https://img.shields.io/github/license/kyr0/defuss-vae)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue)](plugin/ARCH.md)
+
 **V**erified **A**gentic **E**ngineering: your coding agent ships only what it has proven works.
 
 Five skills that you trigger yourself, plus small stdlib-only Python programs that **verify, gate and remember**. The agent does the work; programs, not prompts, decide whether that work is done.
 
 ## TL;DR
 
-Coding agents say "done" too early. They skip tests, mock away the bug, leave debug prints behind, and forget the same lesson every session. Telling the agent "please run the tests" in a prompt doesn't fix that, because the agent can always choose to ignore the prompt.
+A prompt can ask a coding agent to run the tests, mock nothing and clean up its debug prints, but it cannot make the agent do it, and the next session starts without the lessons of the last one.
 
-defuss-vae moves the checks out of the prompt and into code. Hooks deny `git commit` and send the agent back to work when it stops early, until the current code passes **verify → review → docs**. Lessons from failures are written into the project, so the next session starts smarter.
+defuss-vae moves the checks out of the prompt and into code. Hooks deny `git commit` and send the agent back to work when it stops early, until the current code passes **verify → review → docs**. Lessons from failures are written into the project and loaded into the next session.
 
 - 🔒 **Hard gate:** `git commit` is denied until the exact code fingerprint is verified, reviewed and documented
 - 📝 **Docs are gated too:** every changed page passes a static prose check (em dashes, invisible or look-alike characters, broken links, fences and diagrams) and a review against a universal prose catalog
 - 🧯 **Fails closed:** a crashing gate blocks instead of waving changes through
 - 🧪 **Real evidence:** lint, tests (no mocks), coverage ≥ 60 %, and an e2e run against the built artifact that must leave fresh output
-- ♻️ **Cached by content:** unchanged code is never re-verified, so review/docs loops stay fast
+- ♻️ **Cached by content:** verification reruns only when code, pages or policy change, so review/docs loops stay fast
 - 🧠 **Learns per project:** failures become episodes, recurring ones become tests or verifier rules, and memory is loaded into every new session
 - 🧭 **Adapts to your repo:** uses your Makefile, your toolchain and your rules, and grows its policy from your own mistakes
 - 🙋 **Human in charge:** skills never trigger themselves, and nothing is pushed or released without you
@@ -101,7 +105,7 @@ claude plugin marketplace add kyr0/defuss-vae
 claude plugin install defuss-vae@defuss-vae
 ```
 
-Start a new session afterwards. Update with `/plugin marketplace update defuss-vae`. To use a local checkout instead: `claude --plugin-dir "$PWD/plugin"`.
+Start a new session afterwards. To update later, see [Update an existing install](#update-an-existing-install). To use a local checkout instead: `claude --plugin-dir "$PWD/plugin"`.
 
 - **Good for:** the full experience, with the commit gate, the Stop-hook gate, and memory injected at session start.
 
@@ -137,19 +141,88 @@ python3 ~/defuss-vae/plugin/scripts/vae.py gate --repo .
 
 In Claude Code prefer the plugin: its skills are namespaced (`/defuss-vae:plan`), while skills-CLI installs are not (`/plan`).
 
-## Usage
+## Update an existing install
 
-Skills are **human-triggered only**, so the agent never invokes them on its own:
+A new release doesn't reach an installed copy on its own. Each harness keeps the version it installed (Claude Code caches every plugin version in its own directory), and Claude Code's auto-update is off by default for third-party marketplaces like this one. Run the command for your harness and the way you installed:
+
+| Harness | Installed as | Update with |
+|---|---|---|
+| Claude Code | plugin | `claude plugin update defuss-vae@defuss-vae`, or in a session `/plugin` → **Installed** → defuss-vae → **Update now** |
+| Claude Code | local checkout (`--plugin-dir`) | `git -C <checkout> pull` |
+| Codex | plugin | `codex plugin marketplace upgrade`, then reinstall defuss-vae from `/plugins` and review its hooks in `/hooks` (untested) |
+| GitHub Copilot CLI | plugin | `copilot plugin update defuss-vae` (untested) |
+| Claude Code, Codex, Cursor, Gemini CLI, Copilot, Windsurf | skills (`npx skills add`) | `npx skills update`; add `-g` for global installs, `-y` to skip the prompt |
+| any skills-only host | gate clone | `git -C ~/defuss-vae pull` |
+
+With the skills CLI, if a skill added in a later release is missing afterwards, add it by name, e.g. `npx skills add kyr0/defuss-vae --skill docs` (`docs` is new in 0.4.0).
+
+Then activate it. A running session keeps the version it loaded, so in Claude Code run `/reload-plugins` or start a new session; in other harnesses start a new session. Check the installed version with `claude plugin list` (Claude Code) or `npx skills list` (skills CLI):
 
 ```text
-/defuss-vae:plan add rate limiting to the upload endpoint
-/defuss-vae:implement
-/defuss-vae:review          # optional extra pass; the gate already runs a review
-/defuss-vae:docs rewrite the README for first-time users
-/defuss-vae:finalize
+❯ defuss-vae@defuss-vae
+  Version: 0.4.0
+  Status: ✔ enabled
 ```
 
-In Codex: `$plan add rate limiting to the upload endpoint`, then `$implement`, `$review`, `$docs`, `$finalize`.
+To get new releases in Claude Code without asking, turn on auto-update: `/plugin` → **Marketplaces** → defuss-vae → **Enable auto-update**. Claude Code then updates the plugin in the background during a session, and the new version loads the next time you start it.
+
+## Usage
+
+Skills are **human-triggered only**: the agent never invokes one on its own, so you call each one when you want that step. The form depends on how you installed:
+
+| Installed via | Invocation |
+|---|---|
+| Claude Code plugin | `/defuss-vae:plan <request>` |
+| Claude Code, skills CLI | `/plan <request>` |
+| Codex | `$plan <request>` |
+
+The examples below use the plugin form; swap the prefix for your host. Everything after the skill name is your request in plain words.
+
+### Plan: research and a spec before any code
+
+Describe the goal and its constraints. `plan` reads the code, traces the real path, and probes what it doesn't know by running existing commands or scratch scripts in `tmp/`; its rules forbid editing source. It returns a short spec: what's `VERIFIED`, what's `UNKNOWN` and how to find out, the prior art it reuses, the decision, and numbered steps that each name the file and symbol, the change and the check that will prove it. Refine it by replying in plain words ("drop the Redis option, reuse the in-memory limiter"); when the plan is right, run `implement`.
+
+```text
+/defuss-vae:plan add rate limiting to the upload endpoint: 10 requests/min per API key, 429 with Retry-After
+/defuss-vae:plan fix: uploads over 2 GB fail with 413 behind nginx; reproduce it first
+/defuss-vae:plan migrate the config loader from YAML to TOML, then implement it
+```
+
+The last one plans and implements in one go; without "then implement it", `plan` stops at the spec.
+
+### Implement: build it, then loop the gate
+
+```text
+/defuss-vae:implement
+/defuss-vae:implement add a --json flag to `export` that prints one object per line
+```
+
+Without a request it implements the plan from the conversation; with one it works on that task directly. Either way it reruns the gate until `VERIFIED[gate]=true`.
+
+### Review: an extra pass on demand
+
+```text
+/defuss-vae:review
+/defuss-vae:review report only, don't edit anything
+```
+
+By default it reviews the current changes and fixes what it finds. The gate already runs a review before every commit, so call this one when you want a second, deeper look.
+
+### Docs: write or check documentation pages
+
+```text
+/defuss-vae:docs write docs/ARCHITECTURE.md explaining the request flow for new contributors
+/defuss-vae:docs check README.md against the prose catalog and fix what it finds
+```
+
+### Finalize: commits, changelog, memory
+
+```text
+/defuss-vae:finalize
+/defuss-vae:finalize and push
+```
+
+`finalize` never pushes, merges or releases unless you ask for it, as in the second line.
 
 The gate itself needs no command. When the agent tries to finish, or to `git commit`, the hooks run it and hand back exactly what's missing.
 
@@ -163,31 +236,62 @@ python3 plugin/scripts/vae.py prose  --repo .   # static prose check of every do
 python3 plugin/scripts/vae.py doctor --repo .   # memory budgets, epistemic tags, layout
 ```
 
+Full reference with exit codes: [`plugin/scripts/README.md`](plugin/scripts/README.md).
+
 ## What "verified" means
 
 The verifier passes only with direct evidence for **all** of the following. A missing command or metric counts as `UNKNOWN`, and `UNKNOWN` fails.
 
 - `.agents/VERIFY.py` is present and every one of its rules holds
 - `make verify` is wired to `lint test coverage e2e`, and lint passes
-- tests exist and pass, using real subsystems instead of mock frameworks
-- e2e builds the publishable artifact, consumes it like a user, and leaves fresh evidence in `output/`
+- tests exist and pass, using real subsystems (a throwaway database, queue or local server process) instead of mock frameworks, and never live or production data
+- e2e builds the publishable artifact, consumes it like a user, and leaves fresh evidence in `output/`. The rules ask e2e to reach every page, route or component of a UI (in a real browser) and every CLI command or API endpoint at least once; the gate can't check that mechanically, so review does
 - coverage ≥ 60 % (`make coverage` prints `TOTAL <n>%`)
 - no leftover temporary probe lines, no newly added foreign toolchain, and an `.env.example` that lists every config key
-- every changed doc page passes `vae.py prose`. A session that changed only pages runs this check and the project rules, and skips the test suites
+- a `README.md` at the root and for every package with a changed CLI or API, and an `ARCH.md` for every package with changed production code or deployment and schema definitions (not tests, examples, docs, config or data). A page covers the folders below it up to the next package manifest. Both state only verified facts. Templates are in `plugin/templates/`
+- every changed `package.json` sets `packageManager` (bun), description, license and author; a new package is also `"type": "module"`, lints with oxlint and, as a library, builds with pkgroll
+- every changed doc page passes `vae.py prose`.
 
-The layout is the same everywhere: `Makefile` verbs `setup start stop status log metrics bench test coverage lint e2e verify`; services log to `var/log/<svc>.stdout|.stderr` with a pid in `tmp/<svc>.pid`; programs read `input/` and write `output/`; config comes from a gitignored `.env`, with every key listed in a committed `.env.example`.
+The page, `.gitignore` and `package.json` checks are new in 0.5.0 and only warn (listed under `WARNS:`) until 0.6.0; `CONFIG["strict"]=True` in `.agents/VERIFY.py` makes them blocking now. A session that changed only pages runs this check and the project rules, and skips the test suites
+
+The layout is the same everywhere: `Makefile` verbs `setup start stop status log metrics bench test coverage lint e2e verify`; services log to `var/log/<svc>.stdout|.stderr` with a pid in `tmp/<svc>.pid`; programs read `input/` and write `output/`; config comes from a gitignored `.env`, with every key listed in a committed `.env.example` (verified: a key that code reads or `.env` sets but the example lacks fails the gate). `.gitignore` must cover `.env`, `var/`, `tmp/`, `output/` and `dist/`, plus the cache and package folders of each toolchain present (`node_modules/`, `.venv/`, `__pycache__/` and the like); `vae.py init` appends them.
+
+A project without a service (a library, a CLI tool) still has the service verbs, as one Makefile line:
+
+```make
+start stop restart status log: ; @echo "∅ $@: no service"
+```
+
+`make status` then answers "no service" instead of failing on a missing target, and the `var/`, `tmp/` and `.env` ignore checks stay on. The layout check suggests this line when the verbs are missing. `CONFIG["layout"]=False` would also silence it, but it drops those ignore checks, so treat it as a last resort.
 
 ## Enforcement boundary
 
 `VERIFIED:` hooks prove command results, fingerprints, layout and commit gating, and the e2e suite drives the released zip's own hook adapter to show it.
-`UNKNOWN:` review *quality* is still a model property: the gate checks that a complete, current review attestation exists, not that the review was insightful. That's why human review sits before release.
+`VERIFIED:` the gate checks that a complete review attestation exists for the current code, not how insightful the review was. Review quality stays with the model, which is why human review sits before release.
 
 ## Details
 
+- Architecture of this repository: [`ARCH.md`](ARCH.md)
 - Prose catalog for doc pages: [`plugin/references/PROSE.md`](plugin/references/PROSE.md)
-- Prompt and rule design: [`docs/PROMPT_DESIGN.md`](docs/PROMPT_DESIGN.md); the canonical Signan dialect: [`plugin/references/SIGNAN.md`](plugin/references/SIGNAN.md)
+- Prompt and rule design: [`docs/PROMPT_DESIGN.md`](docs/PROMPT_DESIGN.md); the canonical VAE-DIALECT: [`plugin/references/VAE-DIALECT.md`](plugin/references/VAE-DIALECT.md)
 - Gate and verifier design: [`docs/VERIFIER.md`](docs/VERIFIER.md); host support: [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md)
 - Contributing: [`AGENTS.md`](AGENTS.md); run `make setup && make verify`
+
+## Citation
+
+If you use defuss-vae in research or want to reference it, cite it as:
+
+```bibtex
+@misc{homberg2026defussvae,
+  author       = {Homberg, Aron},
+  affiliation  = {Independent Researcher},
+  title        = {defuss-vae: Verified Agentic Engineering},
+  year         = {2026},
+  version      = {0.5.0},
+  howpublished = {\url{https://github.com/kyr0/defuss-vae}},
+  note         = {Claude Code and Agent Skills plugin, MIT License}
+}
+```
 
 ## License
 
