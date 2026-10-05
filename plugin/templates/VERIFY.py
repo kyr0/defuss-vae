@@ -10,11 +10,18 @@ CONFIG = {
     "timeout_s": 180,
     "layout": True,                # Makefile verbs + gitignored var/log/ and tmp/.
     "toolchain": True,             # new (sub)projects start on bun (JS/TS) / uv (Python): newly added npm/yarn/pnpm/poetry/pipenv/pdm/pip lockfiles fail.
+    # Static check of every changed doc page (*.md|*.mdx|*.markdown); False disables it.
+    # allow: {glob: characters a page may use as house style}, e.g. {"docs/de/*.md": "\u201e\u201c"} for German quotes.
+    # phrases: extra slop regexes (any language), case-insensitive, flagged as findings.
+    # HYPOTHESIS: most projects need no allow entry; add one only for a page whose house style needs a flagged character.
+    "prose": {"allow": {}, "phrases": []},
 }
 
 # Deterministic invariants only; no semantic guesses.
 # kinds: command | file_exists | contains | regex | not_regex
-# scope: "path" = one exact file; "glob" = every changed code file matching (fnmatch).
+# scope: "path" = one exact file; "glob" = every changed code file matching (fnmatch); "glob" + "docs": True = every
+# changed doc page matching, e.g. {"id": "docs.arch.diagram", "kind": "contains", "path": "docs/ARCHITECTURE.md",
+# "text": "```mermaid", "claim": "architecture page keeps its diagram"}.
 RULES = [{
     "id": "tests.no-mocks",
     "kind": "not_regex",

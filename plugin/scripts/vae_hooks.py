@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from vae_gate import gate, validate_docs, validate_review
-from vae_repo import PLUGIN_ROOT, changed_since, code_fingerprint, git_root, is_code
+from vae_repo import PLUGIN_ROOT, changed_since, code_fingerprint, git_root, is_gated
 from vae_state import (
     STATE_BUDGET,
     attestation_path,
@@ -53,7 +53,7 @@ def commit_gate(event: dict[str, Any]) -> dict[str, Any] | None:
     sid = str(event.get("session_id") or "unknown")
     state = load_session(repo, sid)
     changed = changed_since(repo, state["baseline"])
-    code_changed = [p for p in changed if is_code(p)]
+    code_changed = [p for p in changed if is_gated(p)]
     if not code_changed:
         return None
     fp = code_fingerprint(repo, code_changed)
@@ -82,6 +82,7 @@ Habits: separate concerns (pure core logic; I/O, config and framework glue at th
 Epistemics: `VERIFIED` = direct evidence; `HYPOTHESIS` = testable inference + falsifier; `UNKNOWN` = not established. Never promote by rhetoric.
 Ponytail: understand → YAGNI → reuse → stdlib → native → installed dependency → minimum code; bug fix = root cause + sibling callers.
 Docs: why this design beats a plausible alternative; prefix material claims `VERIFIED:`, `HYPOTHESIS:` or `UNKNOWN:`.
+Doc pages (`*.md|*.mdx`) are gated too: `vae.py prose --fix` + rewrite by meaning (em dashes, invisible|look-alike characters, broken links|fences|Mermaid), then review against the plugin's `references/PROSE.md`; schematic content (ordered steps, branches, states, components) → a rendered Mermaid diagram.
 Lessons: test | `.agents/VERIFY.py` rule > MEMORY line > EPISODES line."""
 
 

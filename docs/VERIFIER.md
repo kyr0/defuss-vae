@@ -2,10 +2,11 @@
 
 ## Required claims
 
-For code changes (paths outside `.agents/`, `tmp/`, `var/`, `output/`), `VERIFIED[gate]=true` REQUIRES, in order:
+For changes to code or doc pages (`*.md`, `*.mdx`, `*.markdown`; paths outside `.agents/`, `tmp/`, `var/`, `output/`), `VERIFIED[gate]=true` REQUIRES, in order:
 
-1. **verify** — every required check passes:
+1. **verify**: every required check passes:
    - `.agents/VERIFY.py` exists and loads (`init` writes it);
+   - `prose` (unless `CONFIG["prose"]=False`): every changed doc page passes the static prose check (below);
    - `layout` (unless `CONFIG["layout"]=False`): Makefile verbs `setup start stop status log metrics bench test coverage lint e2e verify` exist and `var/`, `tmp/`, `.env` are gitignored (`init` writes these plus the other defaults);
    - `toolchain` (unless `CONFIG["toolchain"]=False`): the change introduces no npm/yarn/pnpm/poetry/pipenv/pdm lockfile, and no pip `requirements.txt` without a `uv.lock`, that `HEAD` doesn't track;
    - `env.example`: every env var that changed code reads directly (JS/TS `process.env`/`Bun.env`/`import.meta.env`, Python `os.environ`/`os.getenv`, Go `os.Getenv`, Rust `env::var`; OS-provided names exempt) or root `.env` sets is declared in the nearest `.env.example`, which is not gitignored;
@@ -16,11 +17,26 @@ For code changes (paths outside `.agents/`, `tmp/`, `var/`, `output/`), `VERIFIE
    - every `make integration`/`make e2e` (or `CONFIG` command) exits 0, and the e2e run leaves a new or rewritten file in `output/`;
    - `make coverage` (or `CONFIG["coverage_command"]`) prints `TOTAL <n>%` or an `All files |…|` table at ≥ `coverage_min` (default 60%);
    - built-in `hygiene.probes`: no temporary probe tag in changed code;
-   - every project rule passes.
-2. **review** — attestation for the current fingerprint covers every changed code path, the full checklist, and only resolved findings with location + evidence + learning.
-3. **docs** — attestation assesses file/method/inline for every changed production file, with a plausible alternative and an epistemically prefixed rationale.
+   - every project rule passes; a `glob` rule sees changed code files, or changed doc pages with `"docs": True`.
+2. **review**: attestation for the current fingerprint covers every changed code path and doc page (pages against `plugin/references/PROSE.md`), the full checklist, and only resolved findings with location + evidence + learning.
+3. **docs**: attestation assesses file/method/inline for every changed production file, with a plausible alternative and an epistemically prefixed rationale. With no production file changed, the step is complete: an attestation over zero files would prove nothing.
 
-A missing command (lint, test, e2e, coverage) or metric is `UNKNOWN` and fails closed, even with `CONFIG["layout"]=False`. Any code edit changes the fingerprint and reopens the gate.
+A session that changed only doc pages runs `verifier.config`, `prose` and the project rules, not lint, tests, coverage or e2e.
+
+A missing command (lint, test, e2e, coverage) or metric is `UNKNOWN` and fails closed, even with `CONFIG["layout"]=False`. Any code or page edit changes the fingerprint and reopens the gate.
+
+## Why doc pages are gated: a static check plus a catalog review
+
+Up to 0.3.1, `.md` files were not code, so a README-only session never reached the gate and nothing checked it. Pages now enter the fingerprint, and two layers check them, because they catch different failures:
+
+- `vae.py prose` (static, `vae_prose.py`) flags what a program can decide: machine-writing tells (em dash, spaced en dash used as a dash, curly quotes, `…`, a few high-precision English filler phrases), invisible and bidirectional control characters (checked inside code too, since they hide or reorder text), words mixing Latin, Cyrillic and Greek letters, glyph bullets that do not render as lists, unclosed fences, broken relative links, placeholders and Mermaid blocks without a known diagram type or with an unbalanced label quote. `--fix` applies only replacements that cannot change meaning (quotes, ellipsis, invisible characters, bullets); a dash needs a rewrite by meaning, so it stays a finding.
+- The review reads each changed unit against `plugin/references/PROSE.md` (evidence, logic, precision, relevance, structure, style, typography, schematic content): the part no regex decides.
+
+Why not normalize to ASCII, as tools like aslopcleaner do: non-ASCII is content (arrows and `∅` are Signan operators, `≥` and emoji are deliberate, other languages have their own quotation marks), and a blind swap can change meaning (an em dash becomes a hyphen inside a compound). `HYPOTHESIS:` a short list of tells plus per-page `CONFIG["prose"]["allow"]` gives fewer false positives than an ASCII allowlist; falsifier: a project needing more than a handful of `allow` entries for ordinary pages. The phrase list is English-only and deliberately short; `CONFIG["prose"]["phrases"]` adds a project's own (any language).
+
+Why docs-only sessions skip the suites: a page edit cannot change what lint, tests or e2e prove, and rerunning them for a typo makes the gate slow enough that people route around it. `UNKNOWN:` pages that embed executable examples (doctest-style) are not run; such a project adds a `command` rule. Why `"docs": True` is opt-in for glob rules: existing `glob: "*"` code rules (no-mocks, probes) would otherwise fail on pages that explain them.
+
+`VERIFIED:` the e2e drives a docs-only session through the installed release (`prose.fix`, `gate.docs_only.*`), and every page in this repository passes `vae.py prose`.
 
 ## Why the verifier must exist and be wired
 

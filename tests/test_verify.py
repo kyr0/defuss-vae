@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 
 from vae_testkit import (  # first: puts plugin/scripts on sys.path
+    PY,
     ROOT,
     TEST_CMD,
     RepoCase,
@@ -99,6 +100,44 @@ class VerifyTests(RepoCase):
         self.assertEqual(c.evidence, "glob='*.py' files=1; hits=['new.py']")
         self.write("new.py", "# SPDX\nx = 1\n")
         self.assertTrue(self.check(verify(self.repo, ["new.py"]), "hdr").value)
+
+    def test_docs_only_change_runs_prose_and_page_rules_not_suites(self):
+        rule = ("[{'id':'docs.no-wip','kind':'not_regex','glob':'*.md','docs':True,'pattern':'WIP','claim':'no WIP pages'},"
+                " {'id':'code.hdr','kind':'contains','glob':'*','text':'# SPDX','claim':'code rule'}]")
+        self.make_python_project(test_command=f"echo run >> runs.txt && {TEST_CMD}", rules=rule)
+        self.write("README.md", "Fast \u2014 WIP. Mocks: " + "mock" + ".patch is banned.\n")
+        report = verify(self.repo, ["README.md"])
+        prose = self.check(report, "prose")
+        self.assertFalse(prose.value)
+        self.assertIn("README.md:1 T02 em dash", prose.evidence)
+        self.assertFalse(self.check(report, "docs.no-wip").value)
+        self.assertEqual(self.check(report, "code.hdr").evidence, "glob='*' files=0", "code globs never see pages")
+        self.assertNotIn("tests.unit", [c.id for c in report.checks])
+        self.assertFalse((self.repo / "runs.txt").exists(), "a page edit must not rerun the suites")
+        self.write("README.md", "Fast, really. Mocks: " + "mock" + ".patch is banned.\n")
+        self.assertTrue(verify(self.repo, ["README.md"]).verified)
+
+    def test_prose_allow_and_disable_per_page(self):
+        self.make_python_project()
+        with (self.repo / ".agents/VERIFY.py").open("a") as f:
+            f.write("CONFIG['prose'] = {'allow': {'docs/de/*.md': '\\u201c'}}\n")
+        self.write("docs/de/a.md", "Er sagte \u201eja\u201c.\n")
+        self.write("docs/b.md", "He said \u201cyes\u201d.\n")
+        self.assertTrue(self.check(verify(self.repo, ["docs/de/a.md"]), "prose").value)
+        self.assertFalse(self.check(verify(self.repo, ["docs/b.md"]), "prose").value)
+        with (self.repo / ".agents/VERIFY.py").open("a") as f:
+            f.write("CONFIG['prose'] = False\n")
+        self.assertTrue(verify(self.repo, ["docs/b.md"]).verified)
+
+    def test_prose_cli_fixes_then_reports_only_rewrites(self):
+        self.make_python_project()
+        self.write("docs/a.md", "\u201cHi\u201d\u2026 now \u2014 later\n")
+        p = sh(f"{PY} {ROOT}/scripts/vae.py prose --repo {self.repo} --fix", self.repo, check=False)
+        self.assertEqual(p.returncode, 2, p.stdout)
+        self.assertEqual((self.repo / "docs/a.md").read_text(), '"Hi"... now \u2014 later\n')
+        self.assertIn("docs/a.md:1 T02 em dash", p.stdout)
+        self.write("docs/a.md", '"Hi"... now, later\n')
+        self.assertIn("VERIFIED[prose]=true", sh(f"{PY} {ROOT}/scripts/vae.py prose --repo {self.repo}", self.repo).stdout)
 
     def test_template_mock_rule_catches_mocks_but_not_itself(self):
         namespace = runpy.run_path(str(ROOT / "templates/VERIFY.py"))

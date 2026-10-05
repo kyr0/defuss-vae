@@ -70,6 +70,31 @@ class GateTests(RepoCase):
         self.assertEqual(sum(" DONE " in e for e in entries), 1, entries)
         self.assertTrue(any("FINDING calc.py:2 learn=test: subtraction slipped in" in e for e in entries), entries)
 
+    def test_docs_only_session_gates_prose_then_review_without_docs_step(self):
+        self.make_python_project(test_command=f"echo run >> runs.txt && {TEST_CMD}")
+        sid = "docs1"
+        init_session(self.repo, sid)
+        self.write("README.md", "Fast \u2014 really.\n")
+        out = self.stop(sid)
+        self.assertIn("GATE 1/3 verify: FAIL", out["reason"])
+        self.assertIn("README.md:1 T02", out["reason"])
+        self.assertEqual(self.commit(sid)["hookSpecificOutput"]["permissionDecision"], "deny")
+        self.write("README.md", "Fast, really.\n")
+        reason = self.stop(sid)["reason"]
+        self.assertIn("GATE 2/3 review", reason)
+        self.assertIn('PAGES ["README.md"]', reason)
+        self.assertIn(str(ROOT / "references/PROSE.md"), reason)
+        fp = code_fingerprint(self.repo, ["README.md"])
+        write_json(attestation_path(self.repo, sid, "review"), {
+            "schema": 1, "status": "VERIFIED", "code_fingerprint": fp, "checklist": REVIEW_CHECKLIST,
+            "reviewed_paths": ["README.md"], "findings": [],
+        })
+        self.assertIsNone(self.stop(sid), "no production source changed, so no docs attestation is required")
+        self.assertIsNone(self.commit(sid))
+        self.assertFalse((self.repo / "runs.txt").exists())
+        self.write("README.md", "Fast, really!\n")
+        self.assertIn("GATE 2/3 review", self.stop(sid)["reason"], "a page edit invalidates the review")
+
     def test_repeat_stop_in_same_turn_does_not_block(self):
         self.make_python_project()
         init_session(self.repo, "s2")

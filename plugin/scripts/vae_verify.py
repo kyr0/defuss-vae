@@ -10,6 +10,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+from vae_prose import Finding, fix, scan
 from vae_repo import (
     PLUGIN_ROOT,
     SOURCE_EXT,
@@ -17,6 +18,7 @@ from vae_repo import (
     dirty_paths,
     find_test_files,
     is_code,
+    is_doc,
     make_graph,
     make_reach,
     now_iso,
@@ -182,7 +184,7 @@ def check_command(check_id: str, claim: str, command: str, repo: Path, timeout: 
     )
 
 
-def run_custom_rule(rule: dict[str, Any], repo: Path, timeout: int, changed: Iterable[str] = ()) -> Check:
+def run_custom_rule(rule: dict[str, Any], repo: Path, timeout: int, changed: Iterable[str] = (), docs: Iterable[str] = ()) -> Check:
     rid = str(rule.get("id") or "custom")
     kind = str(rule.get("kind") or "")
     required = bool(rule.get("required", True))
@@ -209,8 +211,9 @@ def run_custom_rule(rule: dict[str, Any], repo: Path, timeout: int, changed: Ite
     needle = str(rule.get("text") or "")
     if "glob" in rule:
         # WHY changed files only: policy applies to new work without blocking on untouched legacy code.
+        # WHY opt-in `docs`: existing `glob: "*"` code rules (no-mocks, probes) must not fail on pages that cite them.
         glob = str(rule["glob"])
-        paths = [p for p in changed if fnmatch.fnmatchcase(p, glob)]
+        paths = [p for p in (docs if rule.get("docs") else changed) if fnmatch.fnmatchcase(p, glob)]
         scope = f"glob={glob!r} files={len(paths)}"
     else:
         paths = [str(rule.get("path") or "")]
@@ -339,16 +342,63 @@ def check_env(repo: Path, changed: Iterable[str]) -> Check:
     )
 
 
+def prose_findings(repo: Path, pages: Iterable[str], config: dict[str, Any], apply_fix: bool = False) -> list[Finding]:
+    """Scan (and with apply_fix first repair) doc pages under CONFIG["prose"]: {"allow": {glob: chars}, "phrases": [regex]}."""
+    cfg = config.get("prose")
+    cfg = cfg if isinstance(cfg, dict) else {}
+    allow_map = cfg.get("allow") or {}
+    found: list[Finding] = []
+    for rel in pages:
+        f = repo / rel
+        if not f.is_file():
+            continue
+        allow = "".join(str(chars) for glob, chars in allow_map.items() if fnmatch.fnmatchcase(rel, glob))
+        text = f.read_text("utf-8", errors="replace")
+        if apply_fix:
+            fixed = fix(text, allow)
+            if fixed != text:
+                f.write_text(fixed, "utf-8")
+                text = fixed
+        found += scan(text, rel, repo, allow, cfg.get("phrases") or ())
+    return found
+
+
+def check_prose(repo: Path, pages: list[str], config: dict[str, Any]) -> Check:
+    claim = "changed doc pages carry no machine-writing tells, invisible characters or broken Markdown"
+    if config.get("prose") is False:
+        return Check("prose", claim, "VERIFIED", True, "disabled by CONFIG['prose']=False", required=False)
+    try:
+        found = prose_findings(repo, pages, config)
+    except re.error as e:
+        return Check("prose", claim, "UNKNOWN", None, f"invalid CONFIG['prose']['phrases'] regex: {e}", next="FIX .agents/VERIFY.py CONFIG['prose']")
+    hits = [str(f) for f in found]
+    fixable = sorted({f.path for f in found if f.fixable})
+    nxt = None
+    if found:
+        nxt = (f"RUN vae.py prose --repo . --fix {' '.join(fixable)} (meaning-preserving replacements); " if fixable else "")
+        nxt += f"THEN rewrite the rest by meaning ({PLUGIN_ROOT}/references/PROSE.md); a page that needs a flagged character: CONFIG['prose']['allow']"
+    return Check("prose", claim, "VERIFIED", not found, f"pages={len(pages)}" + (f"; hits={hits[:20]}" if hits else ""), next=nxt)
+
+
 def verify(repo: Path, changed_paths: list[str] | None = None) -> VerifyReport:
     repo = repo.resolve()
     if changed_paths is None:
         changed_paths = sorted(dirty_paths(repo))
     code_paths = sorted(p for p in changed_paths if is_code(p))
+    doc_paths = sorted(p for p in changed_paths if is_doc(p))
+    fp = code_fingerprint(repo, code_paths + doc_paths)
     checks: list[Check] = []
     verifier, config, rules = check_verifier(repo, "verifier.config")
     checks.append(verifier)
-    coverage_min = float(config.get("coverage_min", 60.0))
     timeout = int(config.get("timeout_s", 180))
+    if doc_paths:
+        checks.append(check_prose(repo, doc_paths, config))
+    if doc_paths and not code_paths:
+        # WHY prose-only: a page edit cannot change what lint, tests or e2e prove; rerunning the suites for a typo
+        # would only make the gate slower. Project rules still run, so page-specific invariants hold.
+        checks += [run_custom_rule(r, repo, timeout, (), doc_paths) if isinstance(r, dict) else invalid_rule(r) for r in rules]
+        return VerifyReport(fp, doc_paths, checks)
+    coverage_min = float(config.get("coverage_min", 60.0))
     if config.get("layout", True):
         checks.append(check_layout(repo))
     checks.append(check_wiring(repo, config))
@@ -427,11 +477,12 @@ def verify(repo: Path, changed_paths: list[str] | None = None) -> VerifyReport:
             next="ADD Makefile target `coverage` printing `TOTAL <n>%` (bun test --coverage | uv run pytest --cov)",
         ))
     for rule in BUILTIN_RULES + rules:
-        if isinstance(rule, dict):
-            checks.append(run_custom_rule(rule, repo, timeout, code_paths))
-        else:
-            checks.append(Check("custom.invalid", "custom rule valid", "UNKNOWN", None, f"rule is not dict: {rule!r}", next="FIX .agents/VERIFY.py RULES"))
-    return VerifyReport(code_fingerprint(repo, code_paths), code_paths, checks)
+        checks.append(run_custom_rule(rule, repo, timeout, code_paths, doc_paths) if isinstance(rule, dict) else invalid_rule(rule))
+    return VerifyReport(fp, code_paths + doc_paths, checks)
+
+
+def invalid_rule(rule: Any) -> Check:
+    return Check("custom.invalid", "custom rule valid", "UNKNOWN", None, f"rule is not dict: {rule!r}", next="FIX .agents/VERIFY.py RULES")
 
 
 def render_checks(checks: list[Check], evidence_max: int = 1200) -> list[str]:

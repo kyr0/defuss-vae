@@ -13,12 +13,12 @@ from vae_verify import PROBE_TAG
 
 
 class PackageTests(unittest.TestCase):
-    SKILLS = ("plan", "implement", "review", "finalize")
+    SKILLS = ("plan", "implement", "review", "docs", "finalize")
     # Uppercase tokens that are identifiers or record keys, not Signan operators.
     NAMES = frozenset({"VERIFIED", "HYPOTHESIS", "UNKNOWN", "YAGNI", "REPL", "API", "JS", "TS", "ISO", "UTC", "RED", "GREEN", "REFACTOR", "MEMORY",
              "AGENTS", "VERIFY", "EPISODES", "CLI", "GIST", "CHANGELOG", "SIGNAN", "PRIOR_ART", "DECISION", "PLAN",
              "UNCOMMITTED", "REMAINS", "FAIL", "DONE", "FINDING", "LESSON", "BREAKING", "CHANGE", "AGENT_CMD", "CLAUDE_PLUGIN_ROOT",
-             "CLAUDE_SESSION_ID"})
+             "CLAUDE_SESSION_ID", "CONFIG", "RULES"})
     OPERATORS = frozenset({"NOT", "AND", "OR", "IF", "THEN", "ELSE", "WHEN", "CAUSES", "SAYS", "BC", "EVERY", "SOME", "ONE", "REQUIRES", "MAY"})
 
     def skill(self, name: str) -> str:
@@ -57,7 +57,7 @@ class PackageTests(unittest.TestCase):
             self.assertIsNone(re.search(r"\bWHEN\b", body), f"{name}: WHEN is equivalence, never a conditional")
 
     def test_skill_prompt_contracts(self):
-        plan, implement, review, finalize = (self.skill(n) for n in self.SKILLS)
+        plan, implement, review, docs, finalize = (self.skill(n) for n in self.SKILLS)
         for token in ("language stdlib", "native runtime/platform/framework", "current primary docs/source", "Probe unknowns", "`make e2e`", "test coverage lint e2e verify", "IF new project THEN step 0 = `bun init` (JS|TS) | `uv init` (Python)"):
             self.assertIn(token, plan)
         for token in ("You are a lazy senior developer", "RED→GREEN→REFACTOR", "root cause", "Evidence loop (priority 1)", PROBE_TAG, "5. Habits:", "ISO-8601 UTC timestamp first", "EVERY key in `.env.example`", "IF new project|subproject THEN start on `bun init` (JS|TS) | `uv init` (Python)",
@@ -65,6 +65,8 @@ class PackageTests(unittest.TestCase):
             self.assertIn(token, implement)
         for token in ("Correctness / contract pass", "Ponytail / maintainability pass", "tangled concerns", "ISO-8601 timestamp + level", "mocked|stubbed", "publishable artifact", "failing test|probe"):
             self.assertIn(token, review)
+        for token in ("../../references/PROSE.md", "Page rules first", "Mermaid", "mermaid-cli", "prose --repo . --fix", "NOT a character swap", "THEN ask, NOT invent"):
+            self.assertIn(token, docs)
         for token in ("Conventional Commits 1.0.0", ".agents/MEMORY.md", ".agents/CLI_GIST.md", ".agents/EPISODES.md", "doctor --repo", "LESSON"):
             self.assertIn(token, finalize)
 
@@ -77,10 +79,10 @@ class PackageTests(unittest.TestCase):
         sizes = {n: (ROOT / "skills" / n / "SKILL.md").stat().st_size for n in self.SKILLS}
         for name, size in sizes.items():
             self.assertLess(size, 5500, f"{name} skill grew to {size} bytes; move provenance/examples out of runtime prompt")
-        self.assertLess(sum(sizes.values()), 18500, sizes)
+        self.assertLess(sum(sizes.values()), 21500, sizes)
 
     def test_modules_import_only_lower_layers(self):
-        layers = ["vae_repo", "vae_verify", "vae_state", "vae_gate", "vae_hooks", "vae_project"]
+        layers = ["vae_repo", "vae_prose", "vae_verify", "vae_state", "vae_gate", "vae_hooks", "vae_project"]
         for i, name in enumerate(layers):
             tree = ast.parse((ROOT / "scripts" / f"{name}.py").read_text())
             imported = {n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and (n.module or "").startswith("vae_")}

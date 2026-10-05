@@ -171,6 +171,27 @@ def main() -> int:
         step("gate.rejects_leftover_probe", probe.returncode == 2 and "hygiene.probes" in probe.stdout, "calc.py probe line")
         run(["git", "checkout", "--", "calc.py"], proj)
 
+        # Docs-only session: the page is gated by the static prose check, never by the test suites.
+        docs_sid = "e2e-docs"
+        hook(root, proj, {"hook_event_name": "SessionStart", "session_id": docs_sid})
+        (proj / "README.md").write_text("\u201cCalc\u201d adds numbers \u2014 fast.\n")
+        vae = [PY, str(root / "scripts/vae.py")]
+        fixed = run([*vae, "prose", "--repo", str(proj), "--fix", "README.md"], proj, ok=(2,))
+        step("prose.fix", (proj / "README.md").read_text() == '"Calc" adds numbers \u2014 fast.\n' and "README.md:1 T02 em dash" in fixed.stdout, fixed.stdout)
+        blocked = run([*vae, "gate", "--repo", str(proj), "--session", docs_sid], proj, ok=(2,))
+        step("gate.docs_only.prose", "prose" in blocked.stdout and "tests.unit" not in blocked.stdout, blocked.stdout[:300])
+        (proj / "README.md").write_text('"Calc" adds numbers, fast.\n')
+        review = run([*vae, "gate", "--repo", str(proj), "--session", docs_sid], proj, ok=(2,))
+        step("gate.docs_only.review", 'PAGES ["README.md"]' in review.stdout and "references/PROSE.md" in review.stdout, review.stdout[:300])
+        (proj / "tmp/vae" / docs_sid / "review.json").write_text(json.dumps({
+            **json.loads((proj / "tmp/vae" / SID / "review.json").read_text()),
+            "code_fingerprint": fingerprint(review.stdout), "reviewed_paths": ["README.md"],
+        }))
+        done = run([*vae, "gate", "--repo", str(proj), "--session", docs_sid], proj)
+        step("gate.docs_only.done", "VERIFIED[gate]=true" in done.stdout, done.stdout.strip())
+        run(["git", "add", "README.md"], proj)
+        run(["git", "commit", "-qm", "docs: readme"], proj)
+
         # WHY a raw listener, not http.server: VERIFIED (CI macOS runner) its server_bind calls socket.getfqdn('127.0.0.1')
         # before the banner, and that reverse lookup took >30s there. The echo shows the service shell itself ran.
         listener = "import socket; s = socket.create_server(('127.0.0.1', 0)); print('listening port', s.getsockname()[1]); s.accept()"

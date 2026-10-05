@@ -12,7 +12,8 @@ from vae_repo import (
     changed_since,
     code_fingerprint,
     file_hash,
-    is_code,
+    is_doc,
+    is_gated,
     is_production_source,
     read_json,
     write_json,
@@ -48,7 +49,7 @@ def validate_review(path: Path, fp: str, changed_paths: list[str] | None = None)
     if not isinstance(reviewed, list) or any(not isinstance(x, str) for x in reviewed):
         return False, "reviewed_paths missing/invalid"
     if changed_paths is not None:
-        expected = {x for x in changed_paths if is_code(x)}
+        expected = {x for x in changed_paths if is_gated(x)}
         missing = expected - set(reviewed)
         if missing:
             return False, "reviewed_paths incomplete: " + ", ".join(sorted(missing))
@@ -71,6 +72,11 @@ def validate_review(path: Path, fp: str, changed_paths: list[str] | None = None)
 
 
 def validate_docs(path: Path, fp: str, changed_paths: list[str], repo: Path | None = None) -> tuple[bool, str]:
+    expected = [p for p in changed_paths if is_production_source(p)]
+    if not expected:
+        # WHY: with no production source changed (doc pages, tests, config) there is no file to assess; an empty
+        # attestation would prove nothing, so step 3 is complete instead of demanding a ritual file.
+        return True, "docs ∅ production source changed"
     obj = read_json(path)
     if not obj:
         return False, "docs attestation missing/invalid"
@@ -80,7 +86,6 @@ def validate_docs(path: Path, fp: str, changed_paths: list[str], repo: Path | No
     if not isinstance(entries, list):
         return False, "docs files must be list"
     by_path = {e.get("path"): e for e in entries if isinstance(e, dict)}
-    expected = [p for p in changed_paths if is_production_source(p)]
     for rel in expected:
         e = by_path.get(rel)
         if not e:
@@ -114,10 +119,11 @@ VERIFY_NEXT = (
 )
 
 
-def review_instruction(fp: str, path: Path, changed: list[str]) -> str:
+def review_instruction(fp: str, path: Path, changed: list[str], plugin_root: Path = PLUGIN_ROOT) -> str:
+    pages = [p for p in changed if is_doc(p)]
     shape = {
         "schema": 1, "status": "VERIFIED", "code_fingerprint": fp,
-        "reviewed_paths": [p for p in changed if is_code(p)], "checklist": REVIEW_CHECKLIST,
+        "reviewed_paths": [p for p in changed if is_gated(p)], "checklist": REVIEW_CHECKLIST,
         "findings": [{"status": "VERIFIED", "resolved": True, "location": "path:line|symbol", "evidence": "...",
                       "learning": {"status": "VERIFIED|UNKNOWN|HYPOTHESIS", "kind": "test|verifier|memory|none", "why": "..."}}],
     }
@@ -129,7 +135,10 @@ def review_instruction(fp: str, path: Path, changed: list[str]) -> str:
         "PASS2 structure + Ponytail: separated concerns in small testable modules; delete|reuse → stdlib → native → installed dependency → minimum code; NOT duplicate machinery, speculative config|abstraction, unmeasured optimization.\n"
         "Actionable finding REQUIRES location + causal evidence + minimal fix; fix EVERY one. "
         "IF recurrence mechanically checkable THEN regression test OR .agents/VERIFY.py rule ELSE learning.status=UNKNOWN + why.\n"
-        "IF you edit source|test THEN rerun LOOP before attesting (fingerprint changes).\n"
+        + (f"PAGES {json.dumps(pages, separators=(',', ':'))}: review EVERY changed unit against {plugin_root}/references/PROSE.md "
+           "(B evidence, L logic, P precision, R relevance, A structure, S style, T typography incl. T07 Mermaid); fix what the page|code supports, "
+           "NOT invent facts; finding.location = page:line + rule id.\n" if pages else "")
+        + "IF you edit source|test|page THEN rerun LOOP before attesting (fingerprint changes).\n"
         f"THEN write {path} (findings=[] IF none):\n{json.dumps(shape, separators=(',', ':'))}"
     )
 
@@ -179,10 +188,10 @@ def gate(repo: Path, session_id: str, plugin_root: Path = PLUGIN_ROOT) -> Gate:
     state["gate_runs"] = int(state.get("gate_runs", 0)) + 1
     sp = state_path(repo, session_id)
     changed = changed_since(repo, state["baseline"])
-    code = [p for p in changed if is_code(p)]
+    code = [p for p in changed if is_gated(p)]
     if not code:
         write_json(sp, state)
-        return Gate(True, "VERIFIED[gate]=true BC ∅ code changes since session baseline")
+        return Gate(True, "VERIFIED[gate]=true BC ∅ code|doc changes since session baseline")
     bootstrap(repo, plugin_root)
     fp = code_fingerprint(repo, code)
     loop = (f"LOOP: python3 {plugin_root}/scripts/vae.py gate --repo {repo} --session {session_id} "
@@ -204,7 +213,7 @@ def gate(repo: Path, session_id: str, plugin_root: Path = PLUGIN_ROOT) -> Gate:
     ok, why = validate_review(rp, fp, changed)
     if not ok:
         write_json(sp, state)
-        return Gate(False, bounded(repo, session_id, review_instruction(fp, rp, changed) + f"\nSTATE: {why}\n" + loop))
+        return Gate(False, bounded(repo, session_id, review_instruction(fp, rp, changed, plugin_root) + f"\nSTATE: {why}\n" + loop))
     dp = attestation_path(repo, session_id, "docs")
     ok, why = validate_docs(dp, fp, changed, repo)
     if not ok:

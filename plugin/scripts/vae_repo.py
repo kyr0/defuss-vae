@@ -25,6 +25,7 @@ ENGINEERING_EXT = SOURCE_EXT | {
     ".graphql", ".gql", ".proto", ".tf", ".tfvars", ".css", ".scss", ".less", ".html",
 }
 TEST_EXT = SOURCE_EXT
+DOC_EXT = {".md", ".mdx", ".markdown"}
 CODE_CONFIG = {
     "package.json", "pyproject.toml", "setup.py", "setup.cfg", "tox.ini", "pytest.ini",
     "go.mod", "go.sum", "Cargo.toml", "Cargo.lock", "bun.lock", "bun.lockb", "uv.lock",
@@ -134,13 +135,28 @@ def changed_since(repo: Path, baseline: dict[str, Any]) -> list[str]:
     return sorted(changed)
 
 
-def is_code(path: str) -> bool:
+def in_scope(path: str) -> bool:
+    """Project-owned files: not runtime state, agent memory or vendored/build directories."""
     p = Path(path)
     if not p.parts or p.parts[0] in RUNTIME_TOP or path.startswith(".agents/"):
         return False
-    if any(part in IGNORE_DIRS for part in p.parts):
+    return not any(part in IGNORE_DIRS for part in p.parts)
+
+
+def is_code(path: str) -> bool:
+    p = Path(path)
+    if not in_scope(path):
         return False
     return p.suffix.lower() in ENGINEERING_EXT or p.name in CODE_CONFIG or p.name in {"Dockerfile", "Containerfile", "docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"}
+
+
+def is_doc(path: str) -> bool:
+    # WHY Markdown only: the static prose checks parse fences, links and Mermaid blocks, which only Markdown defines.
+    return in_scope(path) and Path(path).suffix.lower() in DOC_EXT
+
+
+def is_gated(path: str) -> bool:
+    return is_code(path) or is_doc(path)
 
 
 def is_test(path: str) -> bool:
@@ -159,8 +175,9 @@ def is_production_source(path: str) -> bool:
 
 
 def code_fingerprint(repo: Path, paths: Iterable[str]) -> str:
+    """Content hash of the gated paths (code and doc pages): any edit invalidates verify, review and docs."""
     h = hashlib.sha256()
-    for rel in sorted({p for p in paths if is_code(p)}):
+    for rel in sorted({p for p in paths if is_gated(p)}):
         h.update(rel.encode("utf-8", "surrogateescape"))
         h.update(b"\0")
         h.update(file_hash(repo / rel).encode())

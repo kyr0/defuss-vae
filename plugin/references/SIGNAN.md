@@ -1,6 +1,6 @@
 # Signan engineering dialect
 
-Purpose: minimum-token technical text that is still uniquely decodable — for agent output and for defuss-vae's own skill prompts. Compression never outranks correctness.
+Purpose: minimum-token technical text that is still uniquely decodable, for agent output and for defuss-vae's own skill prompts. Compression never outranks correctness.
 
 ## Epistemics
 
@@ -12,14 +12,14 @@ Purpose: minimum-token technical text that is still uniquely decodable — for a
 
 ## Grammar
 
-Exact uppercase words are operators only when listed here; lowercase/mixed-case occurrences are ordinary lexical text. Never uppercase other words for emphasis — it makes operators ambiguous.
+Exact uppercase words are operators only when listed here; lowercase/mixed-case occurrences are ordinary lexical text. Never uppercase other words for emphasis: it makes operators ambiguous.
 
 Operators: `NOT`, `AND`, `OR`, `IF … THEN … ELSE`, `WHEN`, `CAUSES`, `SAYS`, `BC`, `EVERY`, `SOME`, `ONE`, `REQUIRES`, `MAY`.
 
 Semantics:
 
 - `IF A THEN B`: implication. `IF A THEN B ELSE C`: B if A holds, otherwise C; `ELSE` binds to the nearest `IF`.
-- `A WHEN B`: equivalence between complete propositions — never a conditional.
+- `A WHEN B`: equivalence between complete propositions, never a conditional.
 - unpaired `THEN`, `A → B`: sequence; `cmd → result`: observed output. Ladder `a → b → c`: try in order, stop at the first rung that holds.
 - `A CAUSES B`: causal claim.
 - `X SAYS P`: explicit attribution.

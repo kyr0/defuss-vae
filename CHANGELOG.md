@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Docs skill (`/defuss-vae:docs`): grounded claims, the universal prose catalog (`references/PROSE.md`), Mermaid for schematic content, page rules declared before writing.
+- Gate: doc pages (`*.md`, `*.mdx`, `*.markdown`) are gated. A docs-only session runs the static prose check, project rules and a catalog review, and skips the test suites. The docs attestation step is skipped when no production source changed.
+- `vae.py prose [--fix]`: flags machine-writing tells, invisible or look-alike characters, broken links, fences and Mermaid blocks; `--fix` applies only meaning-preserving replacements. Configure per page with `CONFIG["prose"]`; `glob` rules reach pages with `"docs": True`.
+
 ## 0.3.1
 
 - Stop hook: blocks once per turn, then ends the turn with a user-facing `systemMessage`. 0.3.0 answered repeat stops with `additionalContext`, which Claude Code also treats as a continuation, so a gate waiting on the human re-invoked the model up to the 8-continuation cap.

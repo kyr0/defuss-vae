@@ -1,0 +1,33 @@
+---
+name: docs
+description: "Human-triggered documentation: grounded claims, universal prose catalog, Mermaid for schematic content, static check."
+disable-model-invocation: true
+allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py *)
+---
+
+# defuss-vae / docs
+
+Precondition: explicit human invocation. Scope = doc pages (`*.md|*.mdx|*.markdown`); code comments → the gate's docs step.
+CLI = `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py` (other hosts: plugin root = skill dir/../..).
+
+## Workflow
+
+1. **Ground.** read EVERY page in scope + the code|tests it describes; claims BC code|test|output, NOT recall. Fix reader, purpose, language; house style > defaults.
+2. **Page rules first.** EVERY page gets the built-in `prose` check. IF a page has its own invariant (section|diagram|command) THEN add a `.agents/VERIFY.py` `RULES` entry before writing (`path`=page | `glob` + `"docs": True`); house-style characters (`„“`, `…`) → `CONFIG["prose"]["allow"][glob]`.
+3. **Form.** IF schematic (≥3 ordered steps, branches|loops, components + links, states, messages, timeline) THEN Mermaid ELSE prose|table|list. One idea, ≤~12 nodes; a sentence still states the claim. Render (`bunx @mermaid-js/mermaid-cli`) to `tmp/` AND inspect; else UNKNOWN[mermaid.render].
+4. **Write.** why > what; epistemic prefixes where project docs use them. Engaging = concrete problem, payoff, early runnable example; NOT hype.
+5. **Static check.** CLI `prose --repo . --fix <pages>`; rewrite the rest by meaning (em dash → comma|colon|parentheses|two sentences), NOT a character swap.
+6. **Catalog review.** read `../../references/PROSE.md`; check EVERY changed unit against it; fix what page|repo support. IF a fix needs an absent fact|source|decision THEN ask, NOT invent.
+7. **Gate.** CLI `gate --repo . --session ${CLAUDE_SESSION_ID}` until VERIFIED[gate]=true.
+
+## Output contract
+
+```text
+VERIFIED[prose] BC `vae.py prose` → findings=0
+VERIFIED[mermaid.render] BC tmp/<page>.png inspected|UNKNOWN
+FINDING <rule> <page:line>: problem; instruction
+```
+
+## Signan core
+
+Signan = min-token, uniquely decodable technical text; correctness > compression. `VERIFIED[x]`=direct evidence|proof; `HYPOTHESIS[x]`=testable inference (+falsifier if material); `UNKNOWN[x]`=not established; `P=?` unknown value. Operators = exact uppercase only: `NOT AND OR IF … THEN … ELSE WHEN CAUSES SAYS BC EVERY SOME ONE REQUIRES MAY`. `WHEN`=equivalence; unpaired `THEN`|`→`=sequence|result (ladder: first rung that holds); `SAYS`=attribution; `BC`=because|evidence; `EVERY SOME ONE`=∀ ∃ ∃!; `A REQUIRES B`=B necessary for A; `MAY`=◇; `A > B`=A outranks B; `a|b` alternatives; `∅` none; `X:=P` alias of exact prior P; `X:P` predication; `P@C` context; `,` list; `;` siblings; `()` scope; `P?` question. Preserve scope, polarity, modality, quantifiers, attribution, causality, order, numbers, units, code. IF unique expansion impossible THEN conventional prose. Spec: `../../references/SIGNAN.md`.
