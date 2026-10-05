@@ -23,6 +23,7 @@ from vae_state import (
     append_episodes,
     attestation_path,
     bootstrap,
+    episode_entries,
     load_session,
     session_dir,
     state_path,
@@ -243,10 +244,16 @@ def gate(repo: Path, session_id: str, plugin_root: Path = PLUGIN_ROOT) -> Gate:
         cov = state.get("coverage")
         paths = ",".join(code[:4]) + (f"(+{len(code) - 4})" if len(code) > 4 else "")
         entries = [f"DONE fp={fp[:12]} cov={'?' if cov is None else f'{cov:.1f}%'} paths={paths}"]
+        # WHY skip known findings: a review carried across fingerprints re-lists earlier findings, and re-logging them
+        # flooded the 100-entry window. VERIFIED: in this repo 71 of 100 entries were such repeats, pushing out history.
+        # Repeated FAIL lines stay: a recurring failure is the signal to promote its lesson.
+        known = {e.split(" ", 2)[2] for e in episode_entries(repo) if e.count(" ") >= 2}
         for f in (read_json(rp) or {}).get("findings") or []:
             learning = f.get("learning") if isinstance(f.get("learning"), dict) else {}
             lesson = " ".join(str(learning.get("why") or f.get("evidence") or "").split())[:160]
-            entries.append(f"FINDING {f.get('location')} learn={learning.get('kind')}: {lesson}")
+            line = f"FINDING {f.get('location')} learn={learning.get('kind')}: {lesson}"
+            if line not in known and line not in entries:
+                entries.append(line)
         append_episodes(repo, session_id, entries, plugin_root)
     write_json(sp, state)
     return Gate(True, f"VERIFIED[gate]=true BC verify+review+docs@fp={fp[:12]}{note}")

@@ -118,6 +118,10 @@ The agent and the hook must agree on attestation paths without environment plumb
 
 IF review finds a deterministic recurrence class that is not yet encoded THEN the agent adds a regression test OR a `.agents/VERIFY.py` rule; IF encoding is not feasible THEN the finding's learning is `UNKNOWN` with a reason. Rules encode invariants, not taste. `glob` rules apply only to changed files so policy covers new work without blocking on untouched legacy code.
 
+## Why the episode log never repeats a finding
+
+The gate appends a `FINDING` line only if the same line is not already in `.agents/EPISODES.md`. A review attestation carried from one fingerprint to the next re-lists its earlier findings, and logging them again flooded the 100-entry window: `VERIFIED:` in this repository 71 of 100 entries were such repeats, which pushed older, distinct history out. `FAIL` lines are not deduplicated, because a failure that keeps recurring is exactly the signal finalize uses to promote a lesson into a test or rule.
+
 ## Why project-local Python
 
 `VERIFIED:` the Python stdlib covers process execution, matching, JSON, git state and rule loading; hooks need no package installs.

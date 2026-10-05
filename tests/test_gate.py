@@ -100,6 +100,23 @@ class GateTests(RepoCase):
         self.write("README.md", "Fast, really!\n")
         self.assertIn("GATE 2/3 review", self.stop(sid)["reason"], "a page edit invalidates the review")
 
+    def test_a_finding_carried_across_fingerprints_is_logged_once(self):
+        self.make_python_project()
+        sid = "dup"
+        init_session(self.repo, sid)
+        finding = {"status": "VERIFIED", "resolved": True, "location": "calc.py:2", "evidence": "sign bug",
+                   "learning": {"status": "VERIFIED", "kind": "test", "why": "pinned by test_add"}}
+        for body in ("return a + b + 0", "return a + b + 1 - 1"):
+            self.write("calc.py", f"def add(a, b):\n    # VERIFIED: direct addition.\n    {body}\n")
+            gate(self.repo, sid, ROOT)
+            fp = code_fingerprint(self.repo, ["calc.py"])
+            self.attest(sid, fp, [finding])
+            self.attest_docs(sid, fp)
+            self.assertTrue(gate(self.repo, sid, ROOT).done)
+        entries = episode_entries(self.repo)
+        self.assertEqual(sum(" DONE " in e for e in entries), 2)
+        self.assertEqual(sum("FINDING calc.py:2" in e for e in entries), 1, "the second DONE re-lists the same finding")
+
     def test_repeat_stop_in_same_turn_does_not_block(self):
         self.make_python_project()
         init_session(self.repo, "s2")
