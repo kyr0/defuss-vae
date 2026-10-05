@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0
 
 - Renamed the engineering dialect from Signan to VAE-DIALECT; its spec moved from `references/SIGNAN.md` to `references/VAE-DIALECT.md`, and each skill's core section is now `## VAE-DIALECT core`.
 - Gate, warning until 0.6.0 (`CONFIG["strict"]=True` blocks now): `docs.pages` requires `README.md` at the root and for every package with a changed CLI or API (executable scripts, `__main__.py`, package manifests, API definitions), and `ARCH.md` for every package with changed production code or deployment and schema definitions. A page covers the folders below it up to the next package manifest. Templates `README.md.tmpl` (with badges) and `ARCH.md.tmpl`; exempt folders via `CONFIG["readme"|"arch"]["exclude"]`.
