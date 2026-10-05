@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.2
 
 - Hooks: PreToolUse returns before loading the gate for a command that cannot be a commit, cutting the cost per Bash call from 35 ms to 19 ms (Apple M4). A gate module that fails to import now denies the commit instead of crashing the hook.
 - `make bench` reports medians for every hook and gate path, plus the consumer's own suite time, so the gate's overhead is visible; the numbers are in the README.
