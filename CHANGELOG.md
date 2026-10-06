@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.5
+
+- Memory: a memory entry binds only inside its evidenced `[scope]` and below the current request; a contested fact (memory against the repo, say) is observed before editing, a disproved entry is narrowed, rewritten or dropped, and rhetoric, repetition, recency or detail never promote or widen a claim. The `MEMORY.md` template and `references/CONSOLIDATION.md` define `[scope]` as the narrowest boundary the evidence supports; finalize promotes a lesson at that scope and narrows entries wider than their evidence. The always-on rules stay the same size.
+- Session start injects at most three open episodes instead of the last three lines: `LESSON` lines, findings learned nowhere else (`learn=none`) and `FAIL`s their session never turned green, newest first, labeled as leads and sharing 1024 characters equally. `MEMORY.md` and `CLI_GIST.md` injection is unchanged.
+- Skills: `implement` greps `.agents/EPISODES.md` for touched paths, symbols or symptoms; `review` reads `AGENTS.md`, `.agents/MEMORY.md`, `.agents/CLI_GIST.md` and `.agents/VERIFY.py` and greps `EPISODES.md` for changed paths, symbols or symptoms instead of reading all of `.agents/`; `finalize` still reads every episode. `implement` step 8 now points to the gate's docs step, which states the same rule.
+
 ## 0.5.4
 
 - Gate: `CONFIG["e2e_paths"]` (globs, e.g. `["web/*"]`) reruns e2e only when a matching file, a build file (`Makefile`, manifests, lockfiles) or the policy changed since e2e last passed in the session; lint, unit tests and coverage still run on every code edit. Without it, any code edit reruns e2e as before.

@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "defuss-vae",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "Lean verified agentic engineering: human-triggered skills plus deterministic verify/review/docs lifecycle gates.",
   "author": {
     "name": "defuss"
