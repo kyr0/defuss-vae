@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 
 from vae_testkit import (  # first: puts plugin/scripts on sys.path
+    E2E_CMD,
     PY,
     ROOT,
     TEST_CMD,
@@ -165,6 +166,41 @@ class GateTests(RepoCase):
         self.write("calc.py", "def add(a, b):\n    return a + b + 0\n")
         gate(self.repo, "s3b", ROOT)
         self.assertEqual(runs(), 2, "a code edit reruns the suites")
+
+    def test_e2e_paths_rerun_e2e_only_for_scoped_or_build_files(self):
+        self.make_python_project(e2e=f"echo run >> e2e.txt && {E2E_CMD}", config=", 'e2e_paths':['web/*']")
+        init_session(self.repo, "s3c")
+        runs = lambda: (self.repo / "e2e.txt").read_text().count("run")
+        self.write("calc.py", "def add(a, b):\n    return b + a\n")
+        self.assertIn("GATE 2/3 review", gate(self.repo, "s3c", ROOT).text)
+        self.assertEqual(runs(), 1, "no green e2e yet in this session")
+        self.write("test_calc.py", (self.repo / "test_calc.py").read_text() + "\n# unit test edit\n")
+        self.assertIn("GATE 2/3 review", gate(self.repo, "s3c", ROOT).text)
+        self.assertEqual(runs(), 1, "a file outside e2e_paths reuses the green e2e")
+        self.write("web/app.py", "PAGE = 'sum'\n")
+        self.write("calc.py", "def add(a, b):\n    return a - b\n")
+        self.assertIn("GATE 1/3 verify: FAIL", gate(self.repo, "s3c", ROOT).text)
+        self.assertEqual(runs(), 2, "a scoped file reruns e2e")
+        self.write("calc.py", "def add(a, b):\n    return a + b + 0\n")
+        self.assertIn("GATE 2/3 review", gate(self.repo, "s3c", ROOT).text)
+        self.assertEqual(runs(), 2, "e2e that passed beside a failing unit test stays cached")
+        self.write("pyproject.toml", "[project]\nname = 'calc'\n")
+        gate(self.repo, "s3c", ROOT)
+        self.assertEqual(runs(), 3, "a build file always reruns e2e")
+        with (self.repo / ".agents/VERIFY.py").open("a") as f:
+            f.write("# policy edit\n")
+        gate(self.repo, "s3c", ROOT)
+        self.assertEqual(runs(), 4, "a policy edit reruns e2e")
+
+    def test_without_e2e_paths_every_code_edit_reruns_e2e(self):
+        self.make_python_project(e2e=f"echo run >> e2e.txt && {E2E_CMD}")
+        init_session(self.repo, "s3d")
+        runs = lambda: (self.repo / "e2e.txt").read_text().count("run")
+        self.write("calc.py", "def add(a, b):\n    return b + a\n")
+        gate(self.repo, "s3d", ROOT)
+        self.write("test_calc.py", (self.repo / "test_calc.py").read_text() + "\n# unit test edit\n")
+        gate(self.repo, "s3d", ROOT)
+        self.assertEqual(runs(), 2)
 
     def test_failures_logged_once_per_distinct_set(self):
         self.make_python_project()

@@ -25,7 +25,7 @@ For changes to code or doc pages (`*.md`, `*.mdx`, `*.markdown`; paths outside `
 2. **review**: attestation for the current fingerprint covers every changed code path and doc page (pages against `plugin/references/PROSE.md`), the full checklist, and only resolved findings with location + evidence + learning.
 3. **docs**: attestation assesses file/method/inline for every changed production file, with a plausible alternative and an epistemically prefixed rationale. With no production file changed, the step is complete: an attestation over zero files would prove nothing.
 
-A session that changed only doc pages runs `verifier.config`, `docs.pages`, `prose` and the project rules, not lint, tests, coverage or e2e. The same holds for a page edit after the suites passed: suites are cached on code and policy, page checks on pages and policy.
+A session that changed only doc pages runs `verifier.config`, `docs.pages`, `prose` and the project rules, not lint, tests, coverage or e2e. The same holds for a page edit after the suites passed: suites are cached on code and policy, page checks on pages and policy, and with `CONFIG["e2e_paths"]` e2e on its scoped files and policy (see below).
 
 `docs.pages`, `gitignore` and `package` arrived in 0.5.0 and fail existing repositories on their next change, so until 0.6.0 they warn: the report lists them under `WARNS:` with their fix, and the gate does not block on them. `CONFIG["strict"]=True` makes them blocking now; this repository sets it.
 
@@ -107,6 +107,14 @@ The Stop hook runs the gate at the end of every turn and PreToolUse runs before 
 ## Why a verification cache
 
 `VERIFIED:` the fingerprint hashes every changed code file; `.agents/VERIFY.py` and `.gitignore` hashes join it in the cache key because they change verification results without being code. Identical key ⇒ identical inputs, so the review and docs loop turns skip re-running suites. `UNKNOWN:` environment drift (installed toolchain changes) is not part of the key; editing any code file or policy re-runs everything.
+
+## Why e2e has its own cache key, and only on request
+
+e2e is usually the slowest suite (a Playwright run builds the app and drives a browser), and without a scope any code edit reruns it, including a typo fix in a unit test. `CONFIG["e2e_paths"]` lists the globs (fnmatch, `*` crosses `/`) of the files the e2e depends on, e.g. `["web/*", "e2e/*"]`. The gate then keys e2e on those changed files, the build files (`Makefile`, manifests, lockfiles, bundler config) and the policy hashes. While that key matches the last passing e2e in the session, the report shows a passing `tests.e2e` check with `reused key=…` instead of running the commands. Lint, unit tests and coverage still run on every code edit, and an e2e that passed next to a failing unit test stays cached.
+
+Why opt-in instead of a default heuristic such as "unit test files never affect e2e": e2e consumes the built artifact, so nearly any source file can change its result, and Playwright's default spec location `tests/*.spec.ts` looks like a unit test path. A guessed scope would skip e2e exactly where it should run; only the project knows which files cannot reach the artifact. A list that is not a non-empty list of strings counts as unset, so a mistake there makes the gate slower, never weaker. Build files always count because they decide what the artifact is.
+
+`VERIFIED:` `test_e2e_paths_rerun_e2e_only_for_scoped_or_build_files` drives this through the gate: an unscoped edit reuses e2e, while a scoped file, a build file and a policy edit each rerun it. `test_without_e2e_paths_every_code_edit_reruns_e2e` covers the default. `UNKNOWN:` a scope that misses a real dependency (a shared module outside the globs) skips e2e wrongly; review is what catches a scope that is too narrow.
 
 ## Why state lives in `tmp/vae/` and logs in `var/log/vae/`
 

@@ -7,6 +7,7 @@ CONFIG = {
     "coverage_command": None,      # None → `make coverage`; output needs `TOTAL <n>%` or an `All files |…|` table.
     "integration_commands": [],    # [] → `make integration` if present.
     "e2e_commands": [],            # [] → `make e2e`: build + consume the publishable artifact.
+    "e2e_paths": [],               # globs e2e depends on, e.g. ["web/*"]: e2e reruns only when one (or a build file) changed; [] → any code file.
     "timeout_s": 180,
     "layout": True,                # Makefile verbs + gitignored secrets, runtime state, dist/, caches and package folders.
     "strict": False,              # True: docs.pages, gitignore and package block instead of warning (blocks from 0.6.0 by default).

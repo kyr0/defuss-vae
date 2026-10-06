@@ -13,7 +13,7 @@ Modules form a strict layer order, `vae_repo` → `vae_prose` → `vae_verify` �
 ## Operations
 
 - **Configuration and policy:** `.agents/VERIFY.py` (`CONFIG`, `RULES`), loaded fresh on every gate run and hashed into the verification cache key.
-- **Complexity and resources:** a cached gate run takes about 90 ms, most of it five `git` subprocesses; a cold run adds the project's commands (`timeout_s`, default 180 s each); repository walks stop at 50,000 files; the suites are cached until code or policy change, the page checks until pages or policy change, so a README fix after a green suite reruns only the page checks.
+- **Complexity and resources:** a cached gate run takes about 90 ms, most of it five `git` subprocesses; a cold run adds the project's commands (`timeout_s`, default 180 s each); repository walks stop at 50,000 files; the suites are cached until code or policy change, the page checks until pages or policy change, so a README fix after a green suite reruns only the page checks; with `CONFIG["e2e_paths"]` e2e is cached until a scoped file, a build file or policy changes.
 - **Reliability:** a missing command or metric is `UNKNOWN` and fails; gate text over 9,000 characters is cut to head and tail, with the full text in `tmp/vae/<session>/gate.txt`.
 - **Observability:** each command's output goes to `var/log/vae/<check>.log`; the gate appends `FAIL`, `DONE` and `FINDING` lines to `.agents/EPISODES.md` (last 100 kept).
 

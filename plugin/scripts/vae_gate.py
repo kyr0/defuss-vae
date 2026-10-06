@@ -28,7 +28,13 @@ from vae_state import (
     session_dir,
     state_path,
 )
-from vae_verify import PROBE_TAG, render_report, verify
+from vae_verify import (
+    PROBE_TAG,
+    e2e_scope,
+    load_project_verifier,
+    render_report,
+    verify,
+)
 
 EPI = {"VERIFIED", "UNKNOWN", "HYPOTHESIS"}
 REVIEW_CHECKLIST = [
@@ -207,8 +213,16 @@ def gate(repo: Path, session_id: str, plugin_root: Path = PLUGIN_ROOT) -> Gate:
     # WHY two cache keys: code + policy hashes decide whether the suites must run again, pages + policy whether the page
     # checks must; a README typo after a green suite reruns only the prose check, and review/docs loops rerun nothing.
     code_ok = state.get("verified_key") == code_key or not any(is_code(p) for p in code)
+    # WHY a third key: with CONFIG["e2e_paths"] set, e2e (often a Playwright run, the slowest suite) reruns only when
+    # a file it depends on changed; without it the scope is every code file, so e2e reruns on any code edit as before.
+    scope = None if code_ok else e2e_scope(load_project_verifier(repo)[0], [p for p in code if is_code(p)])
+    e2e_key = None if scope is None else verify_key(repo, code_fingerprint(repo, scope))
+    e2e_reuse = e2e_key if e2e_key and state.get("e2e_key") == e2e_key else None
     if not code_ok or state.get("pages_key") != pages_key:
-        report = verify(repo, changed, suites=not code_ok)
+        report = verify(repo, changed, suites=not code_ok, e2e_reuse=e2e_reuse)
+        if not code_ok and not e2e_reuse:  # a green e2e stays cached even when another suite failed
+            ran = [c for c in report.checks if c.id.startswith("tests.e2e")]
+            state["e2e_key"] = e2e_key if ran and all(c.passes() for c in ran) else None
         if not report.verified:
             state["verified_fp"] = state["pages_key"] = None
             if not code_ok:  # a page failure leaves the green suites cached

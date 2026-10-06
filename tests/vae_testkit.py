@@ -48,14 +48,15 @@ class RepoCase(unittest.TestCase):
     def commit_all(self, msg="init"):
         sh("git add -A && git commit -qm " + msg, self.repo)
 
-    def make_python_project(self, test_command: str = TEST_CMD, coverage: str = "75", rules: str = "[]", layout: bool = False):
+    def make_python_project(self, test_command: str = TEST_CMD, coverage: str = "75", rules: str = "[]", layout: bool = False,
+                            e2e: str = E2E_CMD, config: str = ""):
         self.write("calc.py", "def add(a, b):\n    return a + b\n")
         self.write("README.md", "# calc\n\nAdds two numbers.\n")
         self.write("ARCH.md", "# Architecture: calc\n\nOne pure function; no I/O, no personal data.\n")
         self.write("test_calc.py", "import unittest\nfrom calc import add\n\nclass T(unittest.TestCase):\n    def test_add(self): self.assertEqual(add(2, 3), 5)\n")
         self.write(".agents/VERIFY.py", (
-            f"CONFIG={{'coverage_min':60, 'test_command':{test_command!r}, 'lint_command':{LINT_CMD!r}, 'e2e_commands':[{E2E_CMD!r}],\n"
-            f" 'coverage_command':\"{PY} -c \\\"print('TOTAL {coverage}%')\\\"\", 'timeout_s':60, 'layout':{layout}}}\n"
+            f"CONFIG={{'coverage_min':60, 'test_command':{test_command!r}, 'lint_command':{LINT_CMD!r}, 'e2e_commands':[{e2e!r}],\n"
+            f" 'coverage_command':\"{PY} -c \\\"print('TOTAL {coverage}%')\\\"\", 'timeout_s':60, 'layout':{layout}{config}}}\n"
             f"RULES={rules}\n"
         ))
         self.commit_all()

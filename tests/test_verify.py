@@ -27,6 +27,7 @@ from vae_verify import (
     check_layout,
     check_package,
     check_wiring,
+    e2e_scope,
     parse_coverage,
     remedy,
     render_report,
@@ -46,6 +47,12 @@ class VerifyTests(RepoCase):
         self.assertIn("Ran 1 test", (self.repo / "var/log/vae/tests.unit.log").read_text())
         self.assertEqual(self.check(report, "tests.e2e.evidence").evidence, "changed=['output/sum.txt']")
         self.assertNotIn("var/", sh("git status --porcelain", self.repo).stdout)
+
+    def test_e2e_scope_matches_globs_plus_build_files_and_ignores_invalid_config(self):
+        paths = ["web/app.ts", "api/main.py", "package.json", "tests/test_api.py"]
+        self.assertEqual(e2e_scope({"e2e_paths": ["web/*"]}, paths), ["package.json", "web/app.ts"])
+        for bad in ({}, {"e2e_paths": []}, {"e2e_paths": "web/*"}, {"e2e_paths": [1]}):
+            self.assertIsNone(e2e_scope(bad, paths), f"{bad} falls back to every code file")
 
     def test_failing_test_reports_tail_and_log_path(self):
         self.make_python_project()

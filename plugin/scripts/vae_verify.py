@@ -13,6 +13,7 @@ from typing import Any
 
 from vae_prose import Finding, fix, scan
 from vae_repo import (
+    CODE_CONFIG,
     MANIFESTS,
     PLUGIN_ROOT,
     SOURCE_EXT,
@@ -544,9 +545,23 @@ def check_doc_pages(repo: Path, changed: Iterable[str], config: dict[str, Any]) 
                  not missing, f"missing={missing[:20]}" if missing else "README.md + ARCH.md present", required=strict(config), next=nxt)
 
 
-def verify(repo: Path, changed_paths: list[str] | None = None, suites: bool = True) -> VerifyReport:
+def e2e_scope(config: dict[str, Any], code_paths: Iterable[str]) -> list[str] | None:
+    """Changed code files the e2e depends on: those matching CONFIG["e2e_paths"] plus build files (Makefile,
+    manifests, lockfiles). None without a non-empty list of globs: then every code file counts.
+
+    WHY opt-in: e2e consumes the built artifact, so nearly any source file can change its result and only the
+    project knows which cannot. WHY build files always count: they decide what the artifact is."""
+    globs = config.get("e2e_paths")
+    if not isinstance(globs, list) or not globs or not all(isinstance(g, str) for g in globs):
+        return None
+    return sorted(p for p in code_paths if Path(p).name in CODE_CONFIG or any(fnmatch.fnmatchcase(p, g) for g in globs))
+
+
+def verify(repo: Path, changed_paths: list[str] | None = None, suites: bool = True, e2e_reuse: str | None = None) -> VerifyReport:
     """All checks for the changed paths. `suites=False` (or a change of pages only) runs just the page checks and
-    project rules: the gate uses it when code already passed and only pages changed since."""
+    project rules: the gate uses it when code already passed and only pages changed since. `e2e_reuse` (the gate's
+    cache key) replaces the e2e commands with a passing check naming that key: no e2e-scoped file changed since
+    they last passed."""
     repo = repo.resolve()
     if changed_paths is None:
         changed_paths = sorted(dirty_paths(repo))
@@ -606,9 +621,15 @@ def verify(repo: Path, changed_paths: list[str] | None = None, suites: bool = Tr
     for i, cmd in enumerate(integration):
         checks.append(check_command(f"tests.integration.{i+1}", "integration test command passes", str(cmd), repo, timeout))
     before = tree_state(repo / "output")
-    for i, cmd in enumerate(e2e):
+    reuse = bool(e2e and e2e_reuse)
+    for i, cmd in enumerate([] if reuse else e2e):
         checks.append(check_command(f"tests.e2e.{i+1}", "e2e (dogfood) command passes", str(cmd), repo, timeout))
-    if not e2e:
+    if reuse:
+        checks.append(Check(
+            "tests.e2e", "e2e passed for the current e2e-scoped files", "VERIFIED", True,
+            f"reused key={str(e2e_reuse)[:12]}: no CONFIG['e2e_paths'] or build file changed since e2e last passed",
+        ))
+    elif not e2e:
         checks.append(Check(
             "tests.e2e", "e2e command passes", "UNKNOWN", None, "no Makefile `e2e` target or CONFIG['e2e_commands']",
             next="ADD Makefile target `e2e`: build the publishable artifact → clean consumer → input/ → output/",
