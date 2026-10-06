@@ -60,6 +60,12 @@ class PackageTests(unittest.TestCase):
         plan, implement, review, docs, finalize = (self.skill(n) for n in self.SKILLS)
         for token in ("language stdlib", "native runtime/platform/framework", "current primary docs/source", "Probe unknowns", "`make e2e`", "test coverage lint e2e verify", "IF new project THEN step 0 = `bun init` (JS|TS) | `uv init` (Python)"):
             self.assertIn(token, plan)
+        # SessionStart injects no episodes, so each skill retrieves them by relevance; finalize reads them all.
+        self.assertIn("`grep` `.agents/EPISODES.md` for touched paths|symptoms", plan)
+        self.assertIn("`grep` `.agents/EPISODES.md` for touched paths|symbols|symptoms", implement)
+        self.assertIn("`AGENTS.md`, `.agents/MEMORY.md`, `.agents/CLI_GIST.md`, `.agents/VERIFY.py`, changed files", review)
+        self.assertIn("`grep` `.agents/EPISODES.md` for changed paths|symbols|symptoms", review)
+        self.assertNotIn("`.agents/*`", review)  # the full episode log is for finalize only
         for token in ("You are a lazy senior developer", "RED→GREEN→REFACTOR", "root cause", "Evidence loop (priority 1)", PROBE_TAG, "5. Habits:", "ISO-8601 UTC timestamp first", "EVERY key in `.env.example`", "IF new project|subproject THEN start on `bun init` (JS|TS) | `uv init` (Python)",
                       "NOT mocks", "clean consumer", "`make start|stop|status|log`", "gate --repo . --session ${CLAUDE_SESSION_ID}"):
             self.assertIn(token, implement)

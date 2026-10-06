@@ -257,13 +257,20 @@ class GateTests(RepoCase):
         init_project(self.repo, ROOT)
         with (self.repo / ".agents/MEMORY.md").open("a") as f:
             f.write("- VERIFIED[db] migrations run via `make migrate` BC 2026-09-30 run\n")
+        with (self.repo / ".agents/CLI_GIST.md").open("a") as f:
+            f.write("- VERIFIED[deploy] `fly deploy --app demo`\n")
         append_episodes(self.repo, "old", ["LESSON HYPOTHESIS[cache] falsified BC probe"], ROOT)
         event = {"hook_event_name": "SessionStart", "cwd": str(self.repo), "session_id": "same"}
         ctx = session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"]
         self.assertIn("CI runs async: after a push report the run URL and finish, NOT wait for it", ctx)
         self.assertIn("- VERIFIED[db] migrations run via `make migrate`", ctx)
+        self.assertIn("- VERIFIED[deploy] `fly deploy --app demo`", ctx)
         self.assertNotIn("VERIFIED[scope] fact", ctx)
-        self.assertIn("LESSON HYPOTHESIS[cache]", ctx)
+        # Episodes are relevant by recency only, so they are grepped by path|symptom, never injected.
+        self.assertNotIn("LESSON HYPOTHESIS[cache]", ctx)
+        for rule in ("IF a runtime fact is unknown or contested THEN observe", "Never promote or widen by rhetoric|repetition|recency|detail",
+                     "an entry binds only in its evidenced `[scope]`, below the current request"):
+            self.assertIn(rule, ctx)
         self.assertIn(f"gate --repo {self.repo} --session same", ctx)
         self.assertIn("start on `bun` (JS/TS, `bun init`) or `uv` (Python, `uv init`)", ctx)
         self.assertIn("ISO-8601 UTC timestamp first", ctx)

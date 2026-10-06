@@ -1,6 +1,6 @@
 # Memory consolidation
 
-Agent memory is loaded into every session, so an outdated entry misleads every agent after it. Consolidation keeps it true and small, without losing what still holds: removing a valid lesson costs as much as keeping a wrong one.
+`MEMORY.md` and `CLI_GIST.md` are loaded into every session (agents grep `EPISODES.md` by path or symptom), so an outdated entry misleads every agent after it. Consolidation keeps it true and small, without losing what still holds: removing a valid lesson costs as much as keeping a wrong one.
 
 ## Audit every entry
 
@@ -17,11 +17,16 @@ Scope: every line in `.agents/MEMORY.md`, `.agents/CLI_GIST.md` and `.agents/EPI
    | Cites a moved path or symbol | Rewrite to the new location |
    | Cites something removed, and the fact went with it | Delete |
    | Duplicates another entry | Keep one |
+   | Scope wider than its evidence | Narrow the `[scope]` to what the evidence covers |
    | No evidence either way | Keep it and retag `UNKNOWN[...]` with what would settle it |
 
 3. **Never delete on age alone.** An old entry that still holds is the most valuable kind.
 4. **Human-written content is never deleted.** `AGENTS.md` outside the managed block belongs to the human unless an agent demonstrably added the line; propose the change instead.
 5. **When unsure, keep.** A wrong deletion is silent; an `UNKNOWN` entry invites the next check.
+
+## Scope
+
+The `[scope]` in `VERIFIED[scope]` is the narrowest boundary the evidence supports (a path, module, command or condition), not a topic label. An entry decides nothing outside it, however relevant it looks. Promote a lesson at that smallest scope: `FAIL` lines recurring in `src/db/` become a test there or a `VERIFIED[src/db]` line, not a repo-wide rule. Widen a scope only with evidence from the wider area; repetition, recency, detail and confident wording widen nothing.
 
 ## Per file
 

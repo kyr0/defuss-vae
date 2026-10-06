@@ -11,7 +11,7 @@ Precondition: explicit human invocation. Default = review + fix actionable findi
 
 ## Method
 
-Review the change in context, NOT an isolated diff: read requirements|plan, `AGENTS.md`, `.agents/*`, changed files, relevant callers|callees, tests. NOT infer behavior from filenames|untraced diff fragments.
+Review the change in context, NOT an isolated diff: read requirements|plan, `AGENTS.md`, `.agents/MEMORY.md`, `.agents/CLI_GIST.md`, `.agents/VERIFY.py`, changed files, relevant callers|callees, tests; `grep` `.agents/EPISODES.md` for changed paths|symbols|symptoms. NOT infer behavior from filenames|untraced diff fragments.
 
 **Correctness / contract pass**
 

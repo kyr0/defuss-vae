@@ -11,7 +11,6 @@ from vae_repo import PLUGIN_ROOT, changed_since, code_fingerprint, git_root, is_
 from vae_state import (
     STATE_BUDGET,
     attestation_path,
-    episode_entries,
     init_session,
     load_session,
     memory_entries,
@@ -81,17 +80,17 @@ def deny(reason: str) -> dict[str, Any]:
 
 
 # One rule text for both channels: SessionStart context (Claude Code) and the AGENTS.md block (hosts without hooks).
-RULES_TEXT = f"""Skills `plan` `implement` `review` `finalize` are human-triggered only; never auto-invoke them. Outside skills write plain concise prose.
-Evidence > assumption: IF a runtime fact is unknown THEN observe before editing (read → existing test/command → smallest discriminating probe → ask). Temporary probe lines carry `{PROBE_TAG}` and the gate rejects leftovers; read logs bounded (`make log`, tail, grep); no log spraying.
+RULES_TEXT = f"""Skills `plan` `implement` `review` `finalize` are human-triggered only, never auto-invoked. Outside skills write plain concise prose.
+Evidence > assumption: IF a runtime fact is unknown or contested THEN observe before editing (read → existing test/command → smallest discriminating probe → ask). Temporary probe lines carry `{PROBE_TAG}` and the gate rejects leftovers; read logs bounded (`make log`, tail, grep); no log spraying.
 Layout: `.agents/` agent state; `Makefile` verbs setup start stop status log metrics bench test coverage lint e2e verify; services only via `make start` → `var/log/<svc>.stdout|.stderr`, `tmp/<svc>.pid` (gitignored); programs read `input/`, write `output/` (both gitignored; commit e2e fixtures via `!input/<file>`).
-test = real subsystems in isolation (a throwaway database|queue|filesystem|local server process instead of a mock), never live|production data or services; coverage is Pareto: every public behavior + its main error path, not every line (gate floor 60%); e2e = build the publishable artifact and consume it like a user, covering EVERY page|route|screen|component of a UI and EVERY CLI command|API endpoint at least once; a web frontend's e2e drives the built app, served via `make start`, in a real Playwright browser (`bun add -d playwright` + `bunx playwright install --with-deps chromium` | `uv add --dev playwright` + `uv run playwright install --with-deps chromium`) with what the app needs enabled: WebGL2 (GPU-less CI: launch args `--use-angle=swiftshader --enable-unsafe-swiftshader`), real network, permissions via `context.grantPermissions([...])` (Python `grant_permissions`); assert rendered output, fail on console errors and failed requests, and write the report (`outputDir`) to `output/`. The gate fails closed without `.agents/VERIFY.py`, any verb, or `verify` running lint test coverage e2e, and when e2e leaves no fresh file in `output/`. A library without a service keeps the layout: `init` adds the ignores and one Makefile line `start stop restart status log: ; @echo "∅ $@: no service"` covers the service verbs; never disable `layout` for that. lint = `uv run ruff check .` (Python) | `bunx oxlint --deny-warnings` (JS/TS; plain oxlint exits 0 on findings). verify = lint + test + coverage + e2e; CI on a GitHub remote is `.github/workflows/verify.yml` running `make setup` then `make verify`; CI runs async: after a push report the run URL and finish, NOT wait for it (`gh run watch`), since the local gate is the proof.
-Toolchain: new projects and subprojects start on `bun` (JS/TS, `bun init`) or `uv` (Python, `uv init`), never npm/yarn/pnpm/pip/poetry; the gate rejects newly added foreign lockfiles. In uv projects use `uv run`/`uv add`, not venv activation, which agent shells do not keep. A repo already on another toolchain keeps it unless the human approves migrating; propose it. Missing uv/bun: `make setup` installs them with the official installers (brand-new project: `curl -LsSf https://astral.sh/uv/install.sh | sh`, `curl -fsSL https://bun.sh/install | bash`).
+test=real subsystems in isolation (a throwaway database|queue|filesystem|local server process instead of a mock), never live|production data or services; coverage is Pareto: every public behavior + its main error path, not every line (gate floor 60%); e2e=build the publishable artifact and consume it like a user, covering EVERY page|route|screen|component of a UI and EVERY CLI command|API endpoint at least once; a web frontend's e2e drives the built app, served via `make start`, in a real Playwright browser (`bun add -d playwright` + `bunx playwright install --with-deps chromium` | `uv add --dev playwright` + `uv run playwright install --with-deps chromium`) with what the app needs enabled: WebGL2 (GPU-less CI: launch args `--use-angle=swiftshader --enable-unsafe-swiftshader`), real network, permissions via `context.grantPermissions([...])` (Python `grant_permissions`); assert rendered output, fail on console errors and failed requests, and write the report (`outputDir`) to `output/`. The gate fails closed without `.agents/VERIFY.py`, any verb, or `verify` running lint test coverage e2e, and when e2e leaves no fresh file in `output/`. A library without a service keeps the layout: `init` adds the ignores and one Makefile line `start stop restart status log: ; @echo "∅ $@: no service"` covers the service verbs; never disable `layout` for that. lint=`uv run ruff check .` (Python) | `bunx oxlint --deny-warnings` (JS/TS; plain oxlint exits 0 on findings). CI on a GitHub remote is `.github/workflows/verify.yml` running `make setup` then `make verify`; CI runs async: after a push report the run URL and finish, NOT wait for it (`gh run watch`), since the local gate is the proof.
+Toolchain: new projects and subprojects start on `bun` (JS/TS, `bun init`) or `uv` (Python, `uv init`), never npm/yarn/pnpm/pip/poetry; the gate rejects newly added foreign lockfiles. In uv projects use `uv run`/`uv add`, not venv activation, which agent shells do not keep. A repo already on another toolchain keeps it unless the human approves migrating; propose it. Missing uv/bun: `make setup` installs them (brand-new project: `curl -LsSf https://astral.sh/uv/install.sh | sh`, `curl -fsSL https://bun.sh/install | bash`).
 Habits: separate concerns (pure core logic; I/O, config and framework glue at the edges) in small single-purpose modules testable with real inputs; split by responsibility, never speculatively. Logs: one line per event, ISO-8601 UTC timestamp first (`2026-10-01T12:00:00.123Z`), then level, message, key=value; never secrets. Config: env vars from a gitignored `.env` (bun loads it itself; Python `uv run --env-file .env`); every key the code reads stays in `.env.example` without secret values, updated in the same change (gate-checked); validate config once at startup and fail fast. Services exit cleanly on SIGTERM (`make stop`).
-Epistemics: `VERIFIED` = direct evidence; `HYPOTHESIS` = testable inference + falsifier; `UNKNOWN` = not established. Never promote by rhetoric.
-Ponytail: understand → YAGNI → reuse → stdlib → native → installed dependency → minimum code; bug fix = root cause + sibling callers.
-Docs: why this design beats a plausible alternative; prefix material claims `VERIFIED:`, `HYPOTHESIS:` or `UNKNOWN:`.
-Doc pages (`*.md|*.mdx`) are gated: `vae.py prose --fix`, rewrite the rest by meaning, review against the plugin's `references/PROSE.md`; schematic content → a rendered Mermaid diagram. `README.md` covers the root and each package with a CLI|API, `ARCH.md` (why + how, operations, security, privacy) each package with production code; both state only VERIFIED facts. New JS/TS packages start on bun, ESM, oxlint and (libraries) pkgroll. The failing check names the template and the exact gaps.
-Lessons: test | `.agents/VERIFY.py` rule > MEMORY line > EPISODES line."""
+Epistemics: `VERIFIED`=direct evidence; `HYPOTHESIS`=testable inference + falsifier; `UNKNOWN`=not established. Never promote or widen by rhetoric|repetition|recency|detail.
+Ponytail: understand → YAGNI → reuse → stdlib → native → installed dependency → minimum code; bug fix=root cause + sibling callers.
+Docs: why this design beats a plausible alternative; prefix material claims `VERIFIED:`|`HYPOTHESIS:`|`UNKNOWN:`.
+Doc pages (`*.md|*.mdx`) are gated: `vae.py prose --fix`, rewrite the rest by meaning, review against the plugin's `references/PROSE.md`; schematic content → a rendered Mermaid diagram. `README.md` covers the root and each package with a CLI|API, `ARCH.md` (why + how, operations, security, privacy) each package with production code; both state only VERIFIED facts. New JS/TS packages use ESM, oxlint and (libraries) pkgroll.
+Lessons: test|`.agents/VERIFY.py` rule > MEMORY line > EPISODES line; an entry binds only in its evidenced `[scope]`, below the current request; narrow|rewrite|drop disproved ones."""
 
 
 def session_context(repo: Path, session_id: str, plugin_root: Path = PLUGIN_ROOT) -> str:
@@ -101,13 +100,13 @@ def session_context(repo: Path, session_id: str, plugin_root: Path = PLUGIN_ROOT
          "(repeat until VERIFIED[gate]=true; git commit is denied until then)."),
     ]
     # WHY inject instead of "go read": memory that is not loaded is not used; the budgets keep this cheap.
+    # WHY no episodes: the last lines are relevant by recency only, and a relevant-looking line is not authority for the
+    # current task; plan|implement|review grep EPISODES.md by touched path|symptom, finalize reads it all.
+    # VERIFIED: the three lines this injected into the session that removed it were unrelated to its task.
     for name, budget in STATE_BUDGET.items():
         entries = memory_entries(repo / ".agents" / name)
         if entries:
             parts.append(f".agents/{name}:\n" + "\n".join(entries)[:budget])
-    recent = episode_entries(repo)[-3:]
-    if recent:
-        parts.append("Recent .agents/EPISODES.md:\n" + "\n".join(recent))
     return "\n".join(parts)[:9000]
 
 

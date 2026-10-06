@@ -8,7 +8,7 @@ echo '{"hook_event_name": "Stop", "cwd": ".", "session_id": "s1", "stop_hook_act
 
 | Event | Registered for | Output |
 |---|---|---|
-| `SessionStart` | `startup`, `resume`, `clear`, `compact`, `fork` | `additionalContext`: the rules, `.agents/MEMORY.md`, `.agents/CLI_GIST.md` and recent episodes |
+| `SessionStart` | `startup`, `resume`, `clear`, `compact`, `fork` | `additionalContext`: the rules, `.agents/MEMORY.md` and `.agents/CLI_GIST.md` |
 | `Stop` | every stop | `decision: "block"` with the gate text while the gate is open; with `stop_hook_active` true, only a `systemMessage` so the turn ends |
 | `PreToolUse` | `Bash`, `PowerShell` | `permissionDecision: "deny"` for a `git commit` while the gate is open |
 
