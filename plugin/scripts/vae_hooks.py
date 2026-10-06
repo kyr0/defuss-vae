@@ -98,8 +98,8 @@ OPEN_EPISODES = 3
 
 
 def open_episodes(entries: list[str]) -> list[str]:
-    """The newest distinct open episodes: `LESSON` lines, `FINDING`s learned nowhere else (`learn=none`) and `FAIL`s
-    that no later `DONE` of the same session resolved.
+    """The newest distinct open episodes, newest first: `LESSON` lines, `FINDING`s learned nowhere else (`learn=none`)
+    and `FAIL`s that no later `DONE` of the same session resolved.
 
     WHY filter instead of the last lines: those are mostly `DONE` records and findings a test already enforces, relevant
     by recency only; an open item is what a new session can act on. VERIFIED: in this repo 12 of 96 entries were
@@ -118,7 +118,7 @@ def open_episodes(entries: list[str]) -> list[str]:
             out.append(" ".join(rows[i]))
             if len(out) == OPEN_EPISODES:
                 break
-    return out[::-1]
+    return out
 
 
 def session_context(repo: Path, session_id: str, plugin_root: Path = PLUGIN_ROOT) -> str:
@@ -136,7 +136,10 @@ def session_context(repo: Path, session_id: str, plugin_root: Path = PLUGIN_ROOT
             parts.append(f".agents/{name}:\n" + "\n".join(entries)[:budget])
     tail = open_episodes(episode_entries(repo))
     if tail:
-        parts.append("Open .agents/EPISODES.md (leads to re-check, not rules):\n" + "\n".join(tail)[:1024])
+        # WHY an equal share of 1024 chars per lead: one long LESSON must not erase the other leads chosen beside it.
+        share = (1024 - len(tail) + 1) // len(tail)
+        parts.append("Open .agents/EPISODES.md (leads to re-check, not rules):\n"
+                     + "\n".join(e if len(e) <= share else e[:share - 1] + "…" for e in tail))
     return "\n".join(parts)[:9000]
 
 

@@ -297,6 +297,29 @@ class GateTests(RepoCase):
         for line in ("oldest open lesson", "FAIL tests.unit", "DONE fp=1", "learn=test"):
             self.assertNotIn(line, tail)
 
+    def test_open_episodes_share_the_section_budget_newest_first(self):
+        init_project(self.repo, ROOT)
+        event = {"hook_event_name": "SessionStart", "cwd": str(self.repo), "session_id": "c"}
+
+        def section(entries: list[str]) -> list[str]:
+            (self.repo / ".agents/EPISODES.md").unlink()
+            append_episodes(self.repo, "s", entries, ROOT)
+            ctx = session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"]
+            body = ctx.split("Open .agents/EPISODES.md (leads to re-check, not rules):\n")[1]
+            self.assertLessEqual(len(body), 1024)
+            return body.split("\n")
+
+        long = "x" * 2000
+        # An older oversized LESSON must not erase newer leads: each gets an equal share, newest first.
+        lines = section([f"LESSON a {long}", f"LESSON b {long}", f"LESSON c {long}"])
+        self.assertEqual([ln.split(" ")[3] for ln in lines], ["c", "b", "a"])
+        self.assertTrue(all(ln.endswith("…") for ln in lines))
+        # Fewer leads use the unused budget; a short one stays whole.
+        newest, short = section(["LESSON short lead", f"LESSON b {long}"])
+        self.assertTrue(short.endswith("LESSON short lead"))
+        self.assertTrue(newest.endswith("…") and len(newest) > 1024 // 3)
+        self.assertEqual(len(section([f"LESSON a {long}"])[0]), 1024)
+
     def test_episodes_stay_bounded(self):
         append_episodes(self.repo, "s", [f"FAIL x{i}" for i in range(EPISODE_KEEP + 5)], ROOT)
         text = (self.repo / ".agents/EPISODES.md").read_text()
