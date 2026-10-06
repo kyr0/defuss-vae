@@ -11,6 +11,7 @@ from vae_repo import PLUGIN_ROOT, changed_since, code_fingerprint, git_root, is_
 from vae_state import (
     STATE_BUDGET,
     attestation_path,
+    episode_entries,
     init_session,
     load_session,
     memory_entries,
@@ -93,6 +94,33 @@ Doc pages (`*.md|*.mdx`) are gated: `vae.py prose --fix`, rewrite the rest by me
 Lessons: test|`.agents/VERIFY.py` rule > MEMORY line > EPISODES line; an entry binds only in its evidenced `[scope]`, below the current request; narrow|rewrite|drop disproved ones."""
 
 
+OPEN_EPISODES = 3
+
+
+def open_episodes(entries: list[str]) -> list[str]:
+    """The newest distinct open episodes: `LESSON` lines, `FINDING`s learned nowhere else (`learn=none`) and `FAIL`s
+    that no later `DONE` of the same session resolved.
+
+    WHY filter instead of the last lines: those are mostly `DONE` records and findings a test already enforces, relevant
+    by recency only; an open item is what a new session can act on. VERIFIED: in this repo 12 of 96 entries were
+    open, 4 of them distinct."""
+    rows = [e.split(" ", 2) for e in entries if e.count(" ") >= 2]
+    last_done = {sid: i for i, (_, sid, body) in enumerate(rows) if body.startswith("DONE ")}
+    out: list[str] = []
+    seen: set[str] = set()
+    for i in range(len(rows) - 1, -1, -1):
+        _, sid, body = rows[i]
+        kind = body.split(" ", 1)[0]
+        learn = re.search(r"\blearn=(\w+)", body)
+        if (kind == "LESSON" or (kind == "FINDING" and (not learn or learn.group(1).lower() == "none"))
+                or (kind == "FAIL" and last_done.get(sid, -1) < i)) and body not in seen:
+            seen.add(body)
+            out.append(" ".join(rows[i]))
+            if len(out) == OPEN_EPISODES:
+                break
+    return out[::-1]
+
+
 def session_context(repo: Path, session_id: str, plugin_root: Path = PLUGIN_ROOT) -> str:
     parts = [
         "defuss-vae (verified agentic engineering):\n" + RULES_TEXT,
@@ -100,13 +128,15 @@ def session_context(repo: Path, session_id: str, plugin_root: Path = PLUGIN_ROOT
          "(repeat until VERIFIED[gate]=true; git commit is denied until then)."),
     ]
     # WHY inject instead of "go read": memory that is not loaded is not used; the budgets keep this cheap.
-    # WHY no episodes: the last lines are relevant by recency only, and a relevant-looking line is not authority for the
-    # current task; plan|implement|review grep EPISODES.md by touched path|symptom, finalize reads it all.
-    # VERIFIED: the three lines this injected into the session that removed it were unrelated to its task.
+    # WHY only open episodes, labeled as leads: retrieval gives an entry relevance, never authority; plan|implement|review
+    # grep EPISODES.md for the rest by touched path|symptom, finalize reads it all.
     for name, budget in STATE_BUDGET.items():
         entries = memory_entries(repo / ".agents" / name)
         if entries:
             parts.append(f".agents/{name}:\n" + "\n".join(entries)[:budget])
+    tail = open_episodes(episode_entries(repo))
+    if tail:
+        parts.append("Open .agents/EPISODES.md (leads to re-check, not rules):\n" + "\n".join(tail)[:1024])
     return "\n".join(parts)[:9000]
 
 

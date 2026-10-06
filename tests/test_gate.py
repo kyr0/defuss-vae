@@ -259,15 +259,13 @@ class GateTests(RepoCase):
             f.write("- VERIFIED[db] migrations run via `make migrate` BC 2026-09-30 run\n")
         with (self.repo / ".agents/CLI_GIST.md").open("a") as f:
             f.write("- VERIFIED[deploy] `fly deploy --app demo`\n")
-        append_episodes(self.repo, "old", ["LESSON HYPOTHESIS[cache] falsified BC probe"], ROOT)
         event = {"hook_event_name": "SessionStart", "cwd": str(self.repo), "session_id": "same"}
         ctx = session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"]
         self.assertIn("CI runs async: after a push report the run URL and finish, NOT wait for it", ctx)
         self.assertIn("- VERIFIED[db] migrations run via `make migrate`", ctx)
         self.assertIn("- VERIFIED[deploy] `fly deploy --app demo`", ctx)
         self.assertNotIn("VERIFIED[scope] fact", ctx)
-        # Episodes are relevant by recency only, so they are grepped by path|symptom, never injected.
-        self.assertNotIn("LESSON HYPOTHESIS[cache]", ctx)
+        self.assertNotIn(".agents/EPISODES.md (", ctx)  # no open episode, no section
         for rule in ("IF a runtime fact is unknown or contested THEN observe", "Never promote or widen by rhetoric|repetition|recency|detail",
                      "an entry binds only in its evidenced `[scope]`, below the current request"):
             self.assertIn(rule, ctx)
@@ -282,6 +280,22 @@ class GateTests(RepoCase):
         s2 = read_json(state_path(self.repo, "same"))
         self.assertEqual(s1["baseline"], s2["baseline"])
         self.assertIn("calc.py", changed_since(self.repo, s2["baseline"]))
+
+    def test_session_start_injects_only_the_newest_open_episodes(self):
+        init_project(self.repo, ROOT)
+        append_episodes(self.repo, "a", ["LESSON oldest open lesson", "FAIL tests.unit", "DONE fp=1 cov=90.0% paths=a.py",
+                                         "FINDING a.py:f learn=test: pinned by test_f"], ROOT)
+        append_episodes(self.repo, "b", ["FINDING b.py:g learn=none: UNKNOWN whether g needs a lock", "FAIL lint",
+                                         "LESSON HYPOTHESIS[cache] falsified BC probe", "LESSON HYPOTHESIS[cache] falsified BC probe"], ROOT)
+        event = {"hook_event_name": "SessionStart", "cwd": str(self.repo), "session_id": "c"}
+        tail = session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"].split("Open .agents/EPISODES.md")[1]
+        # Open = unencoded lesson|finding or a FAIL its session never turned green; newest 3, each once, as leads.
+        self.assertIn("leads to re-check, not rules", tail)
+        for line in ("learn=none: UNKNOWN whether g needs a lock", "s=b FAIL lint", "LESSON HYPOTHESIS[cache]"):
+            self.assertIn(line, tail)
+        self.assertEqual(tail.count("LESSON HYPOTHESIS[cache]"), 1)
+        for line in ("oldest open lesson", "FAIL tests.unit", "DONE fp=1", "learn=test"):
+            self.assertNotIn(line, tail)
 
     def test_episodes_stay_bounded(self):
         append_episodes(self.repo, "s", [f"FAIL x{i}" for i in range(EPISODE_KEEP + 5)], ROOT)

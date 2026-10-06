@@ -1,6 +1,6 @@
 # Memory consolidation
 
-`MEMORY.md` and `CLI_GIST.md` are loaded into every session (agents grep `EPISODES.md` by path or symptom), so an outdated entry misleads every agent after it. Consolidation keeps it true and small, without losing what still holds: removing a valid lesson costs as much as keeping a wrong one.
+`MEMORY.md` and `CLI_GIST.md` are loaded into every session (of `EPISODES.md` only the three newest open entries; agents grep the rest by path or symptom), so an outdated entry misleads every agent after it. Consolidation keeps it true and small, without losing what still holds: removing a valid lesson costs as much as keeping a wrong one.
 
 ## Audit every entry
 
