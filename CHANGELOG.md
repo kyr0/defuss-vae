@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.4
+
+- Gate: `CONFIG["e2e_paths"]` (globs, e.g. `["web/*"]`) reruns e2e only when a matching file, a build file (`Makefile`, manifests, lockfiles) or the policy changed since e2e last passed in the session; lint, unit tests and coverage still run on every code edit. Without it, any code edit reruns e2e as before.
+
 ## 0.5.3
 
 - finalize: audits every memory, episode and agent-added AGENTS.md entry against the current repo and removes or rewrites one only with evidence; unsure entries stay, retagged `UNKNOWN`; human-written content is only proposed for change. Procedure in `references/CONSOLIDATION.md`.
