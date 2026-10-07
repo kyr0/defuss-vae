@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Java defaults, checked against real builds (Gradle 9.8.0 through the gate on a sample app, Maven 3.9.16 run directly): a `setup` line (`mise use java@temurin-25`, a checksum-pinned wrapper); Gradle's coverage line enables the JaCoCo CSV (`csv.required = true`; the report wrote only HTML, so the `awk` total found no file); the test line declares `junit-platform-launcher` (Gradle 9.8 cannot start tests without it); Maven commands for every verb.
 - Rules (session start, `plan`, `implement`, `verify`, the gate's review step): tests assert VERIFIED requirements only; a HYPOTHESIS gets a probe and an UNKNOWN a question, never a test. Coverage is Pareto: test the untested public behaviors and main error paths, not lines. A reproduction stays as a regression test only for a VERIFIED code defect; an environment, configuration or external cause gets a fix and startup validation, never a test pinning the values that worked once.
 - Stack defaults name the test frameworks: vitest for Vite apps (it shares the Vite config, and its coverage table parses), xUnit for .NET.
 

@@ -370,6 +370,10 @@ class VerifyTests(RepoCase):
             verbs = {ln.split(":", 1)[0][2:] for ln in docs.get(stack, [])}
             self.assertLessEqual({"lint", "test", "coverage", "e2e", "pin"}, verbs, stack)
         self.assertIn("real Playwright browser", " ".join(docs["web"]))
+        # Probed with Gradle 9.8: its JaCoCo report writes only HTML until the CSV is enabled, and tests do not start
+        # without the launcher; Maven's report goal writes the CSV under target/site/jacoco/.
+        for token in ("csv.required = true", "junit-platform-launcher", "target/site/jacoco/jacoco.csv"):
+            self.assertIn(token, " ".join(docs["jvm"]))
         self.write(".gitignore", "var/*\ntmp/*\n.env\noutput/*\ndist/\n")
         self.write("Cargo.toml", "")
         self.write("api/Api.csproj", "<Project/>")

@@ -17,11 +17,12 @@ Defaults for the `Makefile` verbs per toolchain. Session start injects the secti
 - pin: `rust-toolchain.toml` with the clippy, rustfmt and llvm-tools-preview components; commit `Cargo.lock`.
 
 ## jvm
-- lint: `./gradlew spotlessCheck classes testClasses` with javac `-Xlint:all -Werror`
-- test: `./gradlew test` on the JUnit Platform
-- coverage: JaCoCo CSV report, then `awk -F, 'NR>1{m+=$8;c+=$9}END{printf "TOTAL %.1f%%\n",100*c/(m+c)}' build/reports/jacoco/test/jacocoTestReport.csv`
-- e2e: `./gradlew installDist`, then run `build/install/<app>/bin/<app>` on `input/`
-- pin: Gradle toolchain for the JDK, versions in `gradle/libs.versions.toml`; commit the wrapper (`gradlew`, `gradle/wrapper/`); Maven projects use the `./mvnw` equivalents.
+- setup: `mise use java@temurin-25` pins the JDK that runs the build (LTS; `make setup` installs it); create the wrapper once, pinned: `gradle wrapper --gradle-version <v> --gradle-distribution-sha256-sum <sha256>` | `mvn wrapper:wrapper -Dmaven=<v>`
+- lint: `./gradlew spotlessCheck classes testClasses` with Spotless `googleJavaFormat()` and javac `-Xlint:all -Werror` in `options.compilerArgs` | `./mvnw spotless:check test-compile`
+- test: `./gradlew test` with `useJUnitPlatform()` and `testRuntimeOnly("org.junit.platform:junit-platform-launcher")` (Gradle 9.8 fails without it) | `./mvnw test`
+- coverage: JaCoCo CSV, then `awk -F, 'NR>1{m+=$8;c+=$9}END{printf "TOTAL %.1f%%\n",100*c/(m+c)}' <csv>`: Gradle `./gradlew test jacocoTestReport` with `reports { csv.required = true }` (off by default) → `build/reports/jacoco/test/jacocoTestReport.csv`; Maven `prepare-agent` + `report` goals, `./mvnw verify` → `target/site/jacoco/jacoco.csv`
+- e2e: `./gradlew installDist`, then `build/install/<app>/bin/<app>` | `./mvnw package`, then `java -jar target/<app>.jar` (manifest `mainClass`), on `input/`
+- pin: the compile JDK in the Gradle toolchain (the foojay resolver plugin in `settings.gradle.kts` downloads a missing one) | `maven.compiler.release`; versions in `gradle/libs.versions.toml`; commit the wrapper (`gradlew` and `gradle/wrapper/` | `mvnw` and `.mvn/wrapper/`).
 
 ## dotnet
 - lint: `dotnet format --verify-no-changes` + `dotnet build -warnaserror`
