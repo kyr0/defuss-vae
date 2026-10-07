@@ -229,6 +229,9 @@ def main() -> int:
         blocked = run([*vae, "gate", "--repo", str(proj), "--session", docs_sid], proj, ok=(2,))
         step("gate.docs_only.prose", "prose" in blocked.stdout and "tests.unit" not in blocked.stdout, blocked.stdout[:300])
         (proj / "README.md").write_text('"Calc" adds numbers, fast.\n')
+        first = run([*vae, "prose", "--repo", str(proj), "--walk", "README.md"], proj, ok=(2,))
+        last = run([*vae, "prose", "--repo", str(proj), "--walk", "README.md", "--part", "2"], proj)
+        step("prose.walk", "part 1/1" in first.stdout and "--part 2" in first.stdout and "VERIFIED[walk]=true" in last.stdout, last.stdout.strip())
         review = run([*vae, "gate", "--repo", str(proj), "--session", docs_sid], proj, ok=(2,))
         step("gate.docs_only.review", 'PAGES ["README.md"]' in review.stdout and "references/PROSE.md" in review.stdout, review.stdout[:300])
         written(review.stdout, "review").write_text(json.dumps({

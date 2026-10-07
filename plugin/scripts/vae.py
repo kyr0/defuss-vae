@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shlex
 import sys
 from pathlib import Path
 
@@ -12,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from vae_gate import gate
 from vae_project import doctor_repo, init_project
+from vae_prose import walk
 from vae_repo import git_root, is_doc, walk_files
 from vae_state import latest_session
 from vae_swarm import SETTLE_S, remove, run_job, spawn, status, stop, swarm_root, upsert
@@ -63,6 +65,23 @@ def doctor_plugin() -> list[str]:
     return gaps
 
 
+def prose_walk(repo: Path, page: str, part: int, config: dict) -> int:
+    """One step of the page walk (vae_prose.walk) with this repo's static findings; exit 0 only at VERIFIED[walk]."""
+    if not (repo / page).is_file():
+        print(f"UNKNOWN[walk] BC {page} is not a file in {repo}")
+        return 2
+    try:
+        static = prose_findings(repo, [page], config)
+    except re.error as e:
+        print(f"UNKNOWN[walk] BC invalid CONFIG['prose']['phrases'] regex: {e}")
+        return 2
+    cli = f"python3 {shlex.quote(str(ROOT / 'scripts/vae.py'))} prose --repo {shlex.quote(str(repo))}"
+    catalog = (ROOT / "references/PROSE.md").read_text("utf-8")
+    done, text = walk(page, (repo / page).read_text("utf-8", errors="replace"), part, catalog, static, cli)
+    print(text)
+    return 0 if done else 2
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(prog="defuss-vae")
     sp = ap.add_subparsers(dest="cmd", required=True)
@@ -76,6 +95,8 @@ def main() -> int:
     p = sp.add_parser("prose", help="static prose check of doc pages (default: every Markdown page in the repo)")
     p.add_argument("--repo", default=".")
     p.add_argument("--fix", action="store_true", help="apply meaning-preserving replacements first")
+    p.add_argument("--walk", metavar="PAGE", help="review PAGE window by window against every catalog rule; each step prints the next")
+    p.add_argument("--part", type=int, default=1, help="--walk: the part to review (default 1, the start)")
     p.add_argument("pages", nargs="*")
     p = sp.add_parser("init", help="scaffold layout + .agents state; never overwrites")
     p.add_argument("--repo", default=".")
@@ -117,6 +138,8 @@ def main() -> int:
     if a.cmd == "prose":
         repo = repo_from(a.repo)
         config = load_project_verifier(repo)[0]
+        if a.walk:
+            return prose_walk(repo, a.walk, a.part, config)
         # WHY every page by default: the CLI doubles as the cleanup tool for legacy pages.
         # VERIFIED: the gate itself scans only changed pages (vae_verify.verify), so legacy pages never block new work.
         pages = a.pages or [p for p in walk_files(repo) if is_doc(p)]

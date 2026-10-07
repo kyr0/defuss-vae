@@ -282,6 +282,7 @@ python3 plugin/scripts/vae.py init   --repo .   # scaffold what's missing (.agen
 python3 plugin/scripts/vae.py gate   --repo .   # verify → review → docs; exit 0 when done
 python3 plugin/scripts/vae.py verify --repo .   # verifier only
 python3 plugin/scripts/vae.py prose  --repo .   # static prose check of every doc page; --fix applies safe replacements
+python3 plugin/scripts/vae.py prose  --repo . --walk README.md  # review one window per step against every catalog rule
 python3 plugin/scripts/vae.py doctor --repo .   # memory budgets, epistemic tags, layout
 python3 plugin/scripts/vae.py swarm status      # free resources + each sub-agent's state; spawn|set|rm|stop manage the registry
 ```

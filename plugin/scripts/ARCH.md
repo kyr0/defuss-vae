@@ -1,6 +1,6 @@
 # Architecture: gate programs
 
-The CLI (`vae.py`) and the modules behind the hooks: repository facts, static prose checks, the verifier, session state, the sub-agent registry, the gate state machine, host adapters and project scaffolding. The full verify, review and docs contract is in [`docs/VERIFIER.md`](../../docs/VERIFIER.md).
+The CLI (`vae.py`) and the modules behind the hooks: repository facts, static prose checks and the page walk, the verifier, session state, the sub-agent registry, the gate state machine, host adapters and project scaffolding. The full verify, review and docs contract is in [`docs/VERIFIER.md`](../../docs/VERIFIER.md).
 
 ## Why this design
 

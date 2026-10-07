@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `vae.py prose --walk <page> [--part N]` drives the catalog review of a page window by window: each step prints the part to review, the part before it as context, every catalog rule (the whole catalog on the first step), the static hits in that part and the command for the next step; past the last part it runs the static check and prints `VERIFIED[walk]`. A stdlib block scanner splits the page at headings, fences and list items and never cuts a fence.
+
 ## 0.7.1
 
 - Pages state what is: `doc` and `doc-edit` write VERIFIED facts in the present, without change narrative (now, new, existing, has been, no longer), and the prose catalog adds rule P09 with its exceptions (changelogs, release notes, migration steps, past observations cited as evidence and pinned to their version), so the gate's page review applies it to every changed page. Three sentences in this repository's design docs are rewritten to match.

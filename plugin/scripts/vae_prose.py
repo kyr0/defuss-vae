@@ -1,4 +1,5 @@
-"""Static prose checks for doc pages: machine-writing tells, invisible or look-alike characters, Markdown that renders wrong.
+"""Static prose checks for doc pages (machine-writing tells, invisible or look-alike characters, Markdown that renders
+wrong) and the page walk, which splits a page into windows for the catalog review.
 
 Pure functions over one page's text; the verifier and `vae.py prose` do the I/O. Every finding names the rule of
 references/PROSE.md it instantiates, so the static check and the catalog review speak one vocabulary.
@@ -12,6 +13,7 @@ from __future__ import annotations
 
 import dataclasses
 import re
+import shlex
 import unicodedata
 from collections.abc import Iterable
 from pathlib import Path
@@ -191,3 +193,140 @@ def prose_fix(s: str, allow: str) -> str:
         if repl is not None and ch not in allow:
             s = s.replace(ch, repl)
     return s
+
+
+# The page walk: the catalog review as a loop a program drives, one window at a time, instead of one pass the agent
+# may skim. WHY a fresh split per step: the agent edits between steps, so part boundaries move; a plain index walk is
+# enough because each window also shows the previous part, so a boundary that moves by one part is still seen.
+HEADING = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]|$)")
+SETEXT = re.compile(r"^ {0,3}(=+|-+)[ \t]*$")
+CONTAINER = re.compile(r"^ {0,3}(?:[-*+][ \t]|\d{1,9}[.)][ \t]|>|\|)")  # list item, quote or table row: no setext heading
+ITEM = re.compile(r"^( *)(?:[-*+]|\d{1,9}[.)])[ \t]")
+RULE_ID = re.compile(r"^- \*\*([BLPRAST]\d\d [^*]+?)\.\*\*", re.MULTILINE)
+# WHY 3,500: two parts, the rule list and line numbers stay inside one tool output even on the first step, which also
+# prints the whole catalog. VERIFIED: (Claude Code env-var docs) BASH_MAX_OUTPUT_LENGTH reads back 30,000 characters by
+# default; the first step on this repository's README prints 19,067.
+WALK_CHARS = 3500
+
+
+@dataclasses.dataclass(frozen=True)
+class Part:
+    id: int
+    first: int  # 1-based line numbers, inclusive
+    last: int
+    headings: tuple[str, ...]
+    text: str
+
+
+def blocks(lines: list[str]) -> list[tuple[int, int]]:
+    """Top-level Markdown blocks as (first line index, heading depth: 0 content, -1 frontmatter). A fenced block is
+    one block whatever it holds; other blocks end at a blank line, a fence or a heading."""
+    out: list[tuple[int, int]] = []
+    i, n = 0, len(lines)
+    opening = lines[0].lstrip("﻿").rstrip() if lines else ""
+    if opening in ("---", "+++"):
+        close = ("---", "...") if opening == "---" else ("+++",)
+        end = next((j for j in range(1, n) if lines[j].rstrip() in close), None)
+        if end is not None:
+            out.append((0, -1))
+            i = end + 1
+    while i < n:
+        if not lines[i].strip():
+            i += 1
+            continue
+        m = FENCE.match(lines[i])
+        if m:
+            out.append((i, 0))
+            char, size, i = m.group(1)[0], len(m.group(1)), i + 1
+            while i < n:
+                c = FENCE.match(lines[i])
+                i += 1
+                if c and c.group(1)[0] == char and len(c.group(1)) >= size and not c.group(2).strip():
+                    break
+            continue
+        h = HEADING.match(lines[i])
+        if h:
+            out.append((i, len(h.group(1))))
+            i += 1
+            continue
+        start, depth, i = i, 0, i + 1
+        while i < n and lines[i].strip() and not FENCE.match(lines[i]) and not HEADING.match(lines[i]):
+            if SETEXT.match(lines[i]) and not CONTAINER.match(lines[start]):  # `Title` over `===`|`---`
+                depth, i = (1 if lines[i].strip()[0] == "=" else 2), i + 1
+                break
+            # Each item of a list is a block of its own, so a long list can span parts; nested items stay inside.
+            item, head = ITEM.match(lines[i]), ITEM.match(lines[start])
+            if item and head and item.group(1) == head.group(1):
+                break
+            i += 1
+        out.append((start, depth))
+    return out
+
+
+def parts(text: str, max_chars: int = WALK_CHARS, heading_depth: int = 1) -> list[Part]:
+    """The page as parts that join back to it exactly. A part starts at every heading of depth ≤ heading_depth and
+    otherwise grows block by block up to max_chars; a heading stays with its first content block, never alone."""
+    lines = text.splitlines(keepends=True)
+    if not lines:
+        return []
+    bs = blocks(lines) or [(0, 0)]
+    starts = [0] + [b[0] for b in bs[1:]]  # blank lines belong to the block before them
+    ends = starts[1:] + [len(lines)]
+    units: list[tuple[int, int, tuple[str, ...], bool]] = []
+    ancestry: list[tuple[int, str]] = []
+    k = 0
+    while k < len(bs):
+        first, boundary = k, False
+        while k < len(bs) and bs[k][1] != 0:
+            depth = bs[k][1]
+            if depth > 0:
+                while ancestry and ancestry[-1][0] >= depth:
+                    ancestry.pop()
+                ancestry.append((depth, lines[bs[k][0]].strip()))
+                boundary = boundary or depth <= heading_depth
+            k += 1
+        k += k < len(bs)
+        units.append((starts[first], ends[k - 1], tuple(t for _, t in ancestry), boundary))
+    groups: list[list] = []
+    for a, b, heads, boundary in units:
+        if groups and not boundary and sum(map(len, lines[groups[-1][0]:b])) <= max_chars:
+            groups[-1][1] = b
+        else:
+            groups.append([a, b, heads])
+    out = [Part(i + 1, a + 1, b, heads, "".join(lines[a:b])) for i, (a, b, heads) in enumerate(groups)]
+    if "".join(p.text for p in out) != text:
+        raise ValueError("page parts do not join back to the page")
+    return out
+
+
+def walk(page: str, text: str, n: int, catalog: str, static: list[Finding], cli: str) -> tuple[bool, str]:
+    """Step n of the page walk: part n to review with part n-1 as context, every catalog rule, and the command for
+    step n+1. Past the last part: the static findings to fix, or VERIFIED. `cli` is the `vae.py prose --repo` prefix."""
+    ps = parts(text)
+    nxt = lambda m: f"{cli} --walk {shlex.quote(page)} --part {m}"
+    if not 1 <= n <= len(ps) + 1:
+        return False, f"UNKNOWN[walk] BC part {n} is outside 1..{len(ps) + 1} of {page}; start with: {nxt(1)}"
+    if n > len(ps):
+        if not static:
+            return True, f"VERIFIED[walk]=true BC {page}: {len(ps)} part{'s' * (len(ps) != 1)} walked, prose findings=0"
+        return False, "\n".join([f"defuss-vae WALK {page}: all {len(ps)} parts walked; the static check still finds:",
+                                 *map(str, static),
+                                 (f"DO: `{cli} --fix {shlex.quote(page)}` repairs the (--fix) ones; rewrite the rest by "
+                                  "meaning, never as a character swap."), f"NEXT: {nxt(n)}"])
+    cur = ps[n - 1]
+    number = lambda p: [f"{p.first + j:>5}| {line}" for j, line in enumerate(p.text.splitlines())]
+    out = [f"defuss-vae WALK {page} part {n}/{len(ps)} (lines {cur.first}-{cur.last})"]
+    if n == 1:
+        out += ["CATALOG (printed once; every rule applies to every part):", catalog.rstrip()]
+    out.append("SECTION: " + (" > ".join(cur.headings) or "(page start)"))
+    if n > 1:
+        prev = ps[n - 2]
+        out += [f"CONTEXT part {n - 1} (lines {prev.first}-{prev.last}): fix only what crosses into part {n}", *number(prev)]
+    out += [f"REVIEW part {n} (lines {cur.first}-{cur.last})", *number(cur)]
+    hits = [str(f) for f in static if cur.first <= f.line <= cur.last]
+    out += ["STATIC: " + ("; ".join(hits) or "∅"),
+            f"CHECK EVERY rule against part {n}: " + ", ".join(RULE_ID.findall(catalog)),
+            (f"DO: edit {page} in place where a rule fails and the page or repo supports the fix; a fix that needs an "
+             "absent fact, source or decision is a question for the human, never an invention. Keep structure and voice."),
+            f"NEXT: {nxt(n + 1)}"]
+    return False, "\n".join(out)
