@@ -32,3 +32,9 @@ Hooks run on plain `python3`, not `uv run`. `VERIFIED:` `uv run` adds 5.4 ms (+1
 `UNKNOWN:` whether every current Codex build loads hooks declared under `extensions.com.openai` in the root manifest.
 
 Therefore the portable root manifest (`plugin/plugin.json`) stays free of the OpenAI extension and the overlay declares hooks explicitly, which works either way.
+
+## Swarm registry
+
+`vae.py swarm` needs a POSIX host. `VERIFIED:` (`tests/test_swarm.py`, macOS) `fcntl.flock` serializes writers, `ps -A -o pid=,ppid=,stat=,lstart=` gives the process table with start times, and `start_new_session` detaches a spawned job into its own session and process group. `HYPOTHESIS:` Linux with procps behaves the same, since procps prints `lstart` in the same format under `LC_ALL=C`; falsifier: the `ubuntu-latest` CI job running `tests/test_swarm.py`. busybox `ps` has no `lstart`: liveness then falls back to `kill(pid, 0)` without pid-reuse detection, and ownership to the caller and its parent. `UNKNOWN:` Windows, which has neither `flock` nor `ps`.
+
+An entry's pid is meaningful only on its own host: `status` reports entries from another host as `UNKNOWN` instead of judging them. A sub-agent that runs inside its harness's process (Claude Code's Agent tool) has no pid of its own, so its entry names the harness process and shares its liveness.

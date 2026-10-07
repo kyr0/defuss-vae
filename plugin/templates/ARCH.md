@@ -1,6 +1,6 @@
 # Architecture: templates
 
-Files `vae.py init` copies into a project when they are missing (`VERIFY.py`, `MEMORY.md`, `CLI_GIST.md`, `EPISODES.md`, `Makefile`, `verify.yml`), and page templates the docs skill and the verifier hints point to (`README.md.tmpl`, `ARCH.md.tmpl`, `package.json.tmpl`).
+Files `vae.py init` copies into a project when they are missing (`VERIFY.py`, `MEMORY.md`, `CLI_GIST.md`, `EPISODES.md`, `Makefile`, `verify.yml`), and page templates the doc skill and the verifier hints point to (`README.md.tmpl`, `ARCH.md.tmpl`, `package.json.tmpl`).
 
 ## Why this design
 
@@ -8,7 +8,7 @@ Files `vae.py init` copies into a project when they are missing (`VERIFY.py`, `M
 
 ## How it works
 
-The `Makefile` declares the verbs the gate runs; undefined verbs print `UNKNOWN[...]` and exit 2, so a fresh project fails closed until each is defined. `setup` installs only toolchains a lockfile declares, so an existing npm or poetry project is never migrated silently. `verify.yml` is added only for a GitHub remote without a workflow that already runs `make verify`.
+The `Makefile` declares the verbs the gate runs, and a bare `make` lists them with their usage; undefined verbs print `UNKNOWN[...]` and exit 2, so a fresh project fails closed until each is defined. `setup` installs the tools `mise.toml` pins and only the toolchains a lockfile declares, so an existing npm or poetry project is never migrated silently; the `.env` keys reach every recipe and the app `start` runs. `verify.yml` is added only for a GitHub remote where `CONFIG["ci"]` is not `False` and no workflow already runs the verification.
 
 ## Operations
 
@@ -17,4 +17,4 @@ The `Makefile` declares the verbs the gate runs; undefined verbs print `UNKNOWN[
 
 ## Security and privacy
 
-`setup` downloads the official uv and bun installers over HTTPS when a lockfile needs them; nothing else fetches from the network. Templates contain no secrets and no personal data; `.env` stays gitignored.
+`setup` downloads the official mise, uv and bun installers over HTTPS only when `mise.toml` or a lockfile needs them, and `mise install` fetches the pinned tools; nothing else fetches from the network. Templates contain no secrets and no personal data; `.env` stays gitignored.

@@ -6,7 +6,7 @@
 
 **V**erified **A**gentic **E**ngineering: your coding agent ships only what it has proven works.
 
-Five skills that you trigger yourself, plus small stdlib-only Python programs that **verify, gate and remember**. The agent does the work; programs, not prompts, decide whether that work is done.
+Seven skills that you trigger yourself, plus small stdlib-only Python programs that **verify, gate and remember**. The agent does the work; programs, not prompts, decide whether that work is done.
 
 ## TL;DR
 
@@ -19,8 +19,9 @@ defuss-vae moves the checks out of the prompt and into code. Hooks deny `git com
 - 🧯 **Fails closed:** a crashing gate blocks instead of waving changes through
 - 🧪 **Real evidence:** lint, tests (no mocks), coverage ≥ 60 %, and an e2e run against the built artifact that must leave fresh output
 - ♻️ **Cached by content:** verification reruns only when code, pages or policy change, so review/docs loops stay fast
-- 🧠 **Learns per project:** failures become episodes, recurring ones become tests or verifier rules, and memory is loaded into every new session
-- 🧭 **Adapts to your repo:** uses your Makefile, your toolchain and your rules, and grows its policy from your own mistakes
+- 🧠 **Learns per project:** failures become episodes, every lesson becomes a test, a verifier rule or a memory line with its reason, and memory is loaded into every new session
+- 🧭 **Adapts to your repo:** uses your Makefile, your toolchain (defaults for Go, Rust, JVM, .NET, JS/TS and Python) and your rules, and grows its policy from your own mistakes
+- 🐝 **Sub-agents without collisions:** each agent claims disjoint paths in its own git worktree, long jobs run detached with timestamped logs, and `status` checks every claim against the process table
 - 🙋 **Human in charge:** skills never trigger themselves, and nothing is pushed or released without you
 - 🪶 **Tiny:** `python3` ≥ 3.9, `git`, `make`; no dependencies, no daemon, no `uv` in the hook path
 
@@ -45,7 +46,7 @@ flowchart LR
 
     I --> V
     gate -.->|"FAIL or code changed: fix, rerun"| I
-    D --> F["<b>finalize</b><br/>Conventional Commits · changelog<br/>reconcile agent memory<br/>add/change verifier · add/change AGENTS.md"]
+    D --> F["<b>wrap</b><br/>Conventional Commits · changelog<br/>reflect lessons · consolidate memory<br/>add/change verifier · add/change AGENTS.md"]
     F --> HR([🙋 human review])
     HR --> REL["<b>release</b><br/>CI · CD · package managers"]
 ```
@@ -55,21 +56,23 @@ flowchart LR
 | **plan** | you trigger, agent works | Traces the real code path, probes unknowns instead of guessing, prefers existing helpers and stdlib, and emits the smallest plan in which every acceptance criterion is an executable check. |
 | **implement** | you trigger, fully agentic | Understands first, fixes the root cause (and its sibling callers), writes the minimum code, adds tests against real subsystems, and loops the gate in-turn. |
 | **gate** | hooks, automatic | **verify** runs the project's own `make` verbs; **review** checks requirements, every changed path and its callers; **docs** records *why* this design beats the plausible alternative. Doc pages get a static prose check and a review against the prose catalog instead of the test suites. Any edit changes the fingerprint and restarts the gate. |
-| **docs** | you trigger, any time | Writes and checks documentation pages: claims grounded in code and tests, page-specific rules declared before writing, Mermaid where the content is schematic, then the static prose check and a catalog review. |
-| **finalize** | you trigger | Splits the work into coherent Conventional Commits, updates `CHANGELOG.md`, reconciles agent memory, promotes recurring lessons into tests or `.agents/VERIFY.py` rules, and updates the managed block in `AGENTS.md`. |
+| **doc** | you trigger, any time | Writes and checks documentation pages: claims grounded in code and tests, page-specific rules declared before writing, Mermaid where the content is schematic, then the static prose check and a catalog review. |
+| **doc-edit** | you trigger, any time | Edits only the pages you name, as you instruct: the same grounding, catalog review and static check, limited to the changed parts. |
+| **wrap** | you trigger | Splits the work into coherent Conventional Commits, updates `CHANGELOG.md`, turns what the work taught into tests, `.agents/VERIFY.py` rules or concise memory lines with their reason, consolidates agent memory, and updates the managed block in `AGENTS.md`. |
+| **status** | you trigger, any time | Shows what runs (sub-agents, the service, free disk, RAM and GPU), reconciles `.agents/SWARM_STATUS.yaml` with the process table, and names the next step per agent. |
 | **human review** | you | You read the commits. Nothing has been pushed yet. |
-| **release** | you, via CI/CD | Push, tag, publish to package managers. On GitHub, `init` adds `.github/workflows/verify.yml` (`make setup && make verify`), so CI runs the same gate. |
+| **release** | you, via CI/CD | Push, tag, publish to package managers. On GitHub, `init` adds `.github/workflows/verify.yml`: the tools `mise.toml` pins via `jdx/mise-action`, uv or bun from their official setup actions, then `make setup` and `make verify` (or the commands in `CONFIG["ci"]`; `False` adds no workflow), so CI runs the same gate. |
 
 ## It adapts to your project
 
 defuss-vae doesn't ship one-size-fits-all checks. It enforces a small **contract**, and each project fills that contract with its own commands and grows it with its own lessons.
 
-- **Your commands, not autodiscovery.** The verifier runs your `Makefile` verbs (`make lint`, `make test`, `make coverage`, `make e2e`), so Python, TypeScript, Go and Rust all go through the same gate. `.agents/VERIFY.py` can point any check at a different command. *Why:* guessing runners per ecosystem would verify commands the project never committed to.
-- **Your toolchain stays.** A repo already on npm, poetry or anything else keeps it; migrating needs your approval. Only *new* projects start on `bun` or `uv`, and the gate rejects foreign lockfiles that newly appear.
-- **Scaffolds only what's missing.** `vae.py init` adds `.agents/`, a template `Makefile`, `.gitignore` lines, a managed `AGENTS.md` block and (on GitHub) the CI workflow. It never overwrites files the project already has.
+- **Your commands, not autodiscovery.** The verifier runs your `Makefile` verbs (`make lint`, `make test`, `make coverage`, `make e2e`), so Python, TypeScript, Go, Rust, Java and C# all go through the same gate. When a verb is missing, the gate cites the detected stack's default from [`plugin/references/STACKS.md`](plugin/references/STACKS.md), and session start injects only the defaults of the stacks a repository uses. `.agents/VERIFY.py` can point any check at a different command. *Why:* guessing runners per ecosystem would verify commands the project never committed to.
+- **Your toolchain stays.** A repo already on npm, poetry or anything else keeps it; migrating needs your approval. Only *new* projects start on `bun` or `uv`, and the gate rejects foreign lockfiles that newly appear. Tool versions live in `mise.toml`: `make setup` runs `mise install`, and CI uses `jdx/mise-action`.
+- **Scaffolds only what's missing.** `vae.py init` adds `.agents/`, a template `Makefile` (a bare `make` lists every verb with its usage; it exports the `.env` keys to every recipe and to the app `make start` runs), `.gitignore` lines, a managed `AGENTS.md` block and (on GitHub) the CI workflow. It never overwrites files the project already has.
 - **Executable policy that grows.** `.agents/VERIFY.py` is project-local Python config plus deterministic rules (`command`, `file_exists`, `contains`, `regex`, `not_regex`). When review finds a bug class that can be checked mechanically, it becomes a regression test or a rule, which every future gate then enforces.
 - **Rules per doc page.** Every page is under the built-in prose check from the moment it exists. A page with its own invariant (a required section, a diagram that must stay) gets a `.agents/VERIFY.py` rule before it is written, and a page whose house style needs a flagged character (German `„“` quotes, say) allows it via `CONFIG["prose"]["allow"]`.
-- **Memory that's actually loaded.** The gate logs `FAIL`/`DONE`/`FINDING` lines to `.agents/EPISODES.md`. `finalize` folds durable lessons into `.agents/MEMORY.md` (≤ 4 KiB) and the commands that worked into `.agents/CLI_GIST.md` (≤ 2 KiB). The SessionStart hook injects MEMORY and CLI_GIST into every new session, so lessons don't depend on the agent remembering to read a file; of the episodes only the three newest open ones (unencoded lessons, failures their session never turned green) arrive, labeled as leads, and `plan`, `implement` and `review` grep the rest by touched path or symptom. Because stale memory would mislead every session, `finalize` audits each entry against the current code and removes or rewrites one only with evidence; an entry it can't settle stays, tagged `UNKNOWN`, and `doctor --repo .` lists entries that cite paths which no longer exist.
+- **Memory that's actually loaded.** The gate logs `FAIL`/`DONE`/`FINDING` lines to `.agents/EPISODES.md`. Past 100 entries the gate trims only its own oldest noise, never an unsettled lesson. `wrap` promotes every lesson to a test, a rule or one concise `.agents/MEMORY.md` line that states its reason (`BC`; ≤ 4 KiB in all), or deletes it with evidence; it records the commands that worked in `.agents/CLI_GIST.md` (≤ 2 KiB). The SessionStart hook injects MEMORY and CLI_GIST into every new session, so lessons don't depend on the agent remembering to read a file; of the episodes only the three newest open ones (unencoded lessons, failures their session never turned green) arrive, labeled as leads, and `plan`, `implement` and `verify` grep the rest by touched path or symptom. Session start also lists the live sub-agents and the defaults of the stacks present; when not everything fits in 9,000 characters, it cuts by priority between lines (MEMORY before CLI_GIST, the stack defaults and the leads) and names what it left out. Because stale memory would mislead every session, `wrap` audits each entry against the current code and removes or rewrites one only with evidence; an entry it can't settle stays, tagged `UNKNOWN`, and `doctor --repo .` lists entries that cite paths which no longer exist.
 
 ```mermaid
 flowchart LR
@@ -77,8 +80,8 @@ flowchart LR
     A --> G["gate"]
     G -->|"FAIL · DONE · FINDING"| E[(".agents/EPISODES.md")]
     G -->|"review finding<br/>mechanically checkable"| T["regression test<br/>or VERIFY.py rule"]
-    E -->|"finalize: lesson recurs"| T
-    E -->|"finalize: durable decision"| M[(".agents/MEMORY.md<br/>AGENTS.md")]
+    E -->|"wrap: lesson"| T
+    E -->|"wrap: durable decision"| M[(".agents/MEMORY.md<br/>AGENTS.md")]
     T -->|"enforced by every future gate"| G
     M --> S
 ```
@@ -131,7 +134,7 @@ npx skills add kyr0/defuss-vae --skill '*' --agent codex --global --yes
 npx skills update
 ```
 
-- **Good for:** bringing the plan/implement/review/docs/finalize discipline to any agent.
+- **Good for:** bringing the plan, implement, verify, doc, doc-edit, wrap and status discipline to any agent.
 - **Drawbacks:** this route copies only `plugin/skills/`, with **no hooks and no CLI**. Nothing blocks `git commit`, and the skills' `vae.py` path doesn't resolve. Clone the repo once and run the gate yourself:
 
 ```bash
@@ -154,7 +157,7 @@ A new release doesn't reach an installed copy on its own. Each harness keeps the
 | Claude Code, Codex, Cursor, Gemini CLI, Copilot, Windsurf | skills (`npx skills add`) | `npx skills update`; add `-g` for global installs, `-y` to skip the prompt |
 | any skills-only host | gate clone | `git -C ~/defuss-vae pull` |
 
-With the skills CLI, if a skill added in a later release is missing afterwards, add it by name, e.g. `npx skills add kyr0/defuss-vae --skill docs` (`docs` is new in 0.4.0).
+With the skills CLI, if a skill added in a later release is missing afterwards, add it by name, e.g. `npx skills add kyr0/defuss-vae --skill doc-edit` (`doc-edit` and `status` are new in 0.6.0). The same release renamed `docs`, `review` and `finalize` to `doc`, `verify` and `wrap`; remove the old copies with `npx skills remove docs review finalize`.
 
 Then activate it. A running session keeps the version it loaded, so in Claude Code run `/reload-plugins` or start a new session; in other harnesses start a new session. Check the installed version with `claude plugin list` (Claude Code) or `npx skills list` (skills CLI):
 
@@ -168,7 +171,7 @@ To get new releases in Claude Code without asking, turn on auto-update: `/plugin
 
 ## Usage
 
-Skills are **human-triggered only**: the agent never invokes one on its own, so you call each one when you want that step. The form depends on how you installed:
+Only you start a skill: the agent never invokes one on its own (`disable-model-invocation` in Claude Code, `allow_implicit_invocation: false` in Codex), so you call each one when you want that step. The form depends on how you installed:
 
 | Installed via | Invocation |
 |---|---|
@@ -199,30 +202,61 @@ The last one plans and implements in one go; without "then implement it", `plan`
 
 Without a request it implements the plan from the conversation; with one it works on that task directly. Either way it reruns the gate until `VERIFIED[gate]=true`.
 
-### Review: an extra pass on demand
+### Verify: an extra review on demand
 
 ```text
-/defuss-vae:review
-/defuss-vae:review report only, don't edit anything
+/defuss-vae:verify
+/defuss-vae:verify report only, don't edit anything
 ```
 
-By default it reviews the current changes and fixes what it finds. The gate already runs a review before every commit, so call this one when you want a second, deeper look.
+By default it reviews the current changes and fixes what it finds. The gate already runs a review before every commit, so call this one when you want a second, deeper look. It is the reviewing counterpart of `make verify`, which runs only the deterministic suites.
 
-### Docs: write or check documentation pages
+### Doc: write or check documentation pages
 
 ```text
-/defuss-vae:docs write docs/ARCHITECTURE.md explaining the request flow for new contributors
-/defuss-vae:docs check README.md against the prose catalog and fix what it finds
+/defuss-vae:doc write docs/ARCHITECTURE.md explaining the request flow for new contributors
+/defuss-vae:doc check README.md against the prose catalog and fix what it finds
 ```
 
-### Finalize: commits, changelog, memory
+### Doc-edit: change one page as instructed
 
 ```text
-/defuss-vae:finalize
-/defuss-vae:finalize and push
+/defuss-vae:doc-edit README.md: add the --json flag to the CLI table
 ```
 
-`finalize` never pushes, merges or releases unless you ask for it, as in the second line.
+It edits only the named pages and leaves the rest of each page alone, except for prose-check hits the gate would block on, which it fixes minimally and reports.
+
+### Wrap: commits, changelog, lessons, memory
+
+```text
+/defuss-vae:wrap
+/defuss-vae:wrap and push
+```
+
+`wrap` never pushes, merges or releases unless you ask for it, as in the second line.
+
+### Status: what runs, and whether the record matches
+
+```text
+/defuss-vae:status
+/defuss-vae:status and respawn whatever crashed
+```
+
+It lists free disk, RAM and GPU and every registered agent with its state (`RUNNING`, `EXITED`, `LOST`, `STALLED`, `OVERDUE`, `CONFLICT`), records drift with `vae.py swarm status --fix`, and names the next step per agent. Run it after an SSH drop or a crash.
+
+### Sub-agents and long runs
+
+One hard rule decides whether work splits: units must have disjoint target paths and explicit contracts; otherwise the work stays sequential. Each unit gets its own git worktree outside the repository, works in small chunks and writes its results to disk early.
+
+```bash
+git worktree add ../app.wt/parser -b swarm/parser
+python3 plugin/scripts/vae.py swarm spawn --name parser --goal "Port the parser to the new AST." \
+  --workdir ../app.wt/parser --targets src/parser,tests/parser --eta 40 --ram 2G -- claude -p "…"
+python3 plugin/scripts/vae.py swarm status            # exit 1 when an agent needs the orchestrator
+python3 plugin/scripts/vae.py swarm rm --name parser  # after its worktree is merged
+```
+
+`spawn` runs any agent CLI or script in its own session, so an SSH drop or a dying shell cannot kill it. It appends each output line with an ISO-8601 timestamp to `var/log/swarm/<name>.log` and records the exit code. It refuses a claim that overlaps a live agent's workdir or targets, and an estimate beyond the free disk, RAM or VRAM. `.agents/SWARM_STATUS.yaml` holds one entry per live agent, with `name`, `pid`, `host`, `goal`, `exit_code`, `workdir`, `target_focus_paths`, `start_timestamp`, `eta_in_mins`, `estimated_ram_usage`, `estimated_vram_usage`, `estimated_disk_space_usage`, `gpu_id`, `container_id` and `pwd`. It lives at the main worktree root and is gitignored. Only the process an entry names, or a descendant of it, may change that entry; every write takes a lock, replaces the file atomically and is re-read after 3 seconds. `status` judges liveness from the process table, and a pid that is gone, or that a later process reuses, makes its entry `LOST`. A power-off stops every process, but the registry, the logs and the results written early survive it, so the next `status` finds the dead agents for the orchestrator to restart. The orchestrator checks back on a timer (its harness scheduler, or cron) every quarter of the expected runtime, between 5 and 30 minutes.
 
 The gate itself needs no command. When the agent tries to finish, or to `git commit`, the hooks run it and hand back exactly what's missing.
 
@@ -234,6 +268,7 @@ python3 plugin/scripts/vae.py gate   --repo .   # verify → review → docs; ex
 python3 plugin/scripts/vae.py verify --repo .   # verifier only
 python3 plugin/scripts/vae.py prose  --repo .   # static prose check of every doc page; --fix applies safe replacements
 python3 plugin/scripts/vae.py doctor --repo .   # memory budgets, epistemic tags, layout
+python3 plugin/scripts/vae.py swarm status      # free resources + each sub-agent's state; spawn|set|rm|stop manage the registry
 ```
 
 Full reference with exit codes: [`plugin/scripts/README.md`](plugin/scripts/README.md).
@@ -246,15 +281,15 @@ The verifier passes only with direct evidence for **all** of the following. A mi
 - `make verify` is wired to `lint test coverage e2e`, and lint passes
 - tests exist and pass, using real subsystems (a throwaway database, queue or local server process) instead of mock frameworks, and never live or production data
 - e2e builds the publishable artifact, consumes it like a user, and leaves fresh evidence in `output/`. The rules ask e2e to reach every page, route or component of a UI (in a real browser) and every CLI command or API endpoint at least once; the gate can't check that mechanically, so review does
-- coverage ≥ 60 % (`make coverage` prints `TOTAL <n>%`)
+- coverage ≥ 60 % (`make coverage` prints `TOTAL <n>%`, a `total:` or `| Total |` row, or an `All files |` table)
 - no leftover temporary probe lines, no newly added foreign toolchain, and an `.env.example` that lists every config key
 - a `README.md` at the root and for every package with a changed CLI or API, and an `ARCH.md` for every package with changed production code or deployment and schema definitions (not tests, examples, docs, config or data). A page covers the folders below it up to the next package manifest. Both state only verified facts. Templates are in `plugin/templates/`
 - every changed `package.json` sets `packageManager` (bun), description, license and author; a new package is also `"type": "module"`, lints with oxlint and, as a library, builds with pkgroll
 - every changed doc page passes `vae.py prose`.
 
-The page, `.gitignore` and `package.json` checks are new in 0.5.0 and only warn (listed under `WARNS:`) until 0.6.0; `CONFIG["strict"]=True` in `.agents/VERIFY.py` makes them blocking now. A session that changed only pages runs this check and the project rules, and skips the test suites
+The page, `.gitignore` and `package.json` checks block where `.agents/VERIFY.py` sets `CONFIG["strict"]=True`, which the template does for every project created with 0.6.0 or later. A project created earlier keeps them as warnings (listed under `WARNS:`) until it sets that key. A session that changed only pages runs this check and the project rules, and skips the test suites
 
-The layout is the same everywhere: `Makefile` verbs `setup start stop status log metrics bench test coverage lint e2e verify`; services log to `var/log/<svc>.stdout|.stderr` with a pid in `tmp/<svc>.pid`; programs read `input/` and write `output/`; config comes from a gitignored `.env`, with every key listed in a committed `.env.example` (verified: a key that code reads or `.env` sets but the example lacks fails the gate). `.gitignore` must cover `.env`, `var/`, `tmp/`, `output/` and `dist/`, plus the cache and package folders of each toolchain present (`node_modules/`, `.venv/`, `__pycache__/` and the like); `vae.py init` appends them.
+The layout is the same everywhere: `Makefile` verbs `setup start stop status log metrics bench test coverage lint e2e verify`; services log to `var/log/<svc>.stdout|.stderr` with a pid in `tmp/<svc>.pid`; programs read `input/` and write `output/`; config comes from a gitignored `.env`, with every key listed in a committed `.env.example` (verified: a key that code reads or `.env` sets but the example lacks fails the gate). `.gitignore` must cover `.env`, `var/`, `tmp/`, `output/` and `dist/`, plus the cache, package and build folders of each toolchain present (`node_modules/`, `.venv/`, `__pycache__/`, `target/`, `bin/`, `obj/`, `build/`, `.gradle/` and the like); `vae.py init` appends them, plus `.agents/SWARM_STATUS.yaml`, the live sub-agent registry.
 
 A project without a service (a library, a CLI tool) still has the service verbs, as one Makefile line:
 
@@ -266,23 +301,24 @@ start stop restart status log: ; @echo "∅ $@: no service"
 
 ## Speed
 
-The gate adds about a tenth of a second to your own suites. Measured with `make bench`, 0.5.1 release installed into a small consumer project, medians of 7 runs, Apple M4, macOS 15.7.3, Python 3.14.3, 2026-10-05:
+The gate adds about a tenth of a second to your own suites. Measured with `make bench`, the 0.6.0 release installed into a small consumer project, medians of 7 runs, Apple M4, macOS 15.7.3, Python 3.14.3, 2026-10-07:
 
 | What | Median |
 |---|---|
-| PreToolUse hook on a command that isn't a commit (runs before every Bash call) | 19 ms (Python startup alone: 16 ms) |
-| SessionStart hook | 55 ms |
-| Gate with nothing changed since its last run (the review and docs loop) | 92 ms |
+| PreToolUse hook on a command that isn't a commit (runs before every Bash call) | 18 ms (Python startup alone: 14 ms) |
+| SessionStart hook | 68 ms |
+| Gate with nothing changed since its last run (the review and docs loop) | 91 ms |
 | Gate after a page edit, with the suites already green | 92 ms |
-| Stop hook, and the commit check, on a cached gate | 84 to 86 ms |
-| Gate cold, running the project's suites | 397 ms, of which 307 ms are the project's own lint, test, coverage and e2e |
+| Stop hook, and the commit check, on a cached gate | 86 ms |
+| Gate cold, running the project's suites | 328 ms, of which 222 ms are the project's own lint, test, coverage and e2e |
 
-So on a cold run the gate's own share is about 90 ms; the rest is your suites, which the gate runs once per code change and then caches. Most of a cached run is five `git` subprocesses. In this repository, `make bench` reproduces the numbers into `output/bench.json`.
+So on a cold run the gate's own share is about 105 ms; the rest is your suites, which the gate runs once per code change and then caches. Most of a cached run is five `git` subprocesses. In this repository, `make bench` reproduces the numbers into `output/bench.json`.
 
 ## Enforcement boundary
 
 `VERIFIED:` hooks prove command results, fingerprints, layout and commit gating, and the e2e suite drives the released zip's own hook adapter to show it.
 `VERIFIED:` the gate checks that a complete review attestation exists for the current code, not how insightful the review was. Review quality stays with the model, which is why human review sits before release.
+`VERIFIED:` (`tests/test_swarm.py`) the swarm CLI refuses overlapping claims and writes by a non-owner, and re-applies a write that a racing editor dropped. An agent that edits the YAML by hand bypasses the first two checks; the next `status` run still judges every entry by the process table.
 
 ## Details
 

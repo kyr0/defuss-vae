@@ -1,6 +1,6 @@
 # Architecture: defuss-vae repository
 
-This repository builds one artifact, the plugin in [`plugin/`](plugin/ARCH.md), and holds the maintainer tooling that proves it works: the `Makefile`, the tests in [`tests/`](tests/ARCH.md), lint config and CI. The gate contract itself is specified in [`docs/VERIFIER.md`](docs/VERIFIER.md); this page covers how the pieces fit and run.
+This repository builds one artifact, the plugin in [`plugin/`](plugin/ARCH.md), and holds the maintainer tooling that proves it works: the `Makefile`, the tests in [`tests/`](tests/ARCH.md), lint and coverage config and CI. The gate contract itself is specified in [`docs/VERIFIER.md`](docs/VERIFIER.md); this page covers how the pieces fit and run.
 
 ## Why this design
 
@@ -17,9 +17,10 @@ flowchart LR
     G -->|"state"| S[("tmp/vae/{session}/")]
     G -->|"logs"| V[("var/log/vae/")]
     G -->|"episodes"| A[(".agents/EPISODES.md")]
+    C -->|"swarm"| W[(".agents/SWARM_STATUS.yaml<br/>var/log/swarm/")]
 ```
 
-The hook adapter and the CLI share one state machine, so the agent can loop the gate in-turn while the Stop hook blocks only once per turn. Maintainer flow: `make setup` installs uv if missing, `make verify` runs lint (pinned ruff and actionlint), tests, a Python 3.9 compatibility run, coverage, doctor and e2e; CI (`.github/workflows/verify.yml`) runs the same two commands on macOS and Ubuntu.
+The hook adapter and the CLI share one state machine, so the agent can loop the gate in-turn while the Stop hook blocks only once per turn. Outside the gate, the CLI keeps the sub-agent registry and starts detached jobs (`vae.py swarm`). Maintainer flow: `make setup` installs uv if missing, `make verify` runs lint (pinned ruff and actionlint), tests, a Python 3.9 compatibility run, coverage, doctor and e2e; CI (`.github/workflows/verify.yml`) runs the same two commands on macOS and Ubuntu.
 
 ## Operations
 
@@ -29,4 +30,4 @@ The hook adapter and the CLI share one state machine, so the agent can loop the 
 
 ## Security and privacy
 
-The gate executes project code by design: `.agents/VERIFY.py` is imported and the Makefile verbs run in a shell with the user's permissions. That is the same trust the user already gives `make test`; the plugin adds no network access of its own. No personal data is processed: state and logs hold session ids, file paths and command output, all in gitignored `tmp/` and `var/`.
+The gate executes project code by design: `.agents/VERIFY.py` is imported and the Makefile verbs run in a shell with the user's permissions. That is the same trust the user already gives `make test`, and `vae.py swarm spawn` runs the command it is given under the same trust; the plugin adds no network access of its own. No personal data is processed: state and logs hold session ids, file paths and command output, all in gitignored `tmp/` and `var/`; the gitignored sub-agent registry adds the host name and absolute paths, which can contain the user's name.

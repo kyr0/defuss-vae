@@ -1,6 +1,6 @@
 # Architecture: tests
 
-Unit tests per module (`test_<module>.py`, mirroring `plugin/scripts/`), a shared fixture kit (`vae_testkit.py`) and the dogfood e2e (`e2e.py`). `make verify` runs them all, with coverage at 60 % or more.
+Unit tests per module (`test_<module>.py`, mirroring `plugin/scripts/`), a shared fixture kit (`vae_testkit.py`) and the dogfood e2e (`e2e.py`). `make verify` runs them all, with coverage at 60 % or more, measured in subprocesses too (`.coveragerc`), since the hook adapter, the CLI and swarm jobs run as their own processes.
 
 ## Why this design
 
@@ -12,8 +12,8 @@ Tests use real git repositories, real processes and real files in temporary dire
 
 ## Operations
 
-- **Resources:** the suite runs in about 10 s plus the e2e; CI runs it on macOS and Ubuntu and once on Python 3.9.
-- **Reliability:** service tests poll for readiness instead of sleeping, and the e2e service uses a raw socket listener because `VERIFIED:` `http.server` performs a reverse DNS lookup that took more than 30 s on a CI runner.
+- **Resources:** the suite runs in about 30 s plus the e2e; CI runs it on macOS and Ubuntu and once on Python 3.9.
+- **Reliability:** service tests poll for readiness instead of sleeping, swarm tests stop any job still running in `tearDown`, and the e2e service uses a raw socket listener because `VERIFIED:` `http.server` performs a reverse DNS lookup that took more than 30 s on a CI runner.
 
 ## Security and privacy
 

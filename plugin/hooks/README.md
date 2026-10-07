@@ -8,7 +8,7 @@ echo '{"hook_event_name": "Stop", "cwd": ".", "session_id": "s1", "stop_hook_act
 
 | Event | Registered for | Output |
 |---|---|---|
-| `SessionStart` | `startup`, `resume`, `clear`, `compact`, `fork` | `additionalContext`: the rules, `.agents/MEMORY.md`, `.agents/CLI_GIST.md` and up to three open episodes |
+| `SessionStart` | `startup`, `resume`, `clear`, `compact`, `fork` | `additionalContext`: the rules, the live sub-agents (`.agents/SWARM_STATUS.yaml`), `.agents/MEMORY.md`, `.agents/CLI_GIST.md`, the defaults of the stacks present and up to three open episodes, cut by priority at 9,000 characters |
 | `Stop` | every stop | `decision: "block"` with the gate text while the gate is open; with `stop_hook_active` true, only a `systemMessage` so the turn ends |
 | `PreToolUse` | `Bash`, `PowerShell` | `permissionDecision: "deny"` for a `git commit` while the gate is open |
 

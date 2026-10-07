@@ -1,6 +1,6 @@
 # Architecture: hook adapter
 
-`hooks.json` registers one command for three harness events, and `lifecycle.py` turns each event into a decision: SessionStart injects rules and memory, Stop runs the gate, PreToolUse denies `git commit` while the gate is open. Policy lives in [`../scripts/`](../scripts/ARCH.md); this folder only adapts.
+`hooks.json` registers one command for three harness events, and `lifecycle.py` turns each event into a decision: SessionStart injects the rules, the live sub-agents, memory and the defaults of the stacks present, Stop runs the gate, PreToolUse denies `git commit` while the gate is open. Policy lives in [`../scripts/`](../scripts/ARCH.md); this folder only adapts.
 
 ## Why this design
 
@@ -13,7 +13,7 @@ The adapter reads the event, dispatches on `hook_event_name`, and prints the res
 ## Operations
 
 - **Timeouts:** 10 s for SessionStart and PreToolUse, 600 s for Stop, which may run the project's suites.
-- **Latency:** PreToolUse returns before loading the gate when a command does not contain `commit`: 19 ms per Bash call against 16 ms for Python startup alone; SessionStart 55 ms; Stop on a cached gate 86 ms (`make bench`, Apple M4).
+- **Latency:** PreToolUse returns before loading the gate when a command does not contain `commit`: 18 ms per Bash call against 14 ms for Python startup alone; SessionStart 68 ms; Stop on a cached gate 86 ms (`make bench`, 0.6.0, Apple M4, 2026-10-07).
 - **Reliability:** fail closed. Any exception, including a gate module that fails to import, becomes a commit denial or one Stop block naming the error; input that is not JSON is ignored, since there is nothing to gate.
 - **Observability:** the gate text the agent receives is the trace; the gate writes its own logs and state (see `../scripts/`).
 
