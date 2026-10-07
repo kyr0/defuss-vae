@@ -176,7 +176,7 @@ Then activate it. A running session keeps the version it loaded, so in Claude Co
 
 ```text
 ❯ defuss-vae@defuss-vae
-  Version: 0.6.0
+  Version: 0.7.0
   Scope: user
   Status: ✔ enabled
 ```
@@ -353,7 +353,7 @@ If you use defuss-vae in research or want to reference it, cite it as:
   affiliation  = {Independent Researcher},
   title        = {defuss-vae: Verified Agentic Engineering},
   year         = {2026},
-  version      = {0.6.0},
+  version      = {0.7.0},
   howpublished = {\url{https://github.com/kyr0/defuss-vae}},
   note         = {Claude Code and Agent Skills plugin, MIT License}
 }

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.0
 
 - The agent starts a skill when its step comes, and only the human starts `wrap`, which commits. `status` any time; `implement` for a task the human gave or a plan they approved; `verify` at the task's goal or a plan milestone, on the whole change when it is large and otherwise on its paths and tests; `doc` after implementing and `doc-edit` after `doc`; `plan` only without a human plan, for a task too risky or complex to do directly, and it then stops for review. Each description states its condition; `wrap` keeps both host switches off, and `vae.py doctor` fails with `skill-invocation-policy:<skill>` when either host's switch deviates from this policy (was `skill-not-human-only`). `vae.py swarm spawn` refuses a command that names `wrap` (`/defuss-vae:wrap`, `/wrap`, `$wrap`).
 - `plan` writes `plans/<yyyy-mm-dd_hh-mm>_<slug>.md` (UTC) and updates it in place; complex work gets milestones to tick off, each followed by a `verify` of its scope, and a split into sub-agents names each one's goal, targets, contract, ETA and worktree, only for units with disjoint paths that don't depend on each other's code. `implement` reads plans from `plans/`; `verify` takes named paths or tests as its scope.
