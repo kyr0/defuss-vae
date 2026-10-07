@@ -4,16 +4,20 @@ from __future__ import annotations
 import ast
 import json
 import re
+import shutil
+import subprocess
+import tempfile
 import unittest
+from pathlib import Path
 
-from vae_testkit import REPO, ROOT  # first: puts plugin/scripts on sys.path
+from vae_testkit import PY, REPO, ROOT  # first: puts plugin/scripts on sys.path
 
 # isort: split
 from vae_verify import PROBE_TAG
 
 
 class PackageTests(unittest.TestCase):
-    SKILLS = ("plan", "implement", "review", "docs", "finalize")
+    SKILLS = ("plan", "implement", "verify", "doc", "doc-edit", "wrap", "status")
     # Uppercase tokens that are identifiers or record keys, not VAE-DIALECT operators.
     NAMES = frozenset({"VERIFIED", "HYPOTHESIS", "UNKNOWN", "YAGNI", "REPL", "API", "JS", "TS", "ISO", "UTC", "RED", "GREEN", "REFACTOR", "MEMORY",
              "AGENTS", "VERIFY", "EPISODES", "CLI", "GIST", "CHANGELOG", "README", "VAE", "DIALECT", "PRIOR_ART", "DECISION", "PLAN",
@@ -40,6 +44,22 @@ class PackageTests(unittest.TestCase):
             text = self.skill(name)
             for token in ("disable-model-invocation: true", "## VAE-DIALECT core", "VERIFIED", "HYPOTHESIS", "UNKNOWN", "IF … THEN … ELSE", "../../references/VAE-DIALECT.md"):
                 self.assertIn(token, text, name)
+            # Codex ignores the frontmatter key; its own switch keeps the skill out of implicit invocation.
+            policy = (ROOT / "skills" / name / "agents/openai.yaml").read_text()
+            self.assertIn("allow_implicit_invocation: false", policy, name)
+            self.assertNotIn("human invocation", text, f"{name}: the frontmatter and policy enforce it; prose is token cost")
+
+    def test_doctor_flags_a_skill_codex_could_invoke_implicitly(self):
+        with tempfile.TemporaryDirectory() as td:
+            copy = Path(td) / "plugin"
+            shutil.copytree(ROOT, copy, ignore=shutil.ignore_patterns("__pycache__"))
+            doctor = lambda: subprocess.run([PY, str(copy / "scripts/vae.py"), "doctor"], capture_output=True, text=True, check=False)
+            ok = doctor()
+            self.assertEqual(ok.returncode, 0, ok.stdout)
+            (copy / "skills/plan/agents/openai.yaml").unlink()
+            out = doctor()
+            self.assertNotEqual(out.returncode, 0)
+            self.assertIn("skill-not-human-only:plan", out.stdout)
 
     def test_skill_frontmatter_is_strict_yaml(self):
         # Strict YAML parsers (e.g. the `npx skills` installer) skip a skill whose plain scalar contains ": ".
@@ -57,26 +77,45 @@ class PackageTests(unittest.TestCase):
             self.assertIsNone(re.search(r"\bWHEN\b", body), f"{name}: WHEN is equivalence, never a conditional")
 
     def test_skill_prompt_contracts(self):
-        plan, implement, review, docs, finalize = (self.skill(n) for n in self.SKILLS)
+        plan, implement, verify, doc, doc_edit, wrap, status = (self.skill(n) for n in self.SKILLS)
         for token in ("language stdlib", "native runtime/platform/framework", "current primary docs/source", "Probe unknowns", "`make e2e`", "test coverage lint e2e verify", "IF new project THEN step 0 = `bun init` (JS|TS) | `uv init` (Python)"):
             self.assertIn(token, plan)
-        # SessionStart injects no episodes, so each skill retrieves them by relevance; finalize reads them all.
+        # SessionStart injects no episodes, so each skill retrieves them by relevance; wrap reads them all.
         self.assertIn("`grep` `.agents/EPISODES.md` for touched paths|symptoms", plan)
         self.assertIn("`grep` `.agents/EPISODES.md` for touched paths|symbols|symptoms", implement)
-        self.assertIn("`AGENTS.md`, `.agents/MEMORY.md`, `.agents/CLI_GIST.md`, `.agents/VERIFY.py`, changed files", review)
-        self.assertIn("`grep` `.agents/EPISODES.md` for changed paths|symbols|symptoms", review)
-        self.assertNotIn("`.agents/*`", review)  # the full episode log is for finalize only
+        self.assertIn("`AGENTS.md`, `.agents/MEMORY.md`, `.agents/CLI_GIST.md`, `.agents/VERIFY.py`, changed files", verify)
+        self.assertIn("`grep` `.agents/EPISODES.md` for changed paths|symbols|symptoms", verify)
+        self.assertNotIn("`.agents/*`", verify)  # the full episode log is for wrap only
         for token in ("You are a lazy senior developer", "RED→GREEN→REFACTOR", "root cause", "Evidence loop (priority 1)", PROBE_TAG, "5. Habits:", "ISO-8601 UTC timestamp first", "EVERY key in `.env.example`", "IF new project|subproject THEN start on `bun init` (JS|TS) | `uv init` (Python)",
                       "NOT mocks", "clean consumer", "`make start|stop|status|log`", "gate --repo . --session ${CLAUDE_SESSION_ID}"):
             self.assertIn(token, implement)
         for token in ("Correctness / contract pass", "Ponytail / maintainability pass", "tangled concerns", "ISO-8601 timestamp + level", "mocked|stubbed", "publishable artifact", "failing test|probe"):
-            self.assertIn(token, review)
+            self.assertIn(token, verify)
         for token in ("../../references/PROSE.md", "Page rules first", "Mermaid", "mermaid-cli", "prose --repo . --fix", "NOT a character swap", "THEN ask, NOT invent"):
-            self.assertIn(token, docs)
+            self.assertIn(token, doc)
+        # doc-edit is doc's edit + catalog review step alone, scoped to the named pages.
+        self.assertIn("`doc-edit` scopes this step to named pages", doc)
+        for token in ("Scope = the pages AND edits the human names; NOT edit other pages|code", "NOT rewrite|restructure unrequested parts", "../../references/PROSE.md",
+                      "check EVERY changed unit", "THEN ask, NOT invent", "CLI `prose --repo . <pages>` → report EVERY hit outside the edit", "THEN `--fix`"):
+            self.assertIn(token, doc_edit)
+        # Design discipline: one owner per concern, checked contracts, composition; text scanners and refactors need proof.
+        for token in ("ONE owner module per concern", "explicit AND checked", "NOT share mutable state|inherit", "public API|events"):
+            self.assertIn(token, plan)
+            self.assertIn(token, implement)
+        # The HEAD worktree lives outside the repo: pytest collected one under tmp/ ("import file mismatch", probed).
+        for token in ("= a parser", "test EVERY scanner over it", "green tests alone NOT proof", "`cmp` its artifacts against a `HEAD` build",
+                      "git worktree add $(mktemp -d) HEAD"):
+            self.assertIn(token, implement)
         for token in ("../../references/CONSOLIDATION.md", "IF unsure THEN keep + retag UNKNOWN", "NOT delete on age alone", "NOT delete human-written content"):
-            self.assertIn(token, finalize)
-        for token in ("Conventional Commits 1.0.0", ".agents/MEMORY.md", ".agents/CLI_GIST.md", ".agents/EPISODES.md", "doctor --repo", "LESSON"):
-            self.assertIn(token, finalize)
+            self.assertIn(token, wrap)
+        for token in ("Conventional Commits 1.0.0", ".agents/MEMORY.md", ".agents/CLI_GIST.md", ".agents/EPISODES.md", "doctor --repo", "LESSON", "Reflect", "EVERY unencoded lesson of this work"):
+            self.assertIn(token, wrap)
+        self.assertIn("CLI `swarm status`: merge then reap EVERY `EXITED` agent", wrap)
+        # Swarm orchestration: plan marks only safely splittable steps; status observes, reconciles, then acts per state.
+        self.assertIn("Mark steps `parallel` only IF their target paths are disjoint AND their contracts explicit", plan)
+        for token in ("swarm status --repo .", "swarm status --fix", "`EXITED` code=0 → merge its worktree through the gate",
+                      "swarm stop --name", "NOT trust silence", "A process outranks its registry entry"):
+            self.assertIn(token, status)
 
     def test_dialect_reference_defines_every_operator(self):
         text = (ROOT / "references/VAE-DIALECT.md").read_text()
@@ -86,11 +125,11 @@ class PackageTests(unittest.TestCase):
     def test_skills_stay_lean(self):
         sizes = {n: (ROOT / "skills" / n / "SKILL.md").stat().st_size for n in self.SKILLS}
         for name, size in sizes.items():
-            self.assertLess(size, 5500, f"{name} skill grew to {size} bytes; move provenance/examples out of runtime prompt")
-        self.assertLess(sum(sizes.values()), 21500, sizes)
+            self.assertLess(size, 6000, f"{name} skill grew to {size} bytes; move provenance/examples out of runtime prompt")
+        self.assertLess(sum(sizes.values()), 28000, sizes)
 
     def test_modules_import_only_lower_layers(self):
-        layers = ["vae_repo", "vae_prose", "vae_verify", "vae_state", "vae_gate", "vae_hooks", "vae_project"]
+        layers = ["vae_repo", "vae_prose", "vae_verify", "vae_state", "vae_swarm", "vae_gate", "vae_hooks", "vae_project"]
         for i, name in enumerate(layers):
             tree = ast.parse((ROOT / "scripts" / f"{name}.py").read_text())
             imported = {n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and (n.module or "").startswith("vae_")}

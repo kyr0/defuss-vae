@@ -1,13 +1,13 @@
 ---
-name: review
-description: "Human-triggered high-precision review against requirements, callers, real tests, gate evidence and Ponytail minimalism; fixes confirmed defects, encodes repeatable ones as tests or rules."
+name: verify
+description: "High-precision review against requirements, callers, real tests, gate evidence and Ponytail minimalism; fixes confirmed defects, encodes repeatable ones as tests or rules."
 disable-model-invocation: true
 allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py *)
 ---
 
-# defuss-vae / review
+# defuss-vae / verify
 
-Precondition: explicit human invocation. Default = review + fix actionable findings; IF the human asks report-only THEN NOT edit.
+Default = review + fix actionable findings; IF the human asks report-only THEN NOT edit.
 
 ## Method
 

@@ -1,12 +1,12 @@
 ---
 name: plan
-description: "Human-triggered lean planning: trace the real path, probe unknowns, climb the prior-art ladder, emit the smallest plan whose invariants are executable checks."
+description: "Lean planning: trace the real path, probe unknowns, climb the prior-art ladder, emit the smallest plan whose invariants are executable checks."
 disable-model-invocation: true
 ---
 
 # defuss-vae / plan
 
-Precondition: explicit human invocation. NOT implement unless the human asks for plan + implement.
+NOT implement unless the human asks for plan + implement.
 Role: senior engineer planning for a strong engineer without hidden context. evidence > design; smallest correct testable plan > elaborate architecture.
 
 ## Workflow
@@ -17,9 +17,10 @@ Role: senior engineer planning for a strong engineer without hidden context. evi
 4. **Prior-art ladder** (stop at first rung that fully holds): YAGNI → repo helper|pattern → language stdlib → native runtime/platform/framework → installed dependency → current primary docs/source → external prior art (only to resolve remaining UNKNOWN).
 5. **Proof before edits.** EVERY acceptance invariant REQUIRES an executable check the gate runs: `make test` (real subsystems in isolation, NOT mocks) | `make e2e` (build publishable artifact → clean consumer → `input/` → `output/`) | `.agents/VERIFY.py` rule. An existing test counts only IF it exercises the changed contract.
 6. **Minimum design.** deletion|reuse > addition; fewest files. NOT speculative interface|factory|config|wrapper|helper|migration|compat layer|dependency. Preserve trust-boundary validation, data-loss protection, security, accessibility, explicit requirements.
-7. **Alternatives only IF live.** IF ≥2 plausible designs AND evidence discriminates THEN matrix `H | for | against | posterior order | cheapest falsifier`; numeric probability REQUIRES grounded base rates|measurements.
-8. **Layout.** `Makefile` verbs `setup start stop status log metrics bench test coverage lint e2e verify`; services log `var/log/<svc>.stdout|.stderr`, pid `tmp/<svc>.pid` (gitignored). IF new project THEN step 0 = `bun init` (JS|TS) | `uv init` (Python). IF layout missing THEN `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py init --repo .` precedes feature steps.
-9. **Emit** steps in dependency order; EVERY step names `path:symbol`, semantic change, proof, why-doc obligation; risk|rollback only IF material.
+7. **Module boundaries.** ONE owner module per concern; EVERY other module asks it, NOT re-derives|caches its state. EVERY cross-module contract (state API, store, render, schema, typed API, view|dialog ownership) explicit AND checked (type|test|`VERIFY.py` rule) BC an implicit contract CAUSES cross-module failures. compose, NOT share mutable state|inherit: a component reaches another only via its public API|events. EVERY step names the contracts it touches + their check.
+8. **Alternatives only IF live.** IF ≥2 plausible designs AND evidence discriminates THEN matrix `H | for | against | posterior order | cheapest falsifier`; numeric probability REQUIRES grounded base rates|measurements.
+9. **Layout.** `Makefile` verbs `setup start stop status log metrics bench test coverage lint e2e verify`; services log `var/log/<svc>.stdout|.stderr`, pid `tmp/<svc>.pid` (gitignored). IF new project THEN step 0 = `bun init` (JS|TS) | `uv init` (Python). IF layout missing THEN `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py init --repo .` precedes feature steps.
+10. **Emit** steps in dependency order; EVERY step names `path:symbol`, semantic change, proof, why-doc obligation; risk|rollback only IF material. Mark steps `parallel` only IF their target paths are disjoint AND their contracts explicit (one sub-agent each).
 
 ## Output contract
 

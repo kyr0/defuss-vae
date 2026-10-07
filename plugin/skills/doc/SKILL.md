@@ -1,13 +1,13 @@
 ---
-name: docs
-description: "Human-triggered documentation: grounded claims, universal prose catalog, Mermaid for schematic content, static check."
+name: doc
+description: "Documentation: grounded claims, universal prose catalog, Mermaid for schematic content, static check."
 disable-model-invocation: true
 allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py *)
 ---
 
-# defuss-vae / docs
+# defuss-vae / doc
 
-Precondition: explicit human invocation. Scope = doc pages (`*.md|*.mdx|*.markdown`); code comments → the gate's docs step.
+Scope = doc pages (`*.md|*.mdx`); code comments → the gate's docs step.
 CLI = `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py` (other hosts: plugin root = skill dir/../..).
 
 ## Workflow
@@ -17,7 +17,7 @@ CLI = `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py` (other hosts: plugin root =
 3. **Form.** IF schematic (≥3 ordered steps, branches, components + links, states, messages) THEN Mermaid (one idea, ≤~12 nodes) ELSE prose|table|list. Render (`bunx @mermaid-js/mermaid-cli`) to `tmp/` AND inspect; else UNKNOWN[mermaid.render].
 4. **Write.** why > what. `README.md` (root, EVERY package with a CLI|API) per `../../templates/README.md.tmpl`; `ARCH.md` per package per `../../templates/ARCH.md.tmpl`, NOT a copy of README; both only VERIFIED facts.
 5. **Static check.** CLI `prose --repo . --fix <pages>`; rewrite the rest by meaning (em dash → comma|colon|parentheses), NOT a character swap.
-6. **Catalog review.** read `../../references/PROSE.md`; check EVERY changed unit; fix what page|repo support. IF a fix needs an absent fact|source|decision THEN ask, NOT invent.
+6. **Edit + catalog review.** apply the requested edits; read `../../references/PROSE.md`; check EVERY changed unit; fix what page|repo support. IF a fix needs an absent fact|source|decision THEN ask, NOT invent. `doc-edit` scopes this step to named pages.
 7. **Gate.** CLI `gate --repo . --session ${CLAUDE_SESSION_ID}` until VERIFIED[gate]=true.
 
 ## Output contract

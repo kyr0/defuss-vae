@@ -1,13 +1,13 @@
 ---
 name: implement
-description: "Human-triggered implementation: Ponytail minimalism, probe-before-assume debugging, root-cause fixes, mock-free tests, dogfood e2e, gated verify → review → docs."
+description: "Ponytail minimalism, probe-before-assume debugging, root-cause fixes, mock-free tests, dogfood e2e, gated verify → review → docs."
 disable-model-invocation: true
 allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py *)
 ---
 
 # defuss-vae / implement
 
-Precondition: explicit human invocation. Implement requested scope completely; NOT invoke another skill.
+Implement requested scope completely; NOT invoke another skill.
 CLI = `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py` (other hosts: plugin root = skill dir/../..).
 
 ## Ponytail
@@ -32,11 +32,13 @@ NOT one-implementation interface|factory, speculative config, "for later" scaffo
 2. Preserve public contracts unless the plan changes them; keep unrelated user changes intact. Toolchain: IF new project|subproject THEN start on `bun init` (JS|TS) | `uv init` (Python), NOT npm|yarn|pnpm|pip|poetry ELSE keep the repo's toolchain AND propose migrating.
 3. Non-trivial behavior REQUIRES RED→GREEN→REFACTOR: failing test → observe expected failure → minimum general code → observe pass → refactor only IF smaller|clearer. NOT hard-code to fixtures; NOT weaken|delete valid tests.
 4. tests = real subsystems in isolation (real fs|process|db|port under `tmp/`), NOT mocks|stubs|fakes. `make e2e` = build publishable artifact → install into clean consumer → `input/` → `output/` → assert; NOT source-tree imports.
-5. Habits: concerns separated (pure core; I/O|config at edges), small modules testable with real inputs; logs = ISO-8601 UTC timestamp first + level; env vars from gitignored `.env`, EVERY key in `.env.example`.
+5. Habits: ONE owner module per concern, EVERY other module asks it; cross-module contracts (state API, store, render, schema, typed API, view|dialog ownership) explicit AND checked by type|test|`VERIFY.py` rule BC an implicit contract CAUSES cross-module failures; compose, NOT share mutable state|inherit (reach another component only via its public API|events); concerns separated (pure core; I/O|config at edges), small modules testable with real inputs; logs = ISO-8601 UTC timestamp first + level; env vars from gitignored `.env`, EVERY key in `.env.example`.
 6. Services only via `make start|stop|status|log` → `var/log/<svc>.stdout|.stderr`, `tmp/<svc>.pid`; NOT foreground|unredirected `&` in the agent shell.
 7. EVERY acceptance invariant → check the gate runs: `make test`|`make e2e`|`.agents/VERIFY.py` rule; NOT claim done from inspection.
-8. Docs for changed production code: per the gate's `3/3 docs` step.
-9. Before finishing: CLI `gate --repo . --session ${CLAUDE_SESSION_ID}` → fix `AGENT_CMD` from lowest causal failure → its review → docs steps; repeat until `VERIFIED[gate]=true`. NOT disable|bypass hooks. New deterministic defect class → regression test OR `VERIFY.py` rule.
+8. A tool reading source as text = a parser: IF source syntax changes (call shape, type argument) THEN test EVERY scanner over it (regex, codegen, linter, `VERIFY.py` rule) with the new syntax.
+9. Behavior-neutral change (refactor|rename|move): green tests alone NOT proof; IF a build exists THEN `cmp` its artifacts against a `HEAD` build (`git worktree add $(mktemp -d) HEAD`) AND explain EVERY diff.
+10. Docs for changed production code: per the gate's `3/3 docs` step.
+11. Before finishing: CLI `gate --repo . --session ${CLAUDE_SESSION_ID}` → fix `AGENT_CMD` from lowest causal failure → its review → docs steps; repeat until `VERIFIED[gate]=true`. NOT disable|bypass hooks. New deterministic defect class → regression test OR `VERIFY.py` rule.
 
 ## Output contract
 

@@ -242,7 +242,7 @@ def gate(repo: Path, session_id: str, plugin_root: Path = PLUGIN_ROOT) -> Gate:
         state.update(verified_fp=fp, verified_key=code_key, pages_key=pages_key, last_fail=None, coverage=cov, warns=warns)
     # The review and docs texts are what the agent reads after verify, so warnings ride on them and on the green text.
     warns = state.get("warns") if isinstance(state.get("warns"), dict) else {}
-    note = "".join(f"\nWARNS {k}: {v}" for k, v in sorted(warns.items())) + ("\n(non-blocking until 0.6.0; fix now)" if warns else "")
+    note = "".join(f"\nWARNS {k}: {v}" for k, v in sorted(warns.items())) + ("\n(non-blocking while CONFIG['strict'] is off; fix now)" if warns else "")
     rp = attestation_path(repo, session_id, "review")
     ok, why = validate_review(rp, fp, changed)
     if not ok:

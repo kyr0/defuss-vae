@@ -51,7 +51,7 @@ SERVICE_VERBS = ("start", "stop", "status", "log")
 # "no service" definitively, where a missing target leaves the agent guessing.
 NO_SERVICE_STUB = '{verbs}: ; @echo "∅ $@: no service"'
 # How `make`, sh, bash and dash report a missing uv/bun (VERIFIED: `make: uv: No such file or directory`).
-MISSING_TOOL = re.compile(r"\b(uv|bun)\b:? (?:command not found|No such file or directory|not found)")
+MISSING_TOOL = re.compile(r"\b(uv|bun|mise|go|cargo|java|gradle|mvn|dotnet|golangci-lint)\b:? (?:command not found|No such file or directory|not found)")
 # Split literal: this file must not contain the tag itself, or the probe rule would flag the plugin's own source.
 PROBE_TAG = "vae" + ":probe"
 BUILTIN_RULES = [{
@@ -63,18 +63,29 @@ BUILTIN_RULES = [{
 GITIGNORE = {".env": ".env", ".venv/x": ".venv/", "__pycache__/x": "__pycache__/", ".pytest_cache/x": ".pytest_cache/",
              ".ruff_cache/x": ".ruff_cache/", "node_modules/x": "node_modules/", "x.pyc": "*.pyc",
              "var/x": "var/*", "tmp/x": "tmp/*", "output/x": "output/*", "input/x": "input/*", ".DS_Store": ".DS_Store",
-             "dist/x": "dist/", "coverage/x": "coverage/", ".coverage": ".coverage", ".cache/x": ".cache/"}
+             "dist/x": "dist/", "coverage/x": "coverage/", ".coverage": ".coverage", ".cache/x": ".cache/",
+             "target/x": "target/", "build/x": "build/", ".gradle/x": ".gradle/", "bin/x": "bin/", "obj/x": "obj/",
+             ".agents/SWARM_STATUS.yaml": ".agents/SWARM_STATUS.yaml"}
 # Required: secrets, runtime state, consumer output and build artifacts always; caches and package folders per toolchain.
 LAYOUT_IGNORES = ("var/x", "tmp/x", ".env")
 BUILD_IGNORES = ("output/x", "dist/x")
-BASE_IGNORES = (".env", "var/x", "tmp/x", "output/x", "input/x", ".DS_Store", "dist/x")
+# The swarm registry is live process state (pids, absolute paths): never committed.
+BASE_IGNORES = (".env", "var/x", "tmp/x", "output/x", "input/x", ".DS_Store", "dist/x", ".agents/SWARM_STATUS.yaml")
 STACK_IGNORES = {
     "js": ("node_modules/x", "coverage/x", ".cache/x"),
     "python": (".venv/x", "__pycache__/x", "x.pyc", ".pytest_cache/x", ".ruff_cache/x", ".coverage"),
+    "rust": ("target/x",),
+    "jvm": ("target/x", "build/x", ".gradle/x"),  # Maven target/, Gradle build/ and .gradle/
+    "dotnet": ("bin/x", "obj/x"),
+    "go": (),  # modules need no ignore; `go build` output goes to output/
+    "web": (),
 }
-# Direct env var reads (JS/TS, Python, Go, Rust); escapes keep this source from matching itself. OS-provided names are exempt.
+# Per-stack defaults (references/STACKS.md): injected at session start for the stacks present, cited by verb hints.
+STACKS_DOC = PLUGIN_ROOT / "references" / "STACKS.md"
+# Direct env var reads (JS/TS, Python, Go, Rust, Java, C#); escapes keep this source from matching itself. OS-provided names are exempt.
 ENV_REF = re.compile(r"""(?:process\.env\.|Bun\.env\.|import\.meta\.env\.|process\.env\[["']|os\.environ\[["']|"""
-                     r"""os\.environ\.get\(\s*["']|os\.(?:getenv|Getenv)\(\s*["']|env::var\(\s*")([A-Z][A-Z0-9_]*)""")
+                     r"""os\.environ\.get\(\s*["']|os\.(?:getenv|Getenv|LookupEnv)\(\s*["']|env::var(?:_os)?\(\s*"|"""
+                     r"""System\.getenv\(\s*"|Environment\.GetEnvironmentVariable\(\s*")([A-Z][A-Z0-9_]*)""")
 ENV_KEY = re.compile(r"(?m)^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=")
 OS_ENV = {"HOME", "PATH", "PWD", "USER", "SHELL", "TERM", "LANG", "TMPDIR", "TZ", "CI"}
 
@@ -171,7 +182,8 @@ def parse_coverage(output: str) -> tuple[float | None, str]:
     if nums:
         # The last numeric column is % Lines in bun (Funcs|Lines) and istanbul/vitest (Stmts|Branch|Funcs|Lines) tables.
         return float(nums[-1]), "All files table, % Lines"
-    m = re.search(r"(?mi)^\s*(?:total|coverage)\b[^\n%]*?([0-9]+(?:\.[0-9]+)?)%", output)
+    # An optional leading `|`: VERIFIED: (dotnet 9) coverlet.msbuild prints `| Total | 71.74% | …` with % Line first.
+    m = re.search(r"(?mi)^\s*\|?\s*(?:total|coverage)\b[^\n%]*?([0-9]+(?:\.[0-9]+)?)%", output)
     if m:
         return float(m.group(1)), "TOTAL line"
     return None, "no `TOTAL <n>%` line or `All files |…|` table"
@@ -186,9 +198,35 @@ def run_logged(check_id: str, command: str, repo: Path, timeout: int) -> tuple[s
 
 def remedy(command: str, output: str, log: str) -> str:
     m = MISSING_TOOL.search(output)
-    if m:
+    if m and m.group(1) in ("uv", "bun"):
         return f"RUN: make setup  (installs the missing `{m.group(1)}` with its official installer), then rerun the gate"
+    if m:
+        tool = {"cargo": "rust", "mvn": "maven"}.get(m.group(1), m.group(1))  # mise names the toolchain, not the binary
+        return (f"RUN: make setup  (installs the missing `{m.group(1)}` via `mise install` once `mise.toml` pins it: "
+                f"`mise use {tool}@<version>`), then rerun the gate")
     return f"RUN: {command}  (full output: tail -n 80 {log})"
+
+
+def stack_defaults(names: Iterable[str], doc: Path = STACKS_DOC) -> dict[str, list[str]]:
+    """The `- ` lines of each requested `## <stack>` section in references/STACKS.md, in file order."""
+    want, out, cur = set(names), {}, None
+    try:
+        lines = doc.read_text("utf-8").splitlines()
+    except OSError:
+        return {}
+    for ln in lines:
+        if ln.startswith("## "):
+            cur = ln[3:].strip()
+        elif cur in want and ln.startswith("- "):
+            out.setdefault(cur, []).append(ln)
+    return out
+
+
+def verb_hint(found: Iterable[str], verb: str, fallback: str) -> str:
+    """`stack: command` for each detected stack's `- <verb>:` line; the bun|uv defaults for a repo with no stack yet."""
+    hints = [f"{s}: {ln.split(': ', 1)[1]}" for s, lines in sorted(stack_defaults(found).items()) for ln in lines
+             if ln.startswith(f"- {verb}: ")]
+    return " | ".join(hints) or fallback
 
 
 def check_command(check_id: str, claim: str, command: str, repo: Path, timeout: int) -> Check:
@@ -278,10 +316,12 @@ def stack_ignores(files: Iterable[str], config: dict[str, Any], base: Iterable[s
 
 
 def strict(config: dict[str, Any]) -> bool:
-    """Checks added in 0.5.0 warn until 0.6.0 unless CONFIG["strict"] is True.
+    """The docs.pages, gitignore and package checks block only when CONFIG["strict"] is True, the template's value
+    since 0.6.0; without it they warn.
 
-    WHY: they fail existing repos on their next gate run; a warning release lets projects catch up (`init`, templates)
-    instead of blocking them mid-task."""
+    WHY a per-project switch, not a version-wide flip: they fail existing repos on their next gate run, and 0.5.x
+    templates wrote "strict": False explicitly, so flipping the code default would only have caught configs older than
+    0.5.0, making behavior depend on when a project was initialized. New projects start strict; old ones opt in."""
     return bool(config.get("strict", False))
 
 
@@ -583,7 +623,8 @@ def verify(repo: Path, changed_paths: list[str] | None = None, suites: bool = Tr
     coverage_min = float(config.get("coverage_min", 60.0))
     if config.get("layout", True):
         checks.append(check_layout(repo))
-    files = walk_files(repo)  # one walk for the ignore and test checks
+    files = walk_files(repo)  # one walk for the ignore and test checks and the stack hints
+    found = stacks(files)
     checks.append(check_gitignore(repo, config, files))
     checks.append(check_wiring(repo, config))
     if config.get("toolchain", True):
@@ -609,14 +650,14 @@ def verify(repo: Path, changed_paths: list[str] | None = None, suites: bool = Tr
     else:
         checks.append(Check(
             "lint", "lint passes", "UNKNOWN", None, "no Makefile `lint` target or CONFIG['lint_command']",
-            next="ADD Makefile target `lint` (uv run ruff check . | bunx oxlint --deny-warnings)",
+            next=f"ADD Makefile target `lint` ({verb_hint(found, 'lint', 'uv run ruff check . | bunx oxlint --deny-warnings')})",
         ))
     if test_cmd:
         checks.append(check_command("tests.unit", "test command passes", str(test_cmd), repo, timeout))
     else:
         checks.append(Check(
             "tests.unit", "test command passes", "UNKNOWN", None, "no Makefile `test` target or CONFIG['test_command']",
-            next="ADD Makefile target `test` (bun test | uv run pytest)",
+            next=f"ADD Makefile target `test` ({verb_hint(found, 'test', 'bun test | uv run pytest')})",
         ))
     for i, cmd in enumerate(integration):
         checks.append(check_command(f"tests.integration.{i+1}", "integration test command passes", str(cmd), repo, timeout))
@@ -632,7 +673,8 @@ def verify(repo: Path, changed_paths: list[str] | None = None, suites: bool = Tr
     elif not e2e:
         checks.append(Check(
             "tests.e2e", "e2e command passes", "UNKNOWN", None, "no Makefile `e2e` target or CONFIG['e2e_commands']",
-            next="ADD Makefile target `e2e`: build the publishable artifact → clean consumer → input/ → output/",
+            next="ADD Makefile target `e2e`: build the publishable artifact → clean consumer → input/ → output/ ("
+                 + verb_hint(found, "e2e", "bun pm pack + bun add <tgz> | uv build + uv run --isolated --with dist/<whl>") + ")",
         ))
     elif all(c.value for c in checks if c.id.startswith("tests.e2e.")):
         # HYPOTHESIS: an e2e that leaves no consumer output most likely never ran the artifact; it cannot prove
@@ -665,7 +707,7 @@ def verify(repo: Path, changed_paths: list[str] | None = None, suites: bool = Tr
     else:
         checks.append(Check(
             "coverage", claim, "UNKNOWN", None, "no Makefile `coverage` target or CONFIG['coverage_command']",
-            next="ADD Makefile target `coverage` printing `TOTAL <n>%` (bun test --coverage | uv run pytest --cov)",
+            next=f"ADD Makefile target `coverage` printing `TOTAL <n>%` ({verb_hint(found, 'coverage', 'bun test --coverage | uv run pytest --cov')})",
         ))
     for rule in BUILTIN_RULES + rules:
         checks.append(run_custom_rule(rule, repo, timeout, code_paths, doc_paths) if isinstance(rule, dict) else invalid_rule(rule))
@@ -697,7 +739,7 @@ def render_checks(checks: list[Check], evidence_max: int = 1200) -> list[str]:
     lines.append("PROVEN: " + (", ".join(proven) or "∅"))
     lines.append("REMAINS: " + (", ".join(remains) or "∅"))
     if warns:
-        lines.append("WARNS: " + ", ".join(warns) + " (non-blocking until 0.6.0; fix now, or CONFIG['strict']=True to block)")
+        lines.append("WARNS: " + ", ".join(warns) + " (non-blocking while CONFIG['strict'] is off; fix now, or set it True to block)")
     lines += ["AGENT_CMD: " + n for n in dict.fromkeys(nexts)] or ["AGENT_CMD: ∅"]
     return lines
 

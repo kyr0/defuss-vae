@@ -1,0 +1,3 @@
+# Codex documents only this switch, not `disable-model-invocation`; it keeps the skill human-invoked there.
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,5 @@
+# Subprocesses count: the tests run the hook adapter, the CLI and swarm jobs as their own processes, as users do.
+[run]
+patch = subprocess
+parallel = true
+source = plugin/scripts,plugin/hooks

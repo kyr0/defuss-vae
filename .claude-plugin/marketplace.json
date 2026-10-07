@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "defuss-vae",
-      "description": "Plan → implement → deterministic verify → review → docs → finalize.",
+      "description": "Plan → implement → deterministic verify → review → docs → wrap.",
       "source": "./plugin",
       "category": "productivity"
     }

@@ -8,7 +8,7 @@
   "interface": {
     "displayName": "defuss-vae",
     "shortDescription": "Lean verified agentic engineering",
-    "longDescription": "Human-triggered planning, implementation, review and finalization; hooks force verifier, review and documentation gates before commits.",
+    "longDescription": "Planning, implementation, review, documentation, wrap-up and swarm-status skills; hooks force verifier, review and documentation gates before commits.",
     "developerName": "defuss",
     "category": "Productivity",
     "capabilities": ["Instructions", "Lifecycle hooks"]

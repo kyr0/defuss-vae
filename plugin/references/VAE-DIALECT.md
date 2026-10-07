@@ -55,4 +55,4 @@ UNKNOWN[e2e] BC browser harness unavailable
 IF HYPOTHESIS[race] THEN next=probe cache writer ELSE next=bisect
 ```
 
-Bayesian matrices MAY be used only when ≥2 live hypotheses/designs AND evidence discriminates. Numeric priors/posteriors require grounded frequencies/measurements; otherwise use ordinal posterior ordering + falsifier.
+MAY use Bayesian matrices only when ≥2 live hypotheses/designs AND evidence discriminates. Numeric priors/posteriors require grounded frequencies/measurements; otherwise use ordinal posterior ordering + falsifier.

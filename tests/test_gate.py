@@ -69,7 +69,7 @@ class GateTests(RepoCase):
         self.assertIn("WARNS gitignore:", gate(self.repo, sid, ROOT).text, "a green gate still shows warnings with their fix")
         green = self.stop(sid)
         self.assertEqual(set(green), {"systemMessage"}, "warnings never block the stop")
-        self.assertIn("warnings that block from 0.6.0: gitignore:", green["systemMessage"])
+        self.assertIn("warnings (CONFIG['strict']=True blocks them): gitignore:", green["systemMessage"])
         self.assertIsNone(self.commit(sid))
         entries = episode_entries(self.repo)
         self.assertEqual(sum(" DONE " in e for e in entries), 1, entries)
@@ -297,6 +297,48 @@ class GateTests(RepoCase):
         for line in ("oldest open lesson", "FAIL tests.unit", "DONE fp=1", "learn=test"):
             self.assertNotIn(line, tail)
 
+    def test_session_start_injects_no_gate_noise_as_a_lead(self):
+        init_project(self.repo, ROOT)
+        append_episodes(self.repo, "a", ["FAIL lint", "DONE fp=1 cov=90.0% paths=a.py", "FINDING a.py:f learn=test: pinned"], ROOT)
+        event = {"hook_event_name": "SessionStart", "cwd": str(self.repo), "session_id": "c"}
+        self.assertNotIn("Open .agents/EPISODES.md", session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"])
+
+    def test_full_memory_is_cut_between_entries_and_the_rest_is_named(self):
+        # The probe that found the silent cut: rules + a MEMORY.md within its 4 KiB budget overflowed 9000 chars, so the
+        # last entry was split mid-line and CLI_GIST and the leads vanished without a trace.
+        self.make_python_project()
+        init_project(self.repo, ROOT)
+        memory = [f"- VERIFIED[m{i:02d}] fact {i} " + "x" * 150 + " BC probe" for i in range(22)]
+        self.write(".agents/MEMORY.md", "# Agent memory\n" + "\n".join(memory) + "\n")
+        self.write(".agents/CLI_GIST.md", "# CLI gist\n- VERIFIED[deploy] `fly deploy --app demo`\n")
+        append_episodes(self.repo, "s", ["LESSON HYPOTHESIS[cache] falsified BC probe"], ROOT)
+        event = {"hook_event_name": "SessionStart", "cwd": str(self.repo), "session_id": "c"}
+        ctx = session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"]
+        self.assertLessEqual(len(ctx), 9000)
+        shown = [m for m in memory if m in ctx]
+        self.assertTrue(shown and all(m in ctx.splitlines() for m in shown), "entries arrive whole or not at all")
+        self.assertIn("… context full; read the rest: ", ctx.splitlines()[-1])
+        for source in (".agents/EPISODES.md",) + (() if "fly deploy" in ctx else (".agents/CLI_GIST.md",)):
+            self.assertIn(source, ctx.splitlines()[-1])
+        # A small repo state fits whole: no cut line, and the detected stack's defaults arrive.
+        self.write(".agents/MEMORY.md", "# Agent memory\n" + memory[0] + "\n")
+        ctx = session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"]
+        self.assertNotIn("context full", ctx)
+        self.assertIn("python lint: `uv run ruff check .`", ctx)
+        self.assertNotIn("golangci-lint", ctx, "only the stacks present")
+
+    def test_session_start_shows_the_live_swarm_first(self):
+        init_project(self.repo, ROOT)
+        (self.repo / ".agents/SWARM_STATUS.yaml").write_text(
+            "agents:\n- name: crashed\n  pid: 999999\n  goal: Port the parser.\n  workdir: ../c\n  target_focus_paths: [src/p]\n"
+            "  start_timestamp: 2026-01-01T00:00:00Z\n")
+        with (self.repo / ".agents/MEMORY.md").open("a") as f:
+            f.write("- VERIFIED[db] pool size 4 BC load test\n")
+        event = {"hook_event_name": "SessionStart", "cwd": str(self.repo), "session_id": "c"}
+        ctx = session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("LOST crashed: Port the parser. (workdir ../c)", ctx)
+        self.assertLess(ctx.index("Swarm .agents/SWARM_STATUS.yaml"), ctx.index(".agents/MEMORY.md:"), "agents before memory")
+
     def test_open_episodes_share_the_section_budget_newest_first(self):
         init_project(self.repo, ROOT)
         event = {"hook_event_name": "SessionStart", "cwd": str(self.repo), "session_id": "c"}
@@ -326,6 +368,22 @@ class GateTests(RepoCase):
         entries = episode_entries(self.repo)
         self.assertEqual(len(entries), EPISODE_KEEP)
         self.assertTrue(entries[0].endswith("FAIL x5") and text.startswith("# Episodes"))
+
+    def test_trim_drops_oldest_gate_noise_and_keeps_every_lead(self):
+        leads = ["LESSON oldest lesson BC probe", "FINDING a.py:f learn=none: UNKNOWN lock", "NOTE unknown kind"]
+        append_episodes(self.repo, "s", leads + ["FINDING b.py:g learn=test: pinned", "DONE fp=1"], ROOT)
+        append_episodes(self.repo, "s", [f"FAIL x{i}" for i in range(EPISODE_KEEP)], ROOT)
+        bodies = [e.split(" ", 2)[2] for e in episode_entries(self.repo)]
+        self.assertEqual(len(bodies), EPISODE_KEEP)
+        self.assertEqual(bodies[:3], leads, "leads are never trimmed by age")
+        self.assertNotIn("DONE fp=1", bodies)
+        self.assertNotIn("FINDING b.py:g learn=test: pinned", bodies)
+        self.assertEqual(bodies[3], "FAIL x3", "the oldest noise goes first")
+        # Leads alone may exceed the window; doctor's lead cap, not the trim, bounds them.
+        append_episodes(self.repo, "s", [f"LESSON l{i} BC x" for i in range(EPISODE_KEEP)], ROOT)
+        bodies = [e.split(" ", 2)[2] for e in episode_entries(self.repo)]
+        self.assertEqual(len(bodies), EPISODE_KEEP + 3)
+        self.assertFalse(any(b.startswith("FAIL ") for b in bodies))
 
     def test_adapter_fails_closed_when_gate_crashes(self):
         self.make_python_project()

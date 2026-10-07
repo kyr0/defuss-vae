@@ -9,8 +9,11 @@ CONFIG = {
     "e2e_commands": [],            # [] → `make e2e`: build + consume the publishable artifact.
     "e2e_paths": [],               # globs e2e depends on, e.g. ["web/*"]: e2e reruns only when one (or a build file) changed; [] → any code file.
     "timeout_s": 180,
+    # `init` on a GitHub remote writes .github/workflows/verify.yml (uv/bun via their official setup actions) unless a
+    # workflow already runs `make verify`, these commands or every verify verb. None → make setup, make verify.
+    "ci": None,                    # None | False (no CI workflow) | ["make setup", "make ci"] (one step each)
     "layout": True,                # Makefile verbs + gitignored secrets, runtime state, dist/, caches and package folders.
-    "strict": False,              # True: docs.pages, gitignore and package block instead of warning (blocks from 0.6.0 by default).
+    "strict": True,               # docs.pages, gitignore and package block; False makes them warnings (a project created before 0.6.0 has False).
     "gitignore_exempt": [],        # required ignore lines this project may skip, e.g. ["dist/"] for a GitHub Action that commits its build.
     "toolchain": True,             # new (sub)projects start on bun (JS/TS) / uv (Python): newly added npm/yarn/pnpm/poetry/pipenv/pdm/pip lockfiles fail.
     # Static check of every changed doc page (*.md|*.mdx|*.markdown); False disables it.
@@ -38,6 +41,7 @@ RULES = [{
     "glob": "*",
     # Every alternative contains an escape, so this file never matches its own pattern.
     "pattern": r"unittest\.mock|from\s+unittest\s+import\s+mock|MagicMock\(|mock\.patch|mocker\.|"
-               r"jest\.(?:mock|fn|spyOn)\(|vi\.(?:mock|fn|spyOn)\(|sinon\.|gomock\.|mock\.Mock\b|Mockito\.|@Mock\s|mockk\(",
+               r"jest\.(?:mock|fn|spyOn)\(|vi\.(?:mock|fn|spyOn)\(|sinon\.|gomock\.|mock\.Mock\b|Mockito\.|@Mock\s|mockk\(|"
+               r"@Mock(?:ito)?Bean\b|new\s+Mock<|Mock\.Of<|Substitute\.For<|A\.Fake<|mockall:{2}|#\[automock\]",
     "claim": "tests exercise real subsystems, not mock frameworks",
 }]

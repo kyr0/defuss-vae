@@ -1,4 +1,4 @@
-# defuss-vae CI: the same bootstrap and verbs as local development, so CI cannot drift from `make verify`.
+# defuss-vae CI: the same verbs as local development, so CI cannot drift from `make verify`.
 name: verify
 on:
   push:
@@ -8,6 +8,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      # setup installs a missing uv/bun with the official installers; later steps get their dirs on PATH.
-      - run: make setup && printf '%s\n' "$HOME/.local/bin" "$HOME/.bun/bin" >> "$GITHUB_PATH"
+      # Official setup actions put uv/bun on PATH for every later step, whatever the project's `make setup` does;
+      # each runs only when its lockfile exists, so a toolchain added later is picked up without editing this file.
+      # mise installs every tool mise.toml pins (Go, Rust, JDK, .NET, linters) and puts its shims on PATH.
+      - uses: jdx/mise-action@v5
+        if: hashFiles('mise.toml', '.tool-versions') != ''
+      # setup-uv publishes no major tags after v7, so pin its release commit as its README does.
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        if: hashFiles('**/uv.lock') != ''
+      - uses: oven-sh/setup-bun@v2
+        if: hashFiles('**/bun.lock', '**/bun.lockb') != ''
+      # CONFIG["ci"] commands from .agents/VERIFY.py, one step each:
+      - run: make setup
       - run: make verify

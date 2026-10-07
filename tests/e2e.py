@@ -249,6 +249,18 @@ def main() -> int:
         status = run(["make", "-s", "status"], proj, ok=(2,)).stdout
         parts = {"start": "running pid=" in started_svc.stdout, "log": "listening port" in log, "stop": "stopped" in stopped, "status": "stopped" in status}
         step("service.lifecycle", all(parts.values()), f"{parts}; start={started_svc.stdout.strip()!r}; log={log.strip()!r}; status={status.strip()!r}{diag}")
+        # Swarm: a detached job logs each line, records its exit, and the registry reconciles; installed CLI only.
+        sw = [*vae, "swarm"]
+        spawned = run([*sw, "spawn", "--repo", str(proj), "--settle", "0.2", "--name", "e2e-job", "--goal", "Echo, then exit.",
+                       "--workdir", ".", "--targets", "output/swarm", "--eta", "1", "--", "sh", "-c", "echo swarm-ok"], proj)
+        deadline, listing = time.time() + 30, ""
+        while time.time() < deadline and "EXITED e2e-job" not in listing:
+            time.sleep(0.2)
+            listing = run([*sw, "status", "--repo", str(proj), "--settle", "0"], proj, ok=(0, 1)).stdout
+        reaped = run([*sw, "rm", "--repo", str(proj), "--settle", "0.2", "--name", "e2e-job"], proj)
+        swlog = (proj / "var/log/swarm/e2e-job.log").read_text()
+        step("swarm.lifecycle", "VERIFIED[swarm.spawn]=true" in spawned.stdout and "EXITED e2e-job" in listing and "code=0" in listing
+             and "Z swarm-ok\n" in swlog and "VERIFIED[swarm.rm]=true" in reaped.stdout, listing.strip().splitlines()[-1])
         step("doctor.repo", run([PY, str(root / "scripts/vae.py"), "doctor", "--repo", str(proj)], proj).returncode == 0, "budgets, tags, layout")
 
     evidence = {"zip": zip_path.name, "seconds": round(time.time() - started, 2), "steps": steps}

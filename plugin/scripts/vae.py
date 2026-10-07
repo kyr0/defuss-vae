@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI for defuss-vae: deterministic verifier, session gate, prose check, layout scaffold, doctor."""
+"""CLI for defuss-vae: deterministic verifier, session gate, prose check, layout scaffold, doctor, swarm registry."""
 from __future__ import annotations
 
 import argparse
@@ -14,6 +14,7 @@ from vae_gate import gate
 from vae_project import doctor_repo, init_project
 from vae_repo import git_root, is_doc, walk_files
 from vae_state import latest_session
+from vae_swarm import SETTLE_S, remove, run_job, spawn, status, stop, swarm_root, upsert
 from vae_verify import (
     load_project_verifier,
     prose_findings,
@@ -22,8 +23,8 @@ from vae_verify import (
     verify,
 )
 
-SKILLS = ("plan", "implement", "review", "docs", "finalize")
-SKILL_MAX = 5500  # runtime prompts stay lean: each SKILL.md loads whole on invocation.
+SKILLS = ("plan", "implement", "verify", "doc", "doc-edit", "wrap", "status")
+SKILL_MAX = 6000  # runtime prompts stay lean: each SKILL.md loads whole on invocation.
 
 
 def repo_from(raw: str) -> Path:
@@ -34,7 +35,7 @@ def repo_from(raw: str) -> Path:
 def doctor_plugin() -> list[str]:
     required = [ROOT / p for p in ("plugin.json", ".claude-plugin/plugin.json", ".codex-plugin/plugin.json",
                                    "hooks/hooks.json", "hooks/lifecycle.py", "references/VAE-DIALECT.md", "references/PROSE.md",
-                                   "references/CONSOLIDATION.md")]
+                                   "references/CONSOLIDATION.md", "references/STACKS.md")]
     required += [ROOT / "templates" / n for n in ("VERIFY.py", "MEMORY.md", "CLI_GIST.md", "EPISODES.md", "Makefile", "verify.yml",
                                                    "README.md.tmpl", "ARCH.md.tmpl", "package.json.tmpl")]
     required += [ROOT / "skills" / n / "SKILL.md" for n in SKILLS]
@@ -48,7 +49,10 @@ def doctor_plugin() -> list[str]:
     for n in SKILLS:
         p = ROOT / "skills" / n / "SKILL.md"
         if p.exists():
-            if "disable-model-invocation: true" not in p.read_text("utf-8"):
+            # WHY both: Claude Code reads the frontmatter key, Codex only agents/openai.yaml (its docs name no other switch).
+            policy = p.parent / "agents" / "openai.yaml"
+            if ("disable-model-invocation: true" not in p.read_text("utf-8")
+                    or not policy.exists() or "allow_implicit_invocation: false" not in policy.read_text("utf-8")):
                 gaps.append(f"skill-not-human-only:{n}")
             if p.stat().st_size >= SKILL_MAX:
                 gaps.append(f"skill-over-budget:{n}:{p.stat().st_size}B")
@@ -73,8 +77,30 @@ def main() -> int:
     p.add_argument("--repo", default=".")
     p = sp.add_parser("doctor", help="validate plugin files, or project agent state with --repo")
     p.add_argument("--repo", default=None)
+    p = sp.add_parser("swarm", help="sub-agent registry .agents/SWARM_STATUS.yaml: spawn|set|rm|stop|status (run: internal)")
+    p.add_argument("action", choices=("spawn", "set", "rm", "stop", "status", "run"))
+    p.add_argument("--repo", default=".")
+    p.add_argument("--name", help="unique agent name")
+    p.add_argument("--goal", help="the final goal in one sentence")
+    p.add_argument("--workdir", help="relative to the project root, e.g. ../<repo>.wt/<name>")
+    p.add_argument("--targets", help="comma-separated paths the agent changes when its work merges back")
+    p.add_argument("--eta", type=int, help="minutes until done")
+    p.add_argument("--ram", help="estimated RAM, e.g. 2G")
+    p.add_argument("--vram", help="estimated VRAM, e.g. 8G")
+    p.add_argument("--disk", help="estimated disk space, e.g. 500M")
+    p.add_argument("--gpu", help="GPU id when a GPU is used")
+    p.add_argument("--container", help="container id when the agent runs in one")
+    p.add_argument("--pid", type=int, help="set: the agent process you own (default for new entries: none, required)")
+    p.add_argument("--exit-code", type=int, dest="exit_code")
+    p.add_argument("--fix", action="store_true", help="status: record drift (LOST → exit_code lost, duplicates dropped)")
+    p.add_argument("--settle", type=float, default=SETTLE_S, help="seconds before the re-read that checks a write")
 
-    a = ap.parse_args()
+    # WHY split at `--` first: argparse's REMAINDER after a positional swallows the options before it.
+    argv = sys.argv[1:]
+    cut = argv.index("--") if "--" in argv else len(argv)
+    a = ap.parse_args(argv[:cut])
+    if a.cmd == "swarm":
+        return swarm(a, argv[cut + 1:])
     if a.cmd == "verify":
         report = verify(repo_from(a.repo), a.changed)
         print(json.dumps(report.as_dict(), indent=2) if a.json else render_report(report))
@@ -99,7 +125,11 @@ def main() -> int:
         print(f"VERIFIED[prose]={str(not found).lower()} BC pages={len(pages)} findings={len(found)}")
         return 2 if found else 0
     if a.cmd == "init":
-        changed = init_project(repo_from(a.repo), ROOT)
+        try:
+            changed = init_project(repo_from(a.repo), ROOT)
+        except ValueError as e:  # an invalid CONFIG["ci"]; everything before the workflow is already scaffolded
+            print(f"UNKNOWN[init] BC {e}")
+            return 2
         print("VERIFIED[init]=true")
         print("CHANGED: " + (", ".join(changed) or "∅"))
         return 0
@@ -111,6 +141,38 @@ def main() -> int:
     print("VERIFIED[plugin.files]=" + ("false" if gaps else "true"))
     print("REMAINS: " + (", ".join(gaps) or "∅"))
     return 2 if gaps else 0
+
+
+def swarm(a: argparse.Namespace, cmd: list[str]) -> int:
+    start = Path(a.repo).resolve()
+    root = swarm_root(start) or start
+    if a.action == "status":
+        code, lines = status(root, a.fix, a.settle)
+        print("\n".join(lines))
+        return code
+    if not a.name:
+        print(f"UNKNOWN[swarm.{a.action}] BC --name is required")
+        return 2
+    if a.action == "run":
+        return run_job(root, a.name, cmd)
+    fields = {"goal": a.goal, "workdir": a.workdir, "eta_in_mins": a.eta, "estimated_ram_usage": a.ram,
+              "estimated_vram_usage": a.vram, "estimated_disk_space_usage": a.disk, "gpu_id": a.gpu,
+              "container_id": a.container, "pid": a.pid, "exit_code": a.exit_code,
+              "target_focus_paths": [t.strip() for t in a.targets.split(",") if t.strip()] if a.targets else None}
+    fields = {k: v for k, v in fields.items() if v is not None}
+    if a.action == "spawn":
+        if not cmd:
+            print("UNKNOWN[swarm.spawn] BC no command: `vae.py swarm spawn --name … -- <command…>`")
+            return 2
+        code, why = spawn(root, {"name": a.name, **fields}, cmd, a.settle)
+    elif a.action == "set":
+        code, why = upsert(root, a.name, fields, a.settle)
+    elif a.action == "rm":
+        code, why = remove(root, a.name, a.settle)
+    else:
+        code, why = stop(root, a.name)
+    print(f"VERIFIED[swarm.{a.action}]={str(code == 0).lower()} BC {a.name}: {why}")
+    return code
 
 
 if __name__ == "__main__":

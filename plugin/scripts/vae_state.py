@@ -17,8 +17,11 @@ from vae_repo import (
 )
 
 EPISODE_KEEP = 100
+# Open leads past this many mean wrap has not settled them; doctor fails so it does.
+EPISODE_LEADS = 30
 # Injected into every session start, so the budget is a per-session token cost, not just disk.
 STATE_BUDGET = {"MEMORY.md": 4096, "CLI_GIST.md": 2048}
+MEMORY_LINE = 240  # one concise lesson: about 16 fit the MEMORY budget
 ENTRY_RE = re.compile(r"\d{4}-\d\d-\d\dT")
 
 
@@ -82,6 +85,17 @@ def episode_entries(repo: Path) -> list[str]:
     return [ln for ln in lines if ENTRY_RE.match(ln)]
 
 
+def is_lead(entry: str) -> bool:
+    """For a full `<UTC ISO> s=<session> <KIND> ...` entry: a lead is what only wrap may settle: a `LESSON`, a `FINDING` learned nowhere else (`learn=none`), or any line
+    of unknown kind. Gate noise is `DONE`, `FAIL` and a `FINDING` already encoded in a test, rule or MEMORY line."""
+    body = entry.split(" ", 2)[2] if entry.count(" ") >= 2 else entry
+    kind = body.split(" ", 1)[0]
+    learn = re.search(r"\blearn=(\w+)", body)
+    if kind == "FINDING":
+        return not learn or learn.group(1).lower() == "none"
+    return kind not in ("DONE", "FAIL")
+
+
 def append_episodes(repo: Path, session_id: str, entries: list[str], template_root: Path = PLUGIN_ROOT) -> None:
     ensure_from_template(repo, ".agents/EPISODES.md", template_root)
     p = repo / ".agents" / "EPISODES.md"
@@ -90,8 +104,15 @@ def append_episodes(repo: Path, session_id: str, entries: list[str], template_ro
     head = lines[:first] + ([""] if first == len(lines) and lines and lines[-1].strip() else [])
     stamp = f"{now_iso()} s={safe_name(session_id)[:8]}"
     body = lines[first:] + [f"{stamp} {e}" for e in entries]
-    # WHY trim on write: bounded by construction; git history keeps older entries, so pruning costs no agent tokens.
-    p.write_text("\n".join(head + body[-EPISODE_KEEP:]) + "\n", "utf-8")
+    # WHY trim only gate noise, oldest first: a plain window dropped unsettled lessons by age alone; git history keeps
+    # the noise. Leads stay until wrap promotes or deletes them, and doctor caps them (EPISODE_LEADS).
+    # VERIFIED: (test_gate) 100 later FAILs drop the oldest DONE and learned FINDING but keep every lead.
+    drop = sum(1 for ln in body if ENTRY_RE.match(ln)) - EPISODE_KEEP
+    if drop > 0:
+        cut = {i for i, ln in enumerate(body) if ENTRY_RE.match(ln) and not is_lead(ln)}
+        cut = set(sorted(cut)[:drop])
+        body = [ln for i, ln in enumerate(body) if i not in cut]
+    p.write_text("\n".join(head + body) + "\n", "utf-8")
 
 
 def memory_entries(path: Path) -> list[str]:

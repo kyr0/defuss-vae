@@ -18,10 +18,20 @@ from vae_testkit import (  # first: puts plugin/scripts on sys.path
 
 # isort: split
 from vae_project import init_project
-from vae_repo import is_code, make_graph, make_reach, run
+from vae_repo import (
+    FALLBACK_BIN,
+    find_test_files,
+    is_code,
+    is_test,
+    make_graph,
+    make_reach,
+    run,
+    stacks,
+)
 from vae_verify import (
     NO_SERVICE_STUB,
     PROBE_TAG,
+    STACK_IGNORES,
     check_doc_pages,
     check_gitignore,
     check_layout,
@@ -31,6 +41,7 @@ from vae_verify import (
     parse_coverage,
     remedy,
     render_report,
+    stack_defaults,
     verify,
 )
 
@@ -165,7 +176,7 @@ class VerifyTests(RepoCase):
         c = check_doc_pages(self.repo, list(files), {})
         self.assertEqual(c.evidence, "missing=['packages/lib/README.md', 'apps/web/ARCH.md', 'packages/lib/ARCH.md']",
                          "a package restarts coverage; everything else is covered by the root pages")
-        self.assertFalse(c.required, "warning-first until 0.6.0")
+        self.assertFalse(c.required, "without CONFIG['strict'] a gap warns")
         self.assertTrue(check_doc_pages(self.repo, list(files), {"strict": True}).required)
         self.write("packages/lib/src/README.md", "x")
         self.assertIn("packages/lib/README.md", check_doc_pages(self.repo, list(files), {}).evidence, "a page below the boundary does not cover it")
@@ -207,13 +218,19 @@ class VerifyTests(RepoCase):
         rule = namespace["RULES"][0]
         rx = re.compile(rule["pattern"])
         self.assertIsNone(rx.search((ROOT / "templates/VERIFY.py").read_text()))
-        for bad in ("from unittest import " + "mock", "m = Magic" + "Mock()", "jest" + ".mock('./db')", "vi" + ".fn()", "mock" + ".patch('x')", "@Mock\n  Foo foo;"):
+        for bad in ("from unittest import " + "mock", "m = Magic" + "Mock()", "jest" + ".mock('./db')", "vi" + ".fn()", "mock" + ".patch('x')", "@Mock\n  Foo foo;",
+                    "new " + "Mock<IRepo>()", "Substitute" + ".For<IRepo>()", "A" + ".Fake<IRepo>()", "use mock" + "all::automock;", "@Mock" + "Bean Repo r;"):
             self.assertIsNotNone(rx.search(bad), bad)
         for fine in ("def mockup(): pass", "# tests avoid mocks", "monkeypatch.setenv('A', '1')"):
             self.assertIsNone(rx.search(fine), fine)
         self.make_python_project(rules=repr(namespace["RULES"]))
         self.write("test_db.py", "from unittest import " + "mock\n")
         self.assertFalse(self.check(verify(self.repo, ["test_db.py"]), "tests.no-mocks").value)
+
+    def test_help_annotations_are_not_make_calls(self):
+        self.write("Makefile", "ci: ; @echo hi ## run make deploy first\nverify: ci ## make lint test\ndeploy:\n\t@echo d\n")
+        graph = make_graph(self.repo)
+        self.assertEqual((graph["ci"], graph["verify"]), (set(), {"ci"}))
 
     def test_makefile_is_the_only_command_source(self):
         # Ecosystem manifests alone must not be guessed into commands: without Makefile verbs the gate fails closed.
@@ -276,11 +293,20 @@ class VerifyTests(RepoCase):
         self.assertIn("svc/.env.example:SVC_TOKEN", c.evidence)  # nearest example, not the root one
         self.write(".gitignore", ".env*\n")
         self.assertIn(".env.example is gitignored", self.check(verify(self.repo, ["svc/main.ts"]), "env.example").evidence)
+        self.write(".gitignore", "")
+        # Java, C# and Go's LookupEnv reads count too (assembled from parts for the same reason as above).
+        self.write("jvm/App.java", 'class App { String u = System.getenv' + '("DB_URL"); }\n')
+        self.write("net/App.cs", 'var k = Environment.GetEnvironmentVariable' + '("API_TOKEN");\n')
+        self.write("go/main.go", 'v, ok := os.LookupEnv' + '("GO_FLAG")\n')
+        c = self.check(verify(self.repo, ["jvm/App.java", "net/App.cs", "go/main.go"]), "env.example")
+        for key in ("DB_URL", "API_TOKEN", "GO_FLAG"):
+            self.assertIn(key, c.evidence)
 
     def test_gate_commands_find_freshly_installed_toolchains(self):
         # Appended, not prepended: a tool already on PATH keeps precedence over the installers' fallback dirs.
         entries = run("echo $PATH", self.repo).stdout.strip().split(os.pathsep)
-        self.assertEqual(entries[-2:], [str(Path.home() / ".local/bin"), str(Path.home() / ".bun/bin")])
+        self.assertEqual(entries[-len(FALLBACK_BIN):], [str(Path.home() / d) for d in FALLBACK_BIN])
+        self.assertIn(str(Path.home() / ".local/share/mise/shims"), entries, "mise-pinned tools resolve in gate commands")
         self.assertEqual(entries[: len(os.environ["PATH"].split(os.pathsep))], os.environ["PATH"].split(os.pathsep))
 
     def test_missing_toolchain_points_at_make_setup(self):
@@ -289,6 +315,9 @@ class VerifyTests(RepoCase):
                              ("sh: 1: bun: not found", "bun"), ("bash: uv: command not found", "uv")):
             self.assertIn(f"make setup  (installs the missing `{tool}`", remedy("make test", output, "var/log/vae/x.log"))
         self.assertEqual(remedy("make test", "FAILED (failures=1)", "var/log/vae/x.log"), "RUN: make test  (full output: tail -n 80 var/log/vae/x.log)")
+        # Other toolchains arrive through mise: the remedy names the pin instead of promising an installer.
+        self.assertIn("`mise use go@<version>`", remedy("make test", "make: go: No such file or directory", "x.log"))
+        self.assertIn("`mise use rust@<version>`", remedy("make test", "sh: cargo: command not found", "x.log"))
 
     def test_coverage_parser_reads_real_tool_output(self):
         # Formats VERIFIED by real runs: bun 1.3.11, pytest-cov under uv 0.11, c8 10 (istanbul text), go 1.26 `cover -func`.
@@ -298,9 +327,66 @@ class VerifyTests(RepoCase):
         pytest_cov = "Name                   Stmts   Miss  Cover\nsrc/calc/__init__.py       2      0   100%\nTOTAL                      2      0   100%\n"
         istanbul = "File      | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s\nAll files |   85.71 |       50 |     100 |   80.12 |\n"
         go = "calc/add.go:3:\tAdd\t\t100.0%\ntotal:\t\t\t(statements)\t75.0%\n"
-        for output, pct in ((bun, 100.0), (pytest_cov, 100.0), (istanbul, 80.12), (go, 75.0)):
+        # coverlet.msbuild (format VERIFIED with dotnet 9 + xUnit): % Line is the first column of the Total row.
+        coverlet = ("| Module | Line   | Branch | Method |\n| Calc   | 71.74% | 69.83% | 61.9%  |\n"
+                    "|         | Line   | Branch | Method |\n| Total   | 71.74% | 69.83% | 61.9%  |\n| Average | 71.74% | 69.83% | 61.9%  |\n")
+        cobertura = "TOTAL 85.5%\n"  # STACKS.md one-liners print this from Cobertura `line-rate` or JaCoCo CSV
+        for output, pct in ((bun, 100.0), (pytest_cov, 100.0), (istanbul, 80.12), (go, 75.0), (coverlet, 71.74), (cobertura, 85.5)):
             self.assertEqual(parse_coverage(output)[0], pct, output)
         self.assertIsNone(parse_coverage("1 pass\nRan 1 test\n")[0])
+
+    def test_test_files_follow_each_ecosystems_convention(self):
+        tests = ("calc_test.go", "tests/test_calc.py", "app/tests.py", "src/calc.test.ts", "src/test/java/a/CalcTest.java",
+                 "Calc.Tests/MathTests.cs", "Calc.Tests/Program.cs", "src/commonTest/kotlin/Foo.kt", "app/src/FooTest.kt",
+                 "src/FooSpec.scala", "src/FooIT.java", "tests/integration.rs", "e2e-tests/run.sh")
+        production = ("src/latest.py", "src/Latest.java", "src/Contest.cs", "src/manifest.rs", "src/Limit.kt", "contest/main.go",
+                      "src/testing.py", "spectrum/a.py")
+        self.assertEqual([p for p in tests if not is_test(p)], [])
+        self.assertEqual([p for p in production if is_test(p)], [])
+
+    def test_rust_inline_tests_count_as_tests(self):
+        # `cargo new --lib` (VERIFIED, cargo 1.9x) writes only an inline `#[cfg(test)] mod tests` into src/lib.rs.
+        self.write("Cargo.toml", '[package]\nname = "calc"\nversion = "0.1.0"\nedition = "2024"\n')
+        self.write("src/lib.rs", "pub fn add(a: u64, b: u64) -> u64 { a + b }\n")
+        self.assertEqual(find_test_files(self.repo), [])
+        self.write("src/lib.rs", "pub fn add(a: u64, b: u64) -> u64 { a + b }\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn adds() {}\n}\n")
+        self.assertEqual(find_test_files(self.repo), ["src/lib.rs"])
+        self.write("tests/api.rs", "#[test]\nfn api() {}\n")
+        self.assertEqual(find_test_files(self.repo), ["tests/api.rs"], "named test files win; sources are read only without any")
+
+    def test_build_files_of_every_stack_reopen_the_gate(self):
+        for path in ("App/App.csproj", "App.sln", "App.slnx", "Directory.Build.props", "Directory.Packages.props", "gradle.properties",
+                     "gradlew", "mvnw", "go.work", ".tool-versions", "rust-toolchain", "mise.toml", "global.json", "web/Page.razor"):
+            self.assertTrue(is_code(path), path)
+        self.assertFalse(is_code("App/obj/project.assets.json"), "MSBuild output is not code")
+
+    def test_each_stack_has_ignores_and_documented_verbs(self):
+        found = stacks(["go.mod", "svc/Cargo.toml", "jvm/build.gradle.kts", "api/Api.csproj", "ui/package.json", "ml/train.py", "ui/App.tsx"])
+        self.assertEqual(found, {"go", "rust", "jvm", "dotnet", "js", "python", "web"})
+        self.assertEqual(set(STACK_IGNORES), found, "every detected stack declares its ignores")
+        docs = stack_defaults(found)
+        for stack in found - {"web"}:
+            verbs = {ln.split(":", 1)[0][2:] for ln in docs.get(stack, [])}
+            self.assertLessEqual({"lint", "test", "coverage", "e2e", "pin"}, verbs, stack)
+        self.assertIn("real Playwright browser", " ".join(docs["web"]))
+        self.write(".gitignore", "var/*\ntmp/*\n.env\noutput/*\ndist/\n")
+        self.write("Cargo.toml", "")
+        self.write("api/Api.csproj", "<Project/>")
+        self.write("build.gradle.kts", "")
+        gaps = check_gitignore(self.repo, {}).evidence
+        for line in ("target/", "bin/", "obj/", "build/", ".gradle/"):
+            self.assertIn(line, gaps)
+
+    def test_missing_verbs_cite_the_detected_stacks_defaults(self):
+        self.write("go.mod", "module example.com/calc\n\ngo 1.26\n")
+        self.write("calc.go", "package calc\n\nfunc Add(a, b int) int { return a + b }\n")
+        self.write(".agents/VERIFY.py", "CONFIG = {'layout': False}\nRULES = []\n")
+        self.commit_all()
+        report = verify(self.repo, ["calc.go"])
+        self.assertIn("go: `golangci-lint run`", self.check(report, "lint").next)
+        self.assertIn("go: `go test -race ./...`", self.check(report, "tests.unit").next)
+        self.assertIn("go tool cover -func", self.check(report, "coverage").next)
+        self.assertNotIn("ruff", self.check(report, "lint").next, "a Go repo gets Go hints, not the bun|uv fallback")
 
     def test_verify_target_must_run_every_gate_verb_even_without_layout(self):
         # CI runs only `make verify`; the gate runs the verbs one by one, so a hollow `verify` would pass locally only.
@@ -341,7 +427,7 @@ class VerifyTests(RepoCase):
         c = check_gitignore(self.repo, {})
         for line in ("node_modules/", "coverage/", ".cache/", ".venv/", "__pycache__/", "*.pyc", ".pytest_cache/", ".ruff_cache/", ".coverage"):
             self.assertIn(line, c.evidence)
-        self.assertTrue(c.passes() and not c.value, "a gap warns but does not block until 0.6.0")
+        self.assertTrue(c.passes() and not c.value, "without CONFIG['strict'] a gap warns but does not block")
         self.assertFalse(check_gitignore(self.repo, {"strict": True}).passes())
         self.assertIn("CONFIG['gitignore_exempt']", c.next)
         self.write(".gitignore", "var/*\ntmp/*\n.env\noutput/*\nnode_modules/\ncoverage/\n.cache/\n.venv/\n__pycache__/\n*.pyc\n.pytest_cache/\n.ruff_cache/\n.coverage\n")
@@ -360,6 +446,17 @@ class VerifyTests(RepoCase):
         report = verify(self.repo, ["calc.py"])
         self.assertTrue(report.verified, render_report(report))
         self.assertIn("WARNS: gitignore", render_report(report))
+
+    def test_new_projects_start_strict_and_old_configs_keep_warnings(self):
+        # Option B (0.6.0): the template blocks from day one; a config without the key, like every 0.5.x project's
+        # explicit False, keeps warnings until the project opts in.
+        init_project(self.repo, ROOT)
+        config = runpy.run_path(str(self.repo / ".agents/VERIFY.py"))["CONFIG"]
+        self.assertIs(config["strict"], True)
+        self.write("package.json", "{}")
+        self.assertTrue(check_gitignore(self.repo, config).required, "a new project blocks on its gaps")
+        self.assertFalse(check_gitignore(self.repo, {}).required, "no key: a warning")
+        self.assertFalse(check_gitignore(self.repo, {"strict": False}).required, "explicit False: a warning")
 
     def test_existing_npm_project_with_an_untracked_lockfile_is_not_a_new_toolchain(self):
         self.make_python_project()
