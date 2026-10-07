@@ -132,7 +132,7 @@ The agent and the hook must agree on attestation paths without environment plumb
 
 `VERIFIED:` a deterministic failure already represented by a failing test or rule needs no duplicate rule.
 
-IF review finds a deterministic recurrence class that is not yet encoded THEN the agent adds a regression test OR a `.agents/VERIFY.py` rule; IF encoding is not feasible THEN the finding's learning is `UNKNOWN` with a reason. Rules encode invariants, not taste. `glob` rules apply only to changed files so policy covers new work without blocking on untouched legacy code.
+IF review finds a deterministic recurrence class with a VERIFIED root cause that is not yet encoded THEN the agent adds a regression test OR a `.agents/VERIFY.py` rule; IF encoding is not feasible THEN the finding's learning is `UNKNOWN` with a reason. Rules encode invariants, not taste. A failure caused by the environment, configuration or an external system gets a fix and startup validation, not a test: one that pins the values that worked once fails on every other correct setup. `glob` rules apply only to changed files so policy covers new work without blocking on untouched legacy code.
 
 ## Why the episode log never repeats a finding
 

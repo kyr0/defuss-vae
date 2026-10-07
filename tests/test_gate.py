@@ -60,6 +60,9 @@ class GateTests(RepoCase):
         self.assertEqual(out["decision"], "block")
         self.assertIn("GATE 2/3 review", out["reason"])
         self.assertIn(f"gate --repo {self.repo} --session {sid}", out["reason"])
+        # A learned regression test needs a verified root cause, never a pinned environment.
+        self.assertIn("IF root cause VERIFIED AND recurrence mechanically checkable THEN regression test", out["reason"])
+        self.assertIn("NOT a test pinning env|config values that worked once", out["reason"])
         self.assertEqual(self.commit(sid)["hookSpecificOutput"]["permissionDecision"], "deny")
         fp = code_fingerprint(self.repo, ["calc.py"])
         finding = {"status": "VERIFIED", "resolved": True, "location": "calc.py:2", "evidence": "sign bug",
@@ -273,6 +276,10 @@ class GateTests(RepoCase):
         self.assertIn(f"gate --repo {self.repo} --session same", ctx)
         self.assertIn("start on `bun` (JS/TS, `bun init`) or `uv` (Python, `uv init`)", ctx)
         self.assertIn("ISO-8601 UTC timestamp first", ctx)
+        for rule in ("tests assert VERIFIED requirements only", "HYPOTHESIS → probe, UNKNOWN → ask, neither gets a test",
+                     "test the untested public behaviors + main error paths, not lines",
+                     "a regression test only for a VERIFIED code defect, never pinning env|config values that worked once"):
+            self.assertIn(rule, ctx)
         self.assertIn("`uv run --env-file .env`", ctx)
         self.assertLess(len(ctx), 9001)
         s1 = read_json(state_path(self.repo, "same"))

@@ -4,7 +4,7 @@
 
 ## Reflect first
 
-Before the audit, capture what this work taught that nothing records yet: a falsified hypothesis, a dead end, a root cause, a command that worked. Each one takes the strongest form that fits, at the narrowest scope its evidence supports: a test, a `.agents/VERIFY.py` rule, one MEMORY line with its reason after `BC`, or a CLI_GIST line for a command. A lesson a test or rule already enforces needs no line.
+Before the audit, capture what this work taught that nothing records yet: a falsified hypothesis, a dead end, a root cause, a command that worked. Each one takes the strongest form that fits, at the narrowest scope its evidence supports: a test, a `.agents/VERIFY.py` rule, one MEMORY line with its reason after `BC`, or a CLI_GIST line for a command. A lesson a test or rule already enforces needs no line. A lesson whose cause was the environment, configuration or an external system becomes a MEMORY or CLI_GIST line at its scope, never a test that pins the values that happened to work once.
 
 ## Audit every entry
 

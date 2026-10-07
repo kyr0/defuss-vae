@@ -25,15 +25,15 @@ Defaults for the `Makefile` verbs per toolchain. Session start injects the secti
 
 ## dotnet
 - lint: `dotnet format --verify-no-changes` + `dotnet build -warnaserror`
-- test: `dotnet test`
+- test: `dotnet test` with xUnit
 - coverage: `dotnet test /p:CollectCoverage=true` (coverlet.msbuild in each test project prints a `| Total |` row)
 - e2e: `dotnet publish -c Release -o output/app`, then run it on `input/`
 - pin: SDK in `global.json`; `Directory.Build.props` sets `Nullable` and `TreatWarningsAsErrors`; versions in `Directory.Packages.props`; `RestorePackagesWithLockFile`, and `dotnet restore --locked-mode` in CI.
 
 ## js
 - lint: `bunx oxlint --deny-warnings` (plain oxlint exits 0 on findings)
-- test: `bun test`
-- coverage: `bun test --coverage`
+- test: `bun test`; a Vite app: `vitest run`, which shares the Vite config and transforms
+- coverage: `bun test --coverage` (vitest: `vitest run --coverage` with `@vitest/coverage-v8`)
 - e2e: `bun pm pack`, then `bun add <tgz>` in a clean consumer that runs on `input/`
 - pin: `packageManager` in `package.json`; new packages are ESM, libraries build with pkgroll; never npm, yarn or pnpm.
 

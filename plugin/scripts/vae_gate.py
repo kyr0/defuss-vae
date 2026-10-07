@@ -146,7 +146,8 @@ def review_instruction(fp: str, path: Path, changed: list[str], plugin_root: Pat
         "e2e (consumes the built artifact; EVERY page|route|screen|component of a UI at least once in a real Playwright browser with WebGL2|network|permissions it needs; EVERY CLI command|API endpoint at least once), observability (no leftover probe|debug spam; logs ISO-8601 UTC first + level).\n"
         "PASS2 structure + Ponytail: separated concerns in small testable modules; delete|reuse → stdlib → native → installed dependency → minimum code; NOT duplicate machinery, speculative config|abstraction, unmeasured optimization.\n"
         "Actionable finding REQUIRES location + causal evidence + minimal fix; fix EVERY one. "
-        "IF recurrence mechanically checkable THEN regression test OR .agents/VERIFY.py rule ELSE learning.status=UNKNOWN + why.\n"
+        "IF root cause VERIFIED AND recurrence mechanically checkable THEN regression test OR .agents/VERIFY.py rule ELSE learning.status=UNKNOWN + why; "
+        "NOT a test pinning env|config values that worked once.\n"
         + (f"PAGES {json.dumps(pages, separators=(',', ':'))}: review EVERY changed unit against {plugin_root}/references/PROSE.md "
            "(B evidence, L logic, P precision, R relevance, A structure, S style, T typography incl. T07 Mermaid); fix what the page|code supports, "
            "NOT invent facts; finding.location = page:line + rule id.\n" if pages else "")

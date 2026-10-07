@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Rules (session start, `plan`, `implement`, `verify`, the gate's review step): tests assert VERIFIED requirements only; a HYPOTHESIS gets a probe and an UNKNOWN a question, never a test. Coverage is Pareto: test the untested public behaviors and main error paths, not lines. A reproduction stays as a regression test only for a VERIFIED code defect; an environment, configuration or external cause gets a fix and startup validation, never a test pinning the values that worked once.
+- Stack defaults name the test frameworks: vitest for Vite apps (it shares the Vite config, and its coverage table parses), xUnit for .NET.
+
 ## 0.6.0
 
 - **Breaking:** skills renamed to verbs in workflow order: `review` → `verify`, `docs` → `doc`, `finalize` → `wrap` (`/defuss-vae:wrap`). The gate's verify, review and docs steps keep their names. Skills CLI installs: `npx skills remove docs review finalize`, then `npx skills add kyr0/defuss-vae --skill verify --skill doc --skill doc-edit --skill wrap`.

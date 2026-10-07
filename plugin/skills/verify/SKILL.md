@@ -18,7 +18,7 @@ Review the change in context, NOT an isolated diff: read requirements|plan, `AGE
 - requirement|spec mismatch; wrong invariants; edge|error paths; state|concurrency|lifetime|resources.
 - unrequested API|schema|compat break; security|trust boundary; data loss; accessibility where applicable.
 - language|framework|runtime gotchas BC current code|version|docs.
-- tests absent, tautological, mocked|stubbed (EVERY test REQUIRES real subsystems in isolation), testing implementation NOT behavior, blind to realistic mutations.
+- tests absent, tautological, mocked|stubbed (EVERY test REQUIRES real subsystems in isolation), testing implementation NOT behavior, asserting a HYPOTHESIS|env values that worked once, blind to realistic mutations.
 - e2e REQUIRES consuming the built publishable artifact, NOT the source tree.
 - observability: leftover probe|debug print|log spam|log without ISO-8601 timestamp + level = defect; services via `make start` → `var/log/`, `tmp/*.pid`.
 - gate evidence: test|integration|e2e as applicable + coverage ≥60%; UNKNOWN stays blocking and explicit.
@@ -37,7 +37,7 @@ precision > volume. Actionable finding REQUIRES `path:line|symbol`, causal failu
 
 ## Fix + learn
 
-EVERY actionable finding (fix mode): root-cause fix, smallest correct diff → regression test IF feasible → IF recurrence mechanically checkable THEN `.agents/VERIFY.py` rule ELSE `.agents/MEMORY.md` line only IF future agents need it → rerun `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py gate --repo . --session ${CLAUDE_SESSION_ID}`. Source|test edits invalidate prior attestations.
+EVERY actionable finding (fix mode): root-cause fix, smallest correct diff → regression test IF the root cause is a VERIFIED code defect → IF recurrence mechanically checkable THEN `.agents/VERIFY.py` rule ELSE `.agents/MEMORY.md` line only IF future agents need it → rerun `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py gate --repo . --session ${CLAUDE_SESSION_ID}`. Source|test edits invalidate prior attestations.
 Clean review valid only after inspecting the changed contract in context; "tests pass" ≠ semantic review.
 
 ## Output contract

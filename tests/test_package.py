@@ -121,6 +121,11 @@ class PackageTests(unittest.TestCase):
         for token in ("Conventional Commits 1.0.0", ".agents/MEMORY.md", ".agents/CLI_GIST.md", ".agents/EPISODES.md", "doctor --repo", "LESSON", "Reflect", "EVERY unencoded lesson of this work"):
             self.assertIn(token, wrap)
         self.assertIn("CLI `swarm status`: merge then reap EVERY `EXITED` agent", wrap)
+        # Tests encode only VERIFIED requirements; a reproduction stays a regression test only for a verified code defect.
+        self.assertIn("Invariants come from VERIFIED requirements only; a HYPOTHESIS gets a probe step, NOT a test", plan)
+        self.assertIn("only IF the root cause is a VERIFIED code defect, NOT env|config that worked once", implement)
+        for token in ("asserting a HYPOTHESIS|env values that worked once", "regression test IF the root cause is a VERIFIED code defect"):
+            self.assertIn(token, verify)
         # Swarm orchestration: plan marks only safely splittable steps; status observes, reconciles, then acts per state.
         self.assertIn("Mark steps `parallel` only IF their target paths are disjoint AND their contracts explicit", plan)
         for token in ("swarm status --repo .", "swarm status --fix", "`EXITED` code=0 → merge its worktree through the gate",
