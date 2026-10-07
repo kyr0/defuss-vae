@@ -123,6 +123,10 @@ class PackageTests(unittest.TestCase):
         for token in ("Scope = the named pages AND edits; NOT edit other pages|code", "NOT rewrite|restructure unrequested parts", "../../references/PROSE.md",
                       "check EVERY changed unit", "THEN ask, NOT invent", "CLI `prose --repo . <pages>` → report EVERY hit outside the edit", "THEN `--fix`"):
             self.assertIn(token, doc_edit)
+        # Pages state what is: the doc skills say so where a page is written, and the catalog rule they cite holds the exceptions.
+        self.assertIn("4. **Write** what is: VERIFIED facts, NOT change narrative (catalog P09: now|new|existing|has been|no longer)", doc)
+        self.assertIn("what is, VERIFIED facts, NOT change narrative (catalog P09)", doc_edit)
+        self.assertIn("- **P09 Current state.**", (ROOT / "references/PROSE.md").read_text())
         # Design discipline: one owner per concern, checked contracts, composition; text scanners and refactors need proof.
         for token in ("ONE owner module per concern", "explicit AND checked", "NOT share mutable state|inherit", "public API|events"):
             self.assertIn(token, plan)

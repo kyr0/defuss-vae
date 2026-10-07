@@ -14,7 +14,7 @@ CLI = `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py` (other hosts: plugin root =
 1. **Ground.** read EVERY page in scope + the code|tests it describes; claims BC code|test|output, NOT recall. house style > defaults.
 2. **Page rules first.** EVERY page gets the built-in `prose` check. IF a page has its own invariant (section|diagram|command) THEN add a `.agents/VERIFY.py` `RULES` entry before writing (`path`=page | `glob` + `"docs": True`); house-style characters (`„“`, `…`, `→`, `—`) → `CONFIG["prose"]["allow"][glob]`.
 3. **Form.** IF schematic (≥3 ordered steps, branches, components + links, states, messages) THEN Mermaid (one idea, ≤~12 nodes) ELSE prose|table|list. Render (`bunx @mermaid-js/mermaid-cli`) to `tmp/` AND inspect; else UNKNOWN[mermaid.render].
-4. **Write.** why > what. `README.md` (root, EVERY package with a CLI|API) per `../../templates/README.md.tmpl`; `ARCH.md` per package per `../../templates/ARCH.md.tmpl`, NOT a copy of README; both only VERIFIED facts.
+4. **Write** what is: VERIFIED facts, NOT change narrative (catalog P09: now|new|existing|has been|no longer); why > what. `README.md` (root, EVERY package with a CLI|API) per `../../templates/README.md.tmpl`; `ARCH.md` per package per `../../templates/ARCH.md.tmpl`, NOT a copy of README.
 5. **Static check.** CLI `prose --repo . --fix <pages>`; rewrite the rest by meaning, NOT a character swap.
 6. **Edit + catalog review.** apply the requested edits; read `../../references/PROSE.md`; check EVERY changed unit; fix what page|repo support. IF a fix needs an absent fact|source|decision THEN ask, NOT invent. `doc-edit` scopes this step to named pages.
 7. **Gate.** CLI `gate --repo . --session ${CLAUDE_SESSION_ID}` until VERIFIED[gate]=true.

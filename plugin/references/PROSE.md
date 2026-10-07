@@ -38,6 +38,7 @@ Use: check every changed unit (sentence, paragraph, heading, list, table, diagra
 - **P06 Kind of statement.** Are observation, interpretation, judgment, forecast and recommendation (and their speaker) apart? *"The menu is objectively confusing"* in a personal review → "I find the menu confusing".
 - **P07 Modality.** Are certainty, frequency, negation, exceptions and reach kept? *Report: "sometimes, on unstable connections"* ≠ *"always"*. Never strip real uncertainty for style.
 - **P08 Ambiguity.** Do syntax, ellipsis or attachment allow several readings? *"Applies to staff and managers abroad"*: does "abroad" bind both? Clarify, then write it out.
+- **P09 Current state.** Does a technical page narrate change instead of stating what is? *"The gate now also checks pages; previously it skipped them"* → "The gate checks code and pages." *Now*, *new*, *existing*, *has been*, *no longer*, *previously* and *used to*, where they compare the system with an earlier version of itself, date a page the day it ships (*a new session* or *existing helpers* state current facts); the history belongs in the changelog and the commit messages. A design rationale may cite a past observation as evidence, pinned to its version (B09). Changelogs, release notes and migration steps describe change by design.
 
 ## R: relevance, substance, use
 
