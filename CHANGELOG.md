@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.1
 
 - Pages state what is: `doc` and `doc-edit` write VERIFIED facts in the present, without change narrative (now, new, existing, has been, no longer), and the prose catalog adds rule P09 with its exceptions (changelogs, release notes, migration steps, past observations cited as evidence and pinned to their version), so the gate's page review applies it to every changed page. Three sentences in this repository's design docs are rewritten to match.
 - `wrap` and `doc` drop text that repeated their own output contract or the prose check's message, which keeps the skill pack under its 28,000-byte cap.
