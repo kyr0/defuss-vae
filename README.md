@@ -57,8 +57,8 @@ flowchart LR
 | **implement** | you or the agent, fully agentic | Understands first, fixes the root cause (and its sibling callers), writes the minimum code, adds tests against real subsystems, and loops the gate in-turn. |
 | **verify** | the agent at a goal or milestone; you any time | Reviews against requirements, callers and tests, and fixes the defects it confirms: the whole change when it is large, otherwise its paths and tests, because a deep review costs time and tokens. |
 | **gate** | hooks, automatic | **verify** runs the project's own `make` verbs; **review** checks requirements, every changed path and its callers; **docs** records *why* this design beats the plausible alternative. Doc pages get a static prose check and a review against the prose catalog instead of the test suites. Any edit changes the fingerprint and restarts the gate. |
-| **doc** | you any time; the agent after implementing | Writes and checks documentation pages: claims grounded in code and tests, page-specific rules declared before writing, Mermaid where the content is schematic, then the static prose check and a catalog review. Pages state what is; history belongs in the changelog. |
-| **doc-edit** | you any time; the agent after `doc` | Edits only the named pages, as instructed: the same grounding, catalog review and static check, limited to the changed parts. |
+| **doc** | you any time; the agent after implementing | Writes and checks documentation pages: claims grounded in code and tests, page-specific rules declared before writing, Mermaid where the content is schematic, then the static prose check and a walk through each page against every catalog rule. Pages state what is; history belongs in the changelog. |
+| **doc-edit** | you any time; the agent after `doc` | Edits the named pages as instructed with the same grounding, then walks each one against every catalog rule, the whole page unless you name parts. |
 | **wrap** | only you, since it commits | Splits the work into coherent Conventional Commits, updates `CHANGELOG.md`, turns what the work taught into tests, `.agents/VERIFY.py` rules or concise memory lines with their reason, consolidates agent memory, and updates the managed block in `AGENTS.md`. |
 | **status** | you or the agent, any time | Shows what runs (sub-agents, the service, free disk, RAM and GPU), reconciles `.agents/SWARM_STATUS.yaml` with the process table, and names the next step per agent. |
 | **human review** | you | You read the commits. Nothing has been pushed yet. |
@@ -236,10 +236,12 @@ By default it reviews the current changes and fixes what it finds; name paths or
 ### Doc-edit: change one page as instructed
 
 ```text
+/defuss-vae:doc-edit README.md
 /defuss-vae:doc-edit README.md: add the --json flag to the CLI table
+/defuss-vae:doc-edit README.md, only the Install section: fix the outdated commands
 ```
 
-It edits only the named pages and leaves the rest of each page alone, except for prose-check hits the gate would block on, which it fixes minimally and reports.
+It makes the edits you ask for, then walks the page: `vae.py prose --walk` splits it into parts at headings, fences and list items and prints one window per step, with the part to review, the part before it as context, every catalog rule and the command for the next step. The agent fixes what fails in the window and runs that command. After the last part the walk runs the static prose check and prints `VERIFIED[walk]` once the page is clean. The walk covers the whole page unless your prompt names parts or sections.
 
 ### Wrap: commits, changelog, lessons, memory
 

@@ -118,10 +118,11 @@ class PackageTests(unittest.TestCase):
             self.assertIn(token, verify)
         for token in ("../../references/PROSE.md", "Page rules first", "Mermaid", "mermaid-cli", "prose --repo . --fix", "NOT a character swap", "THEN ask, NOT invent"):
             self.assertIn(token, doc)
-        # doc-edit is doc's edit + catalog review step alone, scoped to the named pages.
-        self.assertIn("`doc-edit` scopes this step to named pages", doc)
-        for token in ("Scope = the named pages AND edits; NOT edit other pages|code", "NOT rewrite|restructure unrequested parts", "../../references/PROSE.md",
-                      "check EVERY changed unit", "THEN ask, NOT invent", "CLI `prose --repo . <pages>` → report EVERY hit outside the edit", "THEN `--fix`"):
+        # Both skills review pages by the program-driven walk: every window, every catalog rule, until VERIFIED[walk].
+        walk = "CLI `prose --repo . --walk <page>`: per window EVERY rule of `../../references/PROSE.md`, then its `NEXT`"
+        self.assertIn(walk, doc)
+        for token in ("Scope = the named pages, whole unless the prompt names parts|sections, AND the requested edits; NOT edit other pages|code",
+                      walk, "until `VERIFIED[walk]`", "THEN ask, NOT invent"):
             self.assertIn(token, doc_edit)
         # Pages state what is: the doc skills say so where a page is written, and the catalog rule they cite holds the exceptions.
         self.assertIn("4. **Write** what is: VERIFIED facts, NOT change narrative (catalog P09: now|new|existing|has been|no longer)", doc)

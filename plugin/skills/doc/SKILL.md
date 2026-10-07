@@ -16,13 +16,13 @@ CLI = `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py` (other hosts: plugin root =
 3. **Form.** IF schematic (≥3 ordered steps, branches, components + links, states, messages) THEN Mermaid (one idea, ≤~12 nodes) ELSE prose|table|list. Render (`bunx @mermaid-js/mermaid-cli`) to `tmp/` AND inspect; else UNKNOWN[mermaid.render].
 4. **Write** what is: VERIFIED facts, NOT change narrative (catalog P09: now|new|existing|has been|no longer); why > what. `README.md` (root, EVERY package with a CLI|API) per `../../templates/README.md.tmpl`; `ARCH.md` per package per `../../templates/ARCH.md.tmpl`, NOT a copy of README.
 5. **Static check.** CLI `prose --repo . --fix <pages>`; rewrite the rest by meaning, NOT a character swap.
-6. **Edit + catalog review.** apply the requested edits; read `../../references/PROSE.md`; check EVERY changed unit; fix what page|repo support. IF a fix needs an absent fact|source|decision THEN ask, NOT invent. `doc-edit` scopes this step to named pages.
+6. **Walk** EVERY written page, CLI `prose --repo . --walk <page>`: per window EVERY rule of `../../references/PROSE.md`, then its `NEXT` until `VERIFIED[walk]`. IF a fix needs an absent fact|source|decision THEN ask, NOT invent.
 7. **Gate.** CLI `gate --repo . --session ${CLAUDE_SESSION_ID}` until VERIFIED[gate]=true.
 
 ## Output contract
 
 ```text
-VERIFIED[prose] BC `vae.py prose` → findings=0
+VERIFIED[walk] BC `vae.py prose --walk <page>` → parts=<n>, prose findings=0
 VERIFIED[mermaid.render] BC tmp/<page>.png inspected|UNKNOWN
 FINDING <rule> <page:line>: problem; instruction
 ```

@@ -6,23 +6,22 @@ allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py *)
 
 # defuss-vae / doc-edit
 
-Scope = the named pages AND edits; NOT edit other pages|code; NOT rewrite|restructure unrequested parts. Whole-page work → `doc`.
+Scope = the named pages, whole unless the prompt names parts|sections, AND the requested edits; NOT edit other pages|code; NOT restructure beyond what a catalog rule fixes. New|synced pages → `doc`.
 CLI = `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py` (other hosts: plugin root = skill dir/../..).
 
 ## Workflow
 
 1. **Ground.** read the page + the code|tests|output its edited claims describe; claims BC code|test|output, NOT recall. house style > defaults.
 2. **Edit** exactly as instructed: what is, VERIFIED facts, NOT change narrative (catalog P09); keep structure and voice. IF new content is schematic THEN Mermaid (one idea, ≤~12 nodes), rendered to `tmp/` AND inspected.
-3. **Catalog review.** read `../../references/PROSE.md`; check EVERY changed unit; fix what page|repo support. IF a fix needs an absent fact|source|decision THEN ask, NOT invent.
-4. **Static check.** CLI `prose --repo . <pages>` → report EVERY hit outside the edit (the gate scans whole pages); THEN `--fix`; rewrite the rest by meaning, NOT a character swap.
-5. **Gate.** CLI `gate --repo . --session ${CLAUDE_SESSION_ID}` until VERIFIED[gate]=true.
+3. **Walk** EVERY page, CLI `prose --repo . --walk <page>`: per window EVERY rule of `../../references/PROSE.md`, then its `NEXT`; repeat until `VERIFIED[walk]`. Named parts|sections only: their `--part` steps. IF a fix needs an absent fact|source|decision THEN ask, NOT invent.
+4. **Gate.** CLI `gate --repo . --session ${CLAUDE_SESSION_ID}` until VERIFIED[gate]=true.
 
 ## Output contract
 
 ```text
 EDITED <page>: <section> per instruction
-VERIFIED[prose] BC `vae.py prose` → findings=0
-OUTSIDE_EDIT: <page:line rule>|∅
+FIXED <page:line> <rule>: <change>|∅
+VERIFIED[walk] BC `vae.py prose --walk <page>` → parts=<n>, prose findings=0
 ```
 
 ## VAE-DIALECT core
