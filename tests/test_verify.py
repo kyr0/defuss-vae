@@ -213,6 +213,7 @@ class VerifyTests(RepoCase):
         self.assertIn("packageManager (npm@<version>)", gaps("legacy/package.json"), "an npm package is asked for npm, not a migration")
         (self.repo / "legacy/package.json").unlink()
         self.assertTrue(check_package(self.repo, ["legacy/package.json"], {}).value, "a deleted manifest is not 'unreadable'")
+        self.assertEqual(check_package(self.repo, ["src/main/java/calc/App.java"], {}).evidence, "∅ changed package.json")
 
     def test_template_mock_rule_catches_mocks_but_not_itself(self):
         namespace = runpy.run_path(str(ROOT / "templates/VERIFY.py"))

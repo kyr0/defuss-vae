@@ -517,7 +517,8 @@ def check_package(repo: Path, changed: Iterable[str], config: dict[str, Any]) ->
         return Check("package", claim, "VERIFIED", True, "disabled by CONFIG['package']=False", required=False)
     cfg = cfg if isinstance(cfg, dict) else {}
     gaps: list[str] = []
-    for rel in (p for p in changed if Path(p).name == "package.json" and is_code(p) and (repo / p).is_file()):
+    manifests = [p for p in changed if Path(p).name == "package.json" and is_code(p) and (repo / p).is_file()]
+    for rel in manifests:
         try:
             pkg = json.loads((repo / rel).read_text("utf-8"))
         except (OSError, ValueError) as e:
@@ -530,8 +531,9 @@ def check_package(repo: Path, changed: Iterable[str], config: dict[str, Any]) ->
     if gaps:
         nxt = (f"EDIT package.json (template {PLUGIN_ROOT}/templates/package.json.tmpl; app: drop exports/files/build); "
                "an existing package keeps its module type, build and linter unless the human approves migrating")
-    return Check("package", claim, "VERIFIED", not gaps, f"gaps={gaps[:20]}" if gaps else "package.json defaults present",
-                 required=strict(config), next=nxt)
+    # WHY ∅: a Go, JVM or .NET change has no package.json, and "defaults present" would claim a file nobody checked.
+    evidence = f"gaps={gaps[:20]}" if gaps else ("package.json defaults present" if manifests else "∅ changed package.json")
+    return Check("package", claim, "VERIFIED", not gaps, evidence, required=strict(config), next=nxt)
 
 
 def coverage_chain(repo: Path, folder: str) -> list[str]:
