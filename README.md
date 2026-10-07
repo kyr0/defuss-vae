@@ -6,7 +6,7 @@
 
 **V**erified **A**gentic **E**ngineering: your coding agent ships only what it has proven works.
 
-Seven skills that you trigger yourself, plus small stdlib-only Python programs that **verify, gate and remember**. The agent does the work; programs, not prompts, decide whether that work is done.
+Seven skills and small stdlib-only Python programs that **verify, gate and remember**. The agent does the work and starts six of the skills when their step comes; you review risky plans before any code and start `wrap`, which commits. Programs, not prompts, decide whether the work is done.
 
 ## TL;DR
 
@@ -22,7 +22,7 @@ defuss-vae moves the checks out of the prompt and into code. Hooks deny `git com
 - 🧠 **Learns per project:** failures become episodes, every lesson becomes a test, a verifier rule or a memory line with its reason, and memory is loaded into every new session
 - 🧭 **Adapts to your repo:** uses your Makefile, your toolchain (defaults for Go, Rust, JVM, .NET, JS/TS and Python) and your rules, and grows its policy from your own mistakes
 - 🐝 **Sub-agents without collisions:** each agent claims disjoint paths in its own git worktree, long jobs run detached with timestamped logs, and `status` checks every claim against the process table
-- 🙋 **Human in charge:** skills never trigger themselves, and nothing is pushed or released without you
+- 🙋 **Human in charge, no micro-management:** the agent starts a skill only when that skill's condition holds, a risky task without your plan gets one for your review first, only you start `wrap`, and nothing is pushed or released without you
 - 🪶 **Tiny:** `python3` ≥ 3.9, `git`, `make`; no dependencies, no daemon, no `uv` in the hook path
 
 ## How it works
@@ -31,8 +31,8 @@ defuss-vae moves the checks out of the prompt and into code. Hooks deny `git com
 flowchart LR
     H([🙋 you]) -->|"prompt"| P
 
-    subgraph agent ["🤖 skills you trigger, agent works"]
-        P["<b>plan</b><br/>research · probe unknowns<br/>refine · spec with checks"]
+    subgraph agent ["🤖 skills: you or the agent start them"]
+        P["<b>plan</b><br/>research · probe unknowns<br/>plans/*.md for your review"]
         I["<b>implement</b><br/>fully agentic<br/>root cause · minimum code"]
         P --> I
     end
@@ -53,13 +53,14 @@ flowchart LR
 
 | Stage | Who drives it | What it does |
 |---|---|---|
-| **plan** | you trigger, agent works | Traces the real code path, probes unknowns instead of guessing, prefers existing helpers and stdlib, and emits the smallest plan in which every acceptance criterion is an executable check. |
-| **implement** | you trigger, fully agentic | Understands first, fixes the root cause (and its sibling callers), writes the minimum code, adds tests against real subsystems, and loops the gate in-turn. |
+| **plan** | you; the agent only for a risky task you gave no plan for | Traces the real code path, probes unknowns instead of guessing, prefers existing helpers and stdlib, and writes the smallest plan, in which every acceptance criterion is an executable check, to `plans/<yyyy-mm-dd_hh-mm>_<slug>.md`. Complex work gets milestones, and work that splits safely gets its sub-agents planned. A plan the agent started waits for your review. |
+| **implement** | you or the agent, fully agentic | Understands first, fixes the root cause (and its sibling callers), writes the minimum code, adds tests against real subsystems, and loops the gate in-turn. |
+| **verify** | the agent at a goal or milestone; you any time | Reviews against requirements, callers and tests, and fixes the defects it confirms: the whole change when it is large, otherwise its paths and tests, because a deep review costs time and tokens. |
 | **gate** | hooks, automatic | **verify** runs the project's own `make` verbs; **review** checks requirements, every changed path and its callers; **docs** records *why* this design beats the plausible alternative. Doc pages get a static prose check and a review against the prose catalog instead of the test suites. Any edit changes the fingerprint and restarts the gate. |
-| **doc** | you trigger, any time | Writes and checks documentation pages: claims grounded in code and tests, page-specific rules declared before writing, Mermaid where the content is schematic, then the static prose check and a catalog review. |
-| **doc-edit** | you trigger, any time | Edits only the pages you name, as you instruct: the same grounding, catalog review and static check, limited to the changed parts. |
-| **wrap** | you trigger | Splits the work into coherent Conventional Commits, updates `CHANGELOG.md`, turns what the work taught into tests, `.agents/VERIFY.py` rules or concise memory lines with their reason, consolidates agent memory, and updates the managed block in `AGENTS.md`. |
-| **status** | you trigger, any time | Shows what runs (sub-agents, the service, free disk, RAM and GPU), reconciles `.agents/SWARM_STATUS.yaml` with the process table, and names the next step per agent. |
+| **doc** | you any time; the agent after implementing | Writes and checks documentation pages: claims grounded in code and tests, page-specific rules declared before writing, Mermaid where the content is schematic, then the static prose check and a catalog review. |
+| **doc-edit** | you any time; the agent after `doc` | Edits only the named pages, as instructed: the same grounding, catalog review and static check, limited to the changed parts. |
+| **wrap** | only you, since it commits | Splits the work into coherent Conventional Commits, updates `CHANGELOG.md`, turns what the work taught into tests, `.agents/VERIFY.py` rules or concise memory lines with their reason, consolidates agent memory, and updates the managed block in `AGENTS.md`. |
+| **status** | you or the agent, any time | Shows what runs (sub-agents, the service, free disk, RAM and GPU), reconciles `.agents/SWARM_STATUS.yaml` with the process table, and names the next step per agent. |
 | **human review** | you | You read the commits. Nothing has been pushed yet. |
 | **release** | you, via CI/CD | Push, tag, publish to package managers. On GitHub, `init` adds `.github/workflows/verify.yml`: the tools `mise.toml` pins via `jdx/mise-action`, uv or bun from their official setup actions, then `make setup` and `make verify` (or the commands in `CONFIG["ci"]`; `False` adds no workflow), so CI runs the same gate. |
 
@@ -171,7 +172,7 @@ To get new releases in Claude Code without asking, turn on auto-update: `/plugin
 
 ## Usage
 
-Only you start a skill: the agent never invokes one on its own (`disable-model-invocation` in Claude Code, `allow_implicit_invocation: false` in Codex), so you call each one when you want that step. The form depends on how you installed:
+You can start any skill, and the agent starts six of them when their step comes: `status` any time; `implement` for a task you gave or a plan you approved; `verify` at the task's goal or a plan milestone, on the whole change when it is large and otherwise on its paths and tests; `doc` after implementing and `doc-edit` after `doc`; `plan` only when you gave no plan and the task is too risky or complex to do directly, and that plan then waits for your review. No agent starts `wrap`, because it commits: `disable-model-invocation` in Claude Code and `allow_implicit_invocation: false` in Codex keep it yours, and `vae.py swarm spawn` refuses a command that names it. The form depends on how you installed:
 
 | Installed via | Invocation |
 |---|---|
@@ -183,7 +184,7 @@ The examples below use the plugin form; swap the prefix for your host. Everythin
 
 ### Plan: research and a spec before any code
 
-Describe the goal and its constraints. `plan` reads the code, traces the real path, and probes what it doesn't know by running existing commands or scratch scripts in `tmp/`; its rules forbid editing source. It returns a short spec: what's `VERIFIED`, what's `UNKNOWN` and how to find out, the prior art it reuses, the decision, and numbered steps that each name the file and symbol, the change and the check that will prove it. Refine it by replying in plain words ("drop the Redis option, reuse the in-memory limiter"); when the plan is right, run `implement`.
+Describe the goal and its constraints. `plan` reads the code, traces the real path, and probes what it doesn't know by running existing commands or scratch scripts in `tmp/`; its rules forbid editing source. It writes the plan to `plans/<yyyy-mm-dd_hh-mm>_<slug>.md` (UTC) and updates that file as you refine it: steps that each name the file and symbol, the change and the check that will prove it; milestones to tick off when the work turns out complex, each followed by a `verify` of its scope; and, when units have disjoint paths and none depends on another's code, the sub-agents with goal, targets, contract, ETA and worktree. Its reply names the file, what's `VERIFIED`, what's `UNKNOWN` and how to find out, the prior art it reuses, and the decision. Refine it by replying in plain words ("drop the Redis option, reuse the in-memory limiter"); when the plan is right, run `implement`.
 
 ```text
 /defuss-vae:plan add rate limiting to the upload endpoint: 10 requests/min per API key, 429 with Retry-After
@@ -200,16 +201,17 @@ The last one plans and implements in one go; without "then implement it", `plan`
 /defuss-vae:implement add a --json flag to `export` that prints one object per line
 ```
 
-Without a request it implements the plan from the conversation; with one it works on that task directly. Either way it reruns the gate until `VERIFIED[gate]=true`.
+Without a request it implements the plan from the conversation or `plans/`; with one it works on that task directly. Either way it reruns the gate until `VERIFIED[gate]=true`, and at the goal or a plan milestone it starts `verify`, then `doc` when a page describes changed behavior.
 
-### Verify: an extra review on demand
+### Verify: a deep review at milestones
 
 ```text
 /defuss-vae:verify
+/defuss-vae:verify src/upload.py and its tests
 /defuss-vae:verify report only, don't edit anything
 ```
 
-By default it reviews the current changes and fixes what it finds. The gate already runs a review before every commit, so call this one when you want a second, deeper look. It is the reviewing counterpart of `make verify`, which runs only the deterministic suites.
+By default it reviews the current changes and fixes what it finds; name paths or tests to narrow it. The agent starts it at the task's goal or a plan milestone. The gate already runs a review before every commit; call this one yourself when you want a second, deeper look. It is the reviewing counterpart of `make verify`, which runs only the deterministic suites.
 
 ### Doc: write or check documentation pages
 
@@ -246,7 +248,7 @@ It lists free disk, RAM and GPU and every registered agent with its state (`RUNN
 
 ### Sub-agents and long runs
 
-One hard rule decides whether work splits: units must have disjoint target paths and explicit contracts; otherwise the work stays sequential. Each unit gets its own git worktree outside the repository, works in small chunks and writes its results to disk early.
+One hard rule decides whether work splits: units must have disjoint target paths and explicit contracts; otherwise the work stays sequential. A plan names the split and each unit's worktree. Each unit gets its own git worktree outside the repository (`../<repo>.wt/<name>`), or under `tmp/worktrees/<name>` when the harness blocks writes outside it, in which case the project's test discovery must skip `tmp/`. Each unit works in small chunks and writes its results to disk early, and a spawned session never runs `wrap`.
 
 ```bash
 git worktree add ../app.wt/parser -b swarm/parser

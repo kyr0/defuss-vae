@@ -239,6 +239,14 @@ class SwarmTests(RepoCase):
             stranger.wait()
         self.assertIn("ghost: no entry", self.swarm("rm", "--name", "ghost").stdout, "reaping is idempotent")
 
+    def test_a_spawned_session_never_runs_wrap(self):
+        # wrap commits; a headless `claude -p "/defuss-vae:wrap"` or `codex exec '$wrap'` would run it without the human.
+        for i, prompt in enumerate(("/defuss-vae:wrap", "run(/defuss-vae:wrap)", "then `/wrap`", "$wrap now", "$defuss-vae:wrap")):
+            p = self.spawn(f"closer{i}", f"src/z{i}", "echo", prompt)
+            self.assertEqual(p.returncode, 2, prompt)
+            self.assertIn("wrap is human-only", p.stdout)
+        self.assertEqual(self.spawn("lib", "src/lib", "echo", "/usr/lib/wrap.py").returncode, 0, "a path ending in wrap calls no skill")
+
     def test_a_running_wrapper_restores_its_dropped_entry(self):
         code, _ = upsert(self.repo, "self", {"pid": os.getpid(), "goal": "Heal.", "workdir": "../self",
                                              "target_focus_paths": ["src/self"]}, delay=0)

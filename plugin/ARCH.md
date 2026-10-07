@@ -8,7 +8,7 @@ One folder serves Claude Code (`.claude-plugin/plugin.json`, hooks auto-loaded f
 
 ## How it works
 
-Skills set `disable-model-invocation: true` for Claude Code and ship `agents/openai.yaml` with `allow_implicit_invocation: false` for Codex, whose skill docs name only that switch, so only a human starts them; `vae.py doctor` checks both. Each skill calls `scripts/vae.py` through the plugin root variable, and other hosts derive that root from the skill directory. Hooks run `hooks/lifecycle.py` with plain `python3`.
+Only the human starts `wrap`, which commits: it sets `disable-model-invocation: true` for Claude Code and ships `agents/openai.yaml` with `allow_implicit_invocation: false` for Codex, whose skill docs name only that switch. The other six ship `allow_implicit_invocation: true` without the frontmatter switch, and each description says when the agent may start it; `vae.py doctor` fails when either host's switch of any skill deviates from this policy. `vae.py swarm spawn` refuses a command that names `wrap`, since a headless session runs a skill its prompt names. Each skill calls `scripts/vae.py` through the plugin root variable, and other hosts derive that root from the skill directory. Hooks run `hooks/lifecycle.py` with plain `python3`.
 
 ## Operations
 

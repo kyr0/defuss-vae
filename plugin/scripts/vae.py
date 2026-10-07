@@ -25,6 +25,8 @@ from vae_verify import (
 
 SKILLS = ("plan", "implement", "verify", "doc", "doc-edit", "wrap", "status")
 SKILL_MAX = 6000  # runtime prompts stay lean: each SKILL.md loads whole on invocation.
+# wrap commits, so only the human starts it; every other skill's description says when the agent may.
+HUMAN_ONLY = ("wrap",)
 
 
 def repo_from(raw: str) -> Path:
@@ -49,11 +51,13 @@ def doctor_plugin() -> list[str]:
     for n in SKILLS:
         p = ROOT / "skills" / n / "SKILL.md"
         if p.exists():
-            # WHY both: Claude Code reads the frontmatter key, Codex only agents/openai.yaml (its docs name no other switch).
+            # WHY one policy for both hosts: Claude Code reads the frontmatter key, Codex only agents/openai.yaml, and a
+            # skill the agent may start on one host but not the other behaves differently per host.
             policy = p.parent / "agents" / "openai.yaml"
-            if ("disable-model-invocation: true" not in p.read_text("utf-8")
-                    or not policy.exists() or "allow_implicit_invocation: false" not in policy.read_text("utf-8")):
-                gaps.append(f"skill-not-human-only:{n}")
+            claude_human = "disable-model-invocation: true" in p.read_text("utf-8")
+            codex_human = policy.exists() and "allow_implicit_invocation: false" in policy.read_text("utf-8")
+            if not policy.exists() or claude_human != (n in HUMAN_ONLY) or codex_human != (n in HUMAN_ONLY):
+                gaps.append(f"skill-invocation-policy:{n}")
             if p.stat().st_size >= SKILL_MAX:
                 gaps.append(f"skill-over-budget:{n}:{p.stat().st_size}B")
     return gaps

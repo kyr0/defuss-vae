@@ -1,13 +1,12 @@
 ---
 name: implement
-description: "Ponytail minimalism, probe-before-assume debugging, root-cause fixes, mock-free tests, dogfood e2e, gated verify → review → docs."
-disable-model-invocation: true
+description: "Implements a task or approved plan: minimum code, probes before assumptions, root-cause fixes, real tests, gated. The agent may start it for a human's task or approved plan."
 allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py *)
 ---
 
 # defuss-vae / implement
 
-Implement requested scope completely; NOT invoke another skill.
+Implement requested scope completely.
 CLI = `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py` (other hosts: plugin root = skill dir/../..).
 
 ## Ponytail
@@ -28,7 +27,7 @@ NOT one-implementation interface|factory, speculative config, "for later" scaffo
 
 ## Execution
 
-1. read `AGENTS.md`, `.agents/MEMORY.md`, `.agents/CLI_GIST.md`, plan|requirements, EVERY file they name; `grep` `.agents/EPISODES.md` for touched paths|symbols|symptoms; NOT speculate about unopened code. IF layout missing THEN CLI `init --repo .` (never overwrites).
+1. read `AGENTS.md`, `.agents/MEMORY.md`, `.agents/CLI_GIST.md`, plan (`plans/*.md`)|requirements, EVERY file they name; `grep` `.agents/EPISODES.md` for touched paths|symbols|symptoms; NOT speculate about unopened code. IF layout missing THEN CLI `init --repo .`.
 2. Preserve public contracts unless the plan changes them; keep unrelated user changes intact. Toolchain: IF new project|subproject THEN start on `bun init` (JS|TS) | `uv init` (Python), NOT npm|yarn|pnpm|pip|poetry ELSE keep the repo's toolchain AND propose migrating.
 3. Non-trivial behavior REQUIRES RED→GREEN→REFACTOR: failing test → observe expected failure → minimum general code → observe pass → refactor only IF smaller|clearer. NOT hard-code to fixtures; NOT weaken|delete valid tests.
 4. tests = real subsystems in isolation (real fs|process|db|port under `tmp/`), NOT mocks|stubs|fakes. `make e2e` = build publishable artifact → install into clean consumer → `input/` → `output/` → assert; NOT source-tree imports.
@@ -37,7 +36,7 @@ NOT one-implementation interface|factory, speculative config, "for later" scaffo
 7. EVERY acceptance invariant → check the gate runs: `make test`|`make e2e`|`.agents/VERIFY.py` rule; NOT claim done from inspection.
 8. A tool reading source as text = a parser: IF source syntax changes (call shape, type argument) THEN test EVERY scanner over it (regex, codegen, linter, `VERIFY.py` rule) with the new syntax.
 9. Behavior-neutral change (refactor|rename|move): green tests alone NOT proof; IF a build exists THEN `cmp` its artifacts against a `HEAD` build (`git worktree add $(mktemp -d) HEAD`) AND explain EVERY diff.
-10. Docs: per the gate's `3/3 docs` step.
+10. At the goal|a plan milestone: `verify`, THEN `doc` IF a page describes changed behavior.
 11. Before finishing: CLI `gate --repo . --session ${CLAUDE_SESSION_ID}` → fix `AGENT_CMD` from lowest causal failure → its review → docs steps; repeat until `VERIFIED[gate]=true`. NOT disable|bypass hooks. New deterministic defect class → regression test OR `VERIFY.py` rule.
 
 ## Output contract
@@ -52,4 +51,4 @@ NOT feature tour|plan repeat. Deliberate simplification only IF real ceiling + u
 
 ## VAE-DIALECT core
 
-VAE-DIALECT = min-token, uniquely decodable text; correctness > compression. `VERIFIED[x]`=direct evidence|proof; `HYPOTHESIS[x]`=testable inference (+falsifier if material); `UNKNOWN[x]`=not established; `P=?` unknown value. Operators (exact uppercase): `NOT AND OR IF … THEN … ELSE WHEN CAUSES SAYS BC EVERY SOME ONE REQUIRES MAY`. `WHEN`=equivalence; unpaired `THEN`|`→`=sequence|result (ladder: first rung that holds); `SAYS`=attribution; `BC`=because|evidence; `EVERY SOME ONE`=∀ ∃ ∃!; `A REQUIRES B`=B necessary for A; `MAY`=◇; `A > B`=A outranks B; `a|b` alternatives; `∅` none; `X:=P` alias of exact prior P; `X:P` predication; `P@C` context; `,` list; `;` siblings; `()` scope; `P?` question. Preserve scope, polarity, modality, quantifiers, attribution, causality, order, numbers, units, code. IF unique expansion impossible THEN conventional prose. Spec: `../../references/VAE-DIALECT.md`.
+VAE-DIALECT: min-token, uniquely decodable; correctness > compression. `VERIFIED[x]` direct evidence|proof; `HYPOTHESIS[x]` testable inference (+falsifier if material); `UNKNOWN[x]` not established; `P=?` unknown value. Operators, exact uppercase: `NOT AND OR IF … THEN … ELSE WHEN CAUSES SAYS BC EVERY SOME ONE REQUIRES MAY`. `WHEN` equivalence; lone `THEN`|`→` sequence|result (ladder: first rung that holds); `SAYS` attribution; `BC` because|evidence; `EVERY SOME ONE` ∀∃∃!; `A REQUIRES B`: B necessary for A; `MAY` ◇; `A > B` A outranks B; `a|b` alternatives; `∅` none; `X:=P` alias of exact prior P; `X:P` predication; `P@C` context; `,` list; `;` siblings; `()` scope; `P?` question. Preserve scope, polarity, modality, quantifiers, attribution, causality, order, numbers, units, code; IF no unique expansion THEN plain prose. Spec: `../../references/VAE-DIALECT.md`.

@@ -39,14 +39,19 @@ class PackageTests(unittest.TestCase):
         self.assertEqual((REPO / market["plugins"][0]["source"]).resolve(), ROOT)
         self.assertEqual((ROOT / "LICENSE").read_text(), (REPO / "LICENSE").read_text())
 
-    def test_skills_are_human_only_and_define_the_dialect(self):
+    def test_only_wrap_is_human_only_and_every_skill_defines_the_dialect(self):
         for name in self.SKILLS:
             text = self.skill(name)
-            for token in ("disable-model-invocation: true", "## VAE-DIALECT core", "VERIFIED", "HYPOTHESIS", "UNKNOWN", "IF … THEN … ELSE", "../../references/VAE-DIALECT.md"):
+            for token in ("## VAE-DIALECT core", "VERIFIED", "HYPOTHESIS", "UNKNOWN", "IF … THEN … ELSE", "../../references/VAE-DIALECT.md"):
                 self.assertIn(token, text, name)
-            # Codex ignores the frontmatter key; its own switch keeps the skill out of implicit invocation.
+            # wrap commits, so only the human starts it; Claude Code reads the frontmatter key, Codex only its own switch.
+            human = name == "wrap"
             policy = (ROOT / "skills" / name / "agents/openai.yaml").read_text()
-            self.assertIn("allow_implicit_invocation: false", policy, name)
+            self.assertEqual("disable-model-invocation: true" in text, human, name)
+            self.assertIn(f"allow_implicit_invocation: {str(not human).lower()}", policy, name)
+            # The agent picks a skill by its description alone, so each one it may start names when.
+            description = text.split("description: ", 1)[1].splitlines()[0]
+            self.assertEqual(bool(re.search(r"The agent (?:may|should) start it", description)), not human, name)
             self.assertNotIn("human invocation", text, f"{name}: the frontmatter and policy enforce it; prose is token cost")
 
     def test_maintainer_makefile_keeps_every_exit_status(self):
@@ -59,17 +64,23 @@ class PackageTests(unittest.TestCase):
         p = subprocess.run([PY, str(ROOT / "scripts/vae.py"), "doctor"], capture_output=True, text=True, check=False)
         self.assertEqual((p.returncode, p.stdout.splitlines()), (0, ["VERIFIED[plugin.files]=true", "REMAINS: ∅"]))
 
-    def test_doctor_flags_a_skill_codex_could_invoke_implicitly(self):
+    def test_doctor_flags_a_skill_whose_hosts_disagree_on_who_starts_it(self):
         with tempfile.TemporaryDirectory() as td:
             copy = Path(td) / "plugin"
             shutil.copytree(ROOT, copy, ignore=shutil.ignore_patterns("__pycache__"))
             doctor = lambda: subprocess.run([PY, str(copy / "scripts/vae.py"), "doctor"], capture_output=True, text=True, check=False)
             ok = doctor()
             self.assertEqual(ok.returncode, 0, ok.stdout)
-            (copy / "skills/plan/agents/openai.yaml").unlink()
+            (copy / "skills/plan/agents/openai.yaml").unlink()  # Codex default: implicit invocation on
+            wrap = copy / "skills/wrap/agents/openai.yaml"
+            wrap.write_text(wrap.read_text().replace("allow_implicit_invocation: false", "allow_implicit_invocation: true"))
+            verify = copy / "skills/verify/SKILL.md"
+            verify.write_text(verify.read_text().replace("\nallowed-tools:", "\ndisable-model-invocation: true\nallowed-tools:", 1))
             out = doctor()
             self.assertNotEqual(out.returncode, 0)
-            self.assertIn("skill-not-human-only:plan", out.stdout)
+            for name in ("plan", "wrap", "verify"):
+                self.assertIn(f"skill-invocation-policy:{name}", out.stdout)
+            self.assertNotIn("skill-invocation-policy:implement", out.stdout)
 
     def test_skill_frontmatter_is_strict_yaml(self):
         # Strict YAML parsers (e.g. the `npx skills` installer) skip a skill whose plain scalar contains ": ".
@@ -105,7 +116,7 @@ class PackageTests(unittest.TestCase):
             self.assertIn(token, doc)
         # doc-edit is doc's edit + catalog review step alone, scoped to the named pages.
         self.assertIn("`doc-edit` scopes this step to named pages", doc)
-        for token in ("Scope = the pages AND edits the human names; NOT edit other pages|code", "NOT rewrite|restructure unrequested parts", "../../references/PROSE.md",
+        for token in ("Scope = the named pages AND edits; NOT edit other pages|code", "NOT rewrite|restructure unrequested parts", "../../references/PROSE.md",
                       "check EVERY changed unit", "THEN ask, NOT invent", "CLI `prose --repo . <pages>` → report EVERY hit outside the edit", "THEN `--fix`"):
             self.assertIn(token, doc_edit)
         # Design discipline: one owner per concern, checked contracts, composition; text scanners and refactors need proof.
@@ -126,8 +137,15 @@ class PackageTests(unittest.TestCase):
         self.assertIn("only IF the root cause is a VERIFIED code defect, NOT env|config that worked once", implement)
         for token in ("asserting a HYPOTHESIS|env values that worked once", "regression test IF the root cause is a VERIFIED code defect"):
             self.assertIn(token, verify)
+        # A self-started plan stops for human review; the plan lives in a dated file with milestones only when complex.
+        for token in ("self-started → stop after the plan for human review", "`plans/<yyyy-mm-dd_hh-mm>_<slug>.md` (UTC), updated in place",
+                      "IF complex THEN milestones `- [ ]` + proof", "THEN `verify` its scope"):
+            self.assertIn(token, plan)
+        self.assertIn("At the goal|a plan milestone: `verify`, THEN `doc`", implement)
+        self.assertIn("Scope: named paths|tests, ELSE the current change", verify)
         # Swarm orchestration: plan marks only safely splittable steps; status observes, reconciles, then acts per state.
-        self.assertIn("Mark steps `parallel` only IF their target paths are disjoint AND their contracts explicit", plan)
+        for token in ("`parallel` only IF target paths are disjoint AND no step depends on another's code", "`tmp/worktrees/<name>` IF outside writes are blocked, excluded from test discovery"):
+            self.assertIn(token, plan)
         for token in ("swarm status --repo .", "swarm status --fix", "`EXITED` code=0 → merge its worktree through the gate",
                       "swarm stop --name", "NOT trust silence", "A process outranks its registry entry"):
             self.assertIn(token, status)

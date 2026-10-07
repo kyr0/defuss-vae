@@ -385,6 +385,11 @@ def spawn(root: Path, spec: dict[str, Any], cmd: list[str], delay: float = SETTL
     missing = [k for k in REQUIRED if k not in ("pid", "start_timestamp") and spec.get(k) in (None, "", [])]
     if missing:
         return 2, f"{name}: missing " + ",".join(missing)
+    # WHY: wrap commits and only the human starts it, but a headless session runs a skill its prompt names, so the spawn
+    # is refused. VERIFIED: (Claude Code headless docs) `claude -p "/defuss-vae:wrap"` runs it, and `/wrap` is the same
+    # slash command for a standalone skill; HYPOTHESIS: Codex `codex exec '$wrap'` does too (not run here).
+    if re.search(r"/defuss-vae:wrap\b|(?:^|[\s\"'(`])/wrap\b|\$(?:defuss-vae:)?wrap\b", " ".join(cmd)):
+        return 2, f"{name}: wrap is human-only; a spawned session never runs it"
     host = socket.gethostname()
     with locked(root):
         entries, table = read(root), proc_table()

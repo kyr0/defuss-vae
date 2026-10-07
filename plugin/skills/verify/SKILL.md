@@ -1,7 +1,6 @@
 ---
 name: verify
-description: "High-precision review against requirements, callers, real tests, gate evidence and Ponytail minimalism; fixes confirmed defects, encodes repeatable ones as tests or rules."
-disable-model-invocation: true
+description: "Deep review against requirements, callers and tests; fixes confirmed defects. The agent should start it at a goal or plan milestone: on the whole change if large, else on its paths and tests."
 allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py *)
 ---
 
@@ -11,7 +10,7 @@ Default = review + fix actionable findings; IF the human asks report-only THEN N
 
 ## Method
 
-Review the change in context, NOT an isolated diff: read requirements|plan, `AGENTS.md`, `.agents/MEMORY.md`, `.agents/CLI_GIST.md`, `.agents/VERIFY.py`, changed files, relevant callers|callees, tests; `grep` `.agents/EPISODES.md` for changed paths|symbols|symptoms. NOT infer behavior from filenames|untraced diff fragments.
+Scope: named paths|tests, ELSE the current change; review it in context, NOT an isolated diff: read requirements|plan, `AGENTS.md`, `.agents/MEMORY.md`, `.agents/CLI_GIST.md`, `.agents/VERIFY.py`, changed files, relevant callers|callees, tests; `grep` `.agents/EPISODES.md` for changed paths|symbols|symptoms. NOT infer behavior from filenames|untraced diff fragments.
 
 **Correctness / contract pass**
 
@@ -59,4 +58,4 @@ THEN only commands|results proving fixes. NOT praise|score|generic summary.
 
 ## VAE-DIALECT core
 
-VAE-DIALECT = min-token, uniquely decodable text; correctness > compression. `VERIFIED[x]`=direct evidence|proof; `HYPOTHESIS[x]`=testable inference (+falsifier if material); `UNKNOWN[x]`=not established; `P=?` unknown value. Operators (exact uppercase): `NOT AND OR IF … THEN … ELSE WHEN CAUSES SAYS BC EVERY SOME ONE REQUIRES MAY`. `WHEN`=equivalence; unpaired `THEN`|`→`=sequence|result (ladder: first rung that holds); `SAYS`=attribution; `BC`=because|evidence; `EVERY SOME ONE`=∀ ∃ ∃!; `A REQUIRES B`=B necessary for A; `MAY`=◇; `A > B`=A outranks B; `a|b` alternatives; `∅` none; `X:=P` alias of exact prior P; `X:P` predication; `P@C` context; `,` list; `;` siblings; `()` scope; `P?` question. Preserve scope, polarity, modality, quantifiers, attribution, causality, order, numbers, units, code. IF unique expansion impossible THEN conventional prose. Spec: `../../references/VAE-DIALECT.md`.
+VAE-DIALECT: min-token, uniquely decodable; correctness > compression. `VERIFIED[x]` direct evidence|proof; `HYPOTHESIS[x]` testable inference (+falsifier if material); `UNKNOWN[x]` not established; `P=?` unknown value. Operators, exact uppercase: `NOT AND OR IF … THEN … ELSE WHEN CAUSES SAYS BC EVERY SOME ONE REQUIRES MAY`. `WHEN` equivalence; lone `THEN`|`→` sequence|result (ladder: first rung that holds); `SAYS` attribution; `BC` because|evidence; `EVERY SOME ONE` ∀∃∃!; `A REQUIRES B`: B necessary for A; `MAY` ◇; `A > B` A outranks B; `a|b` alternatives; `∅` none; `X:=P` alias of exact prior P; `X:P` predication; `P@C` context; `,` list; `;` siblings; `()` scope; `P?` question. Preserve scope, polarity, modality, quantifiers, attribution, causality, order, numbers, units, code; IF no unique expansion THEN plain prose. Spec: `../../references/VAE-DIALECT.md`.
