@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
 
 - **Breaking:** skills renamed to verbs in workflow order: `review` → `verify`, `docs` → `doc`, `finalize` → `wrap` (`/defuss-vae:wrap`). The gate's verify, review and docs steps keep their names. Skills CLI installs: `npx skills remove docs review finalize`, then `npx skills add kyr0/defuss-vae --skill verify --skill doc --skill doc-edit --skill wrap`.
 - New `doc-edit` skill: edits only the pages and parts you name, then runs the catalog review and static check; `doc` keeps the same step as its step 6.
