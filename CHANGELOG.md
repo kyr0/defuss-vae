@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `wrap` and `doc` drop text that repeated their own output contract or the prose check's message, which keeps the skill pack under its 28,000-byte cap.
+
 ## 0.7.0
 
 - The agent starts a skill when its step comes, and only the human starts `wrap`, which commits. `status` any time; `implement` for a task the human gave or a plan they approved; `verify` at the task's goal or a plan milestone, on the whole change when it is large and otherwise on its paths and tests; `doc` after implementing and `doc-edit` after `doc`; `plan` only without a human plan, for a task too risky or complex to do directly, and it then stops for review. Each description states its condition; `wrap` keeps both host switches off, and `vae.py doctor` fails with `skill-invocation-policy:<skill>` when either host's switch deviates from this policy (was `skill-not-human-only`). `vae.py swarm spawn` refuses a command that names `wrap` (`/defuss-vae:wrap`, `/wrap`, `$wrap`).
