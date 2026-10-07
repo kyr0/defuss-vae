@@ -10,6 +10,7 @@ ACTIONLINT := actionlint-py==1.7.12.25
 # Resolved at parse time with the installer's default dir as fallback: make 3.81 execs simple recipes with its
 # original PATH, so a uv that `make setup` just installed would otherwise be invisible until a new shell.
 UV ?= $(shell command -v uv 2>/dev/null || echo $(HOME)/.local/bin/uv)
+COVERAGE_MIN ?= 60
 
 help: ## list the verbs with their usage (default goal)
 	@awk -F':.*## ' '/^[a-zA-Z0-9_ -]+:.*## /{printf "  %-12s %s\n", $$1, $$2}' $(firstword $(MAKEFILE_LIST))
@@ -31,13 +32,16 @@ bench: dist ## gate latency on the installed release: cold verify vs cached revi
 test: ## unit suite (real git repos, processes and files)
 	$(PYTHON) -m unittest discover -s tests -v
 
+# Output goes to a file and only its last line is shown; the recipe exits with the command's status. A pipe into
+# `tail` would exit with tail's 0 and let a failing run pass `make verify` and CI.
 compat: ## the suite on python 3.9, the oldest the hooks support (macOS Command Line Tools)
-	@$(UV) run -q --no-project --python 3.9 python -m unittest discover -s tests 2>&1 | tail -1
+	@mkdir -p tmp && $(UV) run -q --no-project --python 3.9 python -m unittest discover -s tests > tmp/compat.log 2>&1; s=$$?; tail -1 tmp/compat.log; exit $$s
 
-coverage: ## coverage.py in an ephemeral uv env, subprocesses included (.coveragerc); floor 60%
-	@mkdir -p tmp && rm -f tmp/.coverage* && COVERAGE_FILE=tmp/.coverage $(UV) run -q --no-project --with coverage python -m coverage run -m unittest discover -s tests >/dev/null 2>&1 \
+coverage: ## coverage.py in an ephemeral uv env, subprocesses included (.coveragerc); floor COVERAGE_MIN (60%)
+	@mkdir -p tmp && rm -f tmp/.coverage* tmp/coverage.txt && COVERAGE_FILE=tmp/.coverage $(UV) run -q --no-project --with coverage python -m coverage run -m unittest discover -s tests >/dev/null 2>&1 \
 	  && COVERAGE_FILE=tmp/.coverage $(UV) run -q --no-project --with coverage python -m coverage combine -q \
-	  && COVERAGE_FILE=tmp/.coverage $(UV) run -q --no-project --with coverage python -m coverage report --fail-under=60 | tail -1
+	  && COVERAGE_FILE=tmp/.coverage $(UV) run -q --no-project --with coverage python -m coverage report --fail-under=$(COVERAGE_MIN) > tmp/coverage.txt; \
+	  s=$$?; tail -1 tmp/coverage.txt 2>/dev/null; exit $$s
 
 lint: ## pinned ruff (py39 target) + actionlint on both CI workflows
 	$(UV) run -q --no-project --with $(RUFF) ruff check $(PLUGIN) tests

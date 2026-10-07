@@ -49,6 +49,12 @@ class PackageTests(unittest.TestCase):
             self.assertIn("allow_implicit_invocation: false", policy, name)
             self.assertNotIn("human invocation", text, f"{name}: the frontmatter and policy enforce it; prose is token cost")
 
+    def test_maintainer_makefile_keeps_every_exit_status(self):
+        # A recipe piping into tail|head exits with tail's 0: `make coverage` passed CI below its floor (probed: 97 % vs
+        # fail-under=99 gave exit 0 through the pipe, 2 without it). Recipes write to a file and show its last line.
+        recipes = [ln for ln in (REPO / "Makefile").read_text().splitlines() if ln.startswith(("\t", "  "))]
+        self.assertEqual([ln.strip() for ln in recipes if re.search(r"\|\s*(?:tail|head)\b", ln)], [])
+
     def test_doctor_flags_a_skill_codex_could_invoke_implicitly(self):
         with tempfile.TemporaryDirectory() as td:
             copy = Path(td) / "plugin"
