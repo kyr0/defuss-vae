@@ -55,6 +55,10 @@ class PackageTests(unittest.TestCase):
         recipes = [ln for ln in (REPO / "Makefile").read_text().splitlines() if ln.startswith(("\t", "  "))]
         self.assertEqual([ln.strip() for ln in recipes if re.search(r"\|\s*(?:tail|head)\b", ln)], [])
 
+    def test_plugin_doctor_passes_on_the_shipped_plugin(self):
+        p = subprocess.run([PY, str(ROOT / "scripts/vae.py"), "doctor"], capture_output=True, text=True, check=False)
+        self.assertEqual((p.returncode, p.stdout.splitlines()), (0, ["VERIFIED[plugin.files]=true", "REMAINS: ∅"]))
+
     def test_doctor_flags_a_skill_codex_could_invoke_implicitly(self):
         with tempfile.TemporaryDirectory() as td:
             copy = Path(td) / "plugin"

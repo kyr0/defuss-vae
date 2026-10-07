@@ -13,10 +13,11 @@ from vae_testkit import (  # first: puts plugin/scripts on sys.path
     ROOT,
     TEST_CMD,
     RepoCase,
+    sh,
 )
 
 # isort: split
-from vae_gate import REVIEW_CHECKLIST, bounded, gate, validate_review
+from vae_gate import REVIEW_CHECKLIST, bounded, gate, validate_docs, validate_review
 from vae_hooks import commit_gate, is_commit_command, session_start, stop_gate
 from vae_project import init_project
 from vae_repo import changed_since, code_fingerprint, read_json, write_json
@@ -338,6 +339,92 @@ class GateTests(RepoCase):
         ctx = session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"]
         self.assertIn("LOST crashed: Port the parser. (workdir ../c)", ctx)
         self.assertLess(ctx.index("Swarm .agents/SWARM_STATUS.yaml"), ctx.index(".agents/MEMORY.md:"), "agents before memory")
+
+    def test_attestations_fail_closed_on_every_incomplete_field(self):
+        # One mutation per field of an otherwise valid attestation; each is rejected with its own reason.
+        fp, path = "f" * 64, self.repo / "attestation.json"
+        finding = {"status": "VERIFIED", "resolved": True, "location": "calc.py:1", "evidence": "e",
+                   "learning": {"status": "VERIFIED", "kind": "test", "why": "w"}}
+        review = {"schema": 1, "status": "VERIFIED", "code_fingerprint": fp, "checklist": REVIEW_CHECKLIST,
+                  "reviewed_paths": ["calc.py"], "findings": [finding]}
+        write_json(path, review)
+        self.assertEqual(validate_review(path, fp, ["calc.py"]), (True, "review attestation VERIFIED"))
+        for reason, change in {
+            "review checklist incomplete": {"checklist": REVIEW_CHECKLIST[:-1]},
+            "reviewed_paths missing/invalid": {"reviewed_paths": [1]},
+            "reviewed_paths incomplete: calc.py": {"reviewed_paths": []},
+            "review findings must be list": {"findings": {}},
+            "review finding invalid": {"findings": ["x"]},
+            "all review findings must be VERIFIED+resolved": {"findings": [dict(finding, resolved=False)]},
+            "each review finding needs location+evidence": {"findings": [dict(finding, evidence=" ")]},
+            "each finding needs learning status/action": {"findings": [dict(finding, learning={})]},
+            "learning.kind invalid": {"findings": [dict(finding, learning={"status": "VERIFIED", "kind": "vibes"})]},
+        }.items():
+            write_json(path, {**review, **change})
+            self.assertEqual(validate_review(path, fp, ["calc.py"]), (False, reason), reason)
+        entry = {"path": "calc.py", "status": "VERIFIED", "file": "updated", "method": "updated", "inline": "updated",
+                 "alternative": "a", "why": "VERIFIED: w"}
+        docs = {"schema": 1, "status": "VERIFIED", "code_fingerprint": fp, "files": [entry]}
+        self.write("calc.py", "def add(a, b):\n    return a + b\n")
+        for reason, change in {
+            "docs attestation stale or status!=VERIFIED": {"code_fingerprint": "0" * 64},
+            "docs files must be list": {"files": {}},
+            "docs missing file assessment: calc.py": {"files": []},
+            "docs assessment not VERIFIED: calc.py": {"files": [dict(entry, status="UNKNOWN")]},
+            "docs why missing epistemic label: calc.py": {"files": [dict(entry, why="because")]},
+            "docs alternative missing: calc.py": {"files": [dict(entry, alternative=" ")]},
+            "docs method not assessed: calc.py": {"files": [dict(entry, method="maybe")]},
+            "all-not-applicable docs rationale must be VERIFIED: calc.py": {"files": [dict(
+                entry, file="not-applicable", method="not-applicable", inline="not-applicable", why="UNKNOWN: w")]},
+            "updated docs lack epistemic prefix in source: calc.py": {},
+        }.items():
+            write_json(path, {**docs, **change})
+            self.assertEqual(validate_docs(path, fp, ["calc.py"], self.repo), (False, reason), reason)
+        self.write("calc.py", "def add(a, b):\n    # VERIFIED: plain addition.\n    return a + b\n")
+        self.assertTrue(validate_docs(path, fp, ["calc.py"], self.repo)[0])
+        self.assertEqual(validate_docs(path, fp, ["README.md"]), (True, "docs ∅ production source changed"))
+
+    def test_hooks_pass_unrelated_events_but_deny_a_commit_without_a_baseline(self):
+        self.make_python_project()
+        self.write("calc.py", "def add(a, b):\n    return b + a\n")  # dirty code, and no SessionStart ever ran
+
+        def event(**kw):
+            return {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "git commit -m x"},
+                    "cwd": str(self.repo), "session_id": "nobase", **kw}
+
+        self.assertIsNone(commit_gate(event(tool_name="Read")), "only shell tools commit")
+        self.assertIsNone(commit_gate(event(tool_input={"command": "git status"})), "not a commit")
+        outside = str(self.repo.parent)
+        self.assertIsNone(commit_gate(event(cwd=outside)), "outside a repository nothing is gated")
+        self.assertIsNone(stop_gate({"hook_event_name": "Stop", "cwd": outside, "session_id": "x"}, ROOT))
+        self.assertIsNone(session_start({"hook_event_name": "SessionStart", "cwd": outside, "session_id": "x"}, ROOT))
+        # Fail closed: without a recorded baseline every dirty file counts as this session's change.
+        self.assertEqual(commit_gate(event())["hookSpecificOutput"]["permissionDecision"], "deny")
+        self.assertEqual(read_json(state_path(self.repo, "nobase"))["baseline_status"], "HYPOTHESIS")
+        sh("git checkout -- calc.py", self.repo)
+        self.assertIsNone(commit_gate(event()), "nothing changed since the baseline: commit allowed")
+
+    def test_adapter_ignores_non_json_and_unknown_events(self):
+        self.make_python_project()
+
+        def adapter(stdin: str) -> subprocess.CompletedProcess[str]:
+            return subprocess.run([PY, str(ROOT / "hooks/lifecycle.py")], input=stdin, text=True, capture_output=True, check=False)
+
+        for stdin in ("not json", json.dumps({"hook_event_name": "Notification", "cwd": str(self.repo), "session_id": "a"})):
+            self.assertEqual((adapter(stdin).returncode, adapter(stdin).stdout), (0, ""), stdin)
+        start = json.loads(adapter(json.dumps({"hook_event_name": "SessionStart", "cwd": str(self.repo), "session_id": "a"})).stdout)
+        self.assertIn("gate --repo", start["hookSpecificOutput"]["additionalContext"])
+
+    def test_cli_gate_uses_the_latest_session_and_commits_do_not_escape_it(self):
+        self.make_python_project()
+        init_session(self.repo, "quiet")
+        p = subprocess.run([PY, str(ROOT / "scripts/vae.py"), "gate", "--repo", str(self.repo)], text=True, capture_output=True, check=False)
+        self.assertEqual(p.returncode, 0, p.stdout)
+        self.assertIn("∅ code|doc changes since session baseline", p.stdout)
+        # A commit made during the session (by a human, say) still counts as changed since the baseline.
+        self.write("calc.py", "def add(a, b):\n    return a + b + 0\n")
+        sh("git commit -qam change", self.repo)
+        self.assertIn("calc.py", changed_since(self.repo, read_json(state_path(self.repo, "quiet"))["baseline"]))
 
     def test_open_episodes_share_the_section_budget_newest_first(self):
         init_project(self.repo, ROOT)

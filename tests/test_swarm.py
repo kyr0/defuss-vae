@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -12,7 +13,20 @@ from pathlib import Path
 from vae_testkit import ROOT, RepoCase, sh  # first: puts plugin/scripts on sys.path
 
 # isort: split
-from vae_swarm import SWARM_FILE, dump, parse, read, resources, size_bytes, swarm_root
+from vae_swarm import (
+    SWARM_FILE,
+    dump,
+    heal,
+    parse,
+    read,
+    resources,
+    size_bytes,
+    status,
+    stop,
+    summary,
+    swarm_root,
+    upsert,
+)
 
 CLI = [sys.executable, str(ROOT / "scripts/vae.py"), "swarm"]
 
@@ -153,10 +167,102 @@ class SwarmTests(RepoCase):
         self.assertIn("RESOURCES disk", p.stdout)
         self.assertEqual((size_bytes("512M"), size_bytes("2G"), size_bytes("300B"), size_bytes(4)), (2**29, 2**31, 300, 2**22))
 
+    def test_status_names_every_state(self):
+        live = subprocess.Popen(["sleep", "60"])  # a real process the entries point at
+        try:
+            now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            base = {"pid": live.pid, "goal": "G.", "start_timestamp": now}
+            entries = [
+                dict(base, name="malformed", goal=None, workdir="../m", target_focus_paths=["m"]),
+                dict(base, name="foreign", host="elsewhere.invalid", workdir="../f", target_focus_paths=["f"]),
+                dict(base, name="nopid", pid="n/a", workdir="../n", target_focus_paths=["n"]),
+                dict(base, name="overdue", workdir="../o", target_focus_paths=["o"], eta_in_mins=0.01),
+                dict(base, name="stalled", workdir="../s", target_focus_paths=["s"], estimated_ram_usage="999T"),
+                dict(base, name="running", workdir="../r", target_focus_paths=["r"], start_timestamp="not a time", eta_in_mins=30),
+            ]
+            (self.repo / ".agents").mkdir(exist_ok=True)
+            (self.repo / SWARM_FILE).write_text(dump(entries))
+            log = self.repo / "var/log/swarm/stalled.log"
+            log.parent.mkdir(parents=True)
+            log.write_text("2026-01-01T00:00:00Z last words\n")
+            silent = time.time() - 20 * 60
+            os.utime(log, (silent, silent))
+            time.sleep(1.2)  # past the 0.6 s eta
+            code, lines = status(self.repo, delay=0)
+            self.assertEqual(code, 1)
+            for line in ("MALFORMED malformed", "UNKNOWN foreign", "UNKNOWN nopid", "OVERDUE overdue", "STALLED stalled",
+                         "RUNNING running", "OVERCOMMIT live RAM claims exceed total RAM"):
+                self.assertTrue(any(ln.startswith(line) for ln in lines), (line, lines))
+            self.assertEqual([ln.split()[0] for ln in summary(self.repo)],
+                             ["MALFORMED", "UNKNOWN", "UNKNOWN", "OVERDUE", "STALLED", "RUNNING"])
+            (self.repo / SWARM_FILE).write_text("agents: []\n")
+            self.assertEqual(summary(self.repo), [], "an empty registry costs a session nothing")
+        finally:
+            live.kill()
+            live.wait()
+
+    def test_stop_kills_a_job_that_ignores_sigterm(self):
+        self.assertEqual(self.spawn("stubborn", "src/s", "sh", "-c", "trap '' TERM; sleep 30").returncode, 0)
+        time.sleep(0.3)  # the trap is installed
+        self.assertEqual(stop(self.repo, "stubborn", grace=0.5), (0, "stubborn: killed (SIGKILL after 0.5 s)"))
+        self.assertEqual(self.entry("stubborn")["exit_code"], 137, "the wrapper died with it, so stop records the kill")
+        self.assertEqual(stop(self.repo, "stubborn"), (0, "stubborn: not running"))
+        self.assertEqual(stop(self.repo, "ghost")[0], 2)
+
+    def test_bad_requests_are_refused_and_a_missing_command_exits_127(self):
+        self.assertEqual(self.spawn("typo", "src/t", "no-such-command-xyz").returncode, 0)
+        self.assertEqual(self.wait_for("typo", "exit_code"), 127)
+        self.assertIn(" EXIT 127 ", (self.repo / "var/log/swarm/typo.log").read_text())
+        me = ("--pid", str(os.getpid()))
+        refused = {
+            "name taken": self.spawn("typo", "src/u", "true"),
+            "missing: `git worktree add": self.spawn("nowt", "src/w", "true", workdir="../missing-wt"),
+            "nogoal: missing goal": self.swarm("spawn", "--name", "nogoal", "--workdir", ".", "--targets", "src/g", "--", "true"),
+            "no command": self.swarm("spawn", "--name", "nocmd", "--goal", "G.", "--workdir", ".", "--targets", "src/c"),
+            "--name is required": self.swarm("rm"),
+            "half: missing goal": self.swarm("set", "--name", "half", *me, "--workdir", "../h", "--targets", "src/h"),
+            "RESOURCES disk": self.swarm("set", "--name", "huge", *me, "--goal", "G.", "--workdir", "../hg", "--targets", "src/hg",
+                                         "--disk", "999999T"),
+        }
+        for text, p in refused.items():
+            self.assertEqual(p.returncode, 2, (text, p.stdout))
+            self.assertIn(text, p.stdout)
+        self.assertEqual(self.swarm("set", "--name", "mine", *me, "--goal", "G.", "--workdir", "../mine", "--targets", "src/mine").returncode, 0)
+        clash = self.swarm("set", "--name", "clash", *me, "--goal", "G.", "--workdir", "../c2", "--targets", "src/mine/sub")
+        self.assertIn("CONFLICT mine: target src/mine/sub", clash.stdout)
+        stranger = subprocess.Popen(["sleep", "30"])
+        try:
+            moved = self.swarm("set", "--name", "mine", "--pid", str(stranger.pid))
+            self.assertIn("an entry moves only to a pid you own", moved.stdout)
+        finally:
+            stranger.kill()
+            stranger.wait()
+        self.assertIn("ghost: no entry", self.swarm("rm", "--name", "ghost").stdout, "reaping is idempotent")
+
+    def test_a_running_wrapper_restores_its_dropped_entry(self):
+        code, _ = upsert(self.repo, "self", {"pid": os.getpid(), "goal": "Heal.", "workdir": "../self",
+                                             "target_focus_paths": ["src/self"]}, delay=0)
+        self.assertEqual(code, 0)
+        done = threading.Event()
+        healer = threading.Thread(target=heal, args=(self.repo, "self", done, 0.05), daemon=True)
+        healer.start()
+        try:
+            time.sleep(0.3)  # the heal loop has seen the entry and kept a copy
+            (self.repo / SWARM_FILE).write_text("agents: []\n")  # another editor's stale copy drops it
+            deadline = time.time() + 5
+            while time.time() < deadline and not read(self.repo):
+                time.sleep(0.05)
+            self.assertEqual(self.entry("self")["goal"], "Heal.")
+        finally:
+            done.set()
+            healer.join(2)
+
     def test_dump_round_trips_and_keeps_unknown_fields(self):
         entries = [{"name": "a", "pid": 1, "goal": 'Quotes " and: colons.', "target_focus_paths": ["x", "y"], "note": "kept"}]
         self.assertEqual([{k: v for k, v in e.items() if v is not None} for e in parse(dump(entries))], entries)
         self.assertEqual(parse(dump([])), [])
+        self.assertEqual(parse("agents:\n- name: 'quoted'\n  goal: plain words\n")[0], {"name": "quoted", "goal": "plain words"})
+        self.assertIsNone(size_bytes("lots"))
 
 
 if __name__ == "__main__":

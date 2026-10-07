@@ -407,10 +407,11 @@ def spawn(root: Path, spec: dict[str, Any], cmd: list[str], delay: float = SETTL
     return code, f"pid={proc.pid} log={LOG_DIR}/{safe_name(name)}.log" if code == 0 else why
 
 
-def heal(root: Path, name: str, done: threading.Event) -> None:
-    """Restore this wrapper's entry when an edit dropped it: the wrapper owns it, so the restore is the owner's write."""
+def heal(root: Path, name: str, done: threading.Event, every: float = HEAL_S) -> None:
+    """Restore this wrapper's entry when an edit dropped it: the wrapper owns it, so the restore is the owner's write.
+    `every` is a parameter so tests exercise the loop in milliseconds without patching HEAL_S."""
     kept = None
-    while not done.wait(HEAL_S):
+    while not done.wait(every):
         with locked(root):
             entries = read(root)
             mine = next((e for e in entries if e.get("name") == name and e.get("pid") == os.getpid()), None)

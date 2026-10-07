@@ -5,6 +5,7 @@ import json
 import os
 import re
 import runpy
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -446,6 +447,53 @@ class VerifyTests(RepoCase):
         report = verify(self.repo, ["calc.py"])
         self.assertTrue(report.verified, render_report(report))
         self.assertIn("WARNS: gitignore", render_report(report))
+
+    def test_custom_rule_kinds_pass_fail_or_report_misconfiguration(self):
+        rules = [
+            {"id": "cmd.ok", "kind": "command", "command": "true"},
+            {"id": "cmd.fail", "kind": "command", "command": "exit 3"},
+            {"id": "cmd.missing", "kind": "command"},
+            {"id": "file.ok", "kind": "file_exists", "path": "calc.py"},
+            {"id": "file.missing", "kind": "file_exists", "path": "nope.txt"},
+            {"id": "kind.bad", "kind": "telepathy"},
+            {"id": "rx.bad", "kind": "regex", "path": "calc.py", "pattern": "("},
+            {"id": "contains.gone", "kind": "contains", "path": "gone.py", "text": "x"},
+            "not a dict",
+        ]
+        self.make_python_project(rules=repr(rules), config=", 'integration_commands': ['true'], 'coverage_command': 'exit 4'")
+        report = verify(self.repo, ["calc.py"])
+        got = {c.id: (c.status, c.value) for c in report.checks}
+        expected = {"cmd.ok": ("VERIFIED", True), "cmd.fail": ("VERIFIED", False), "cmd.missing": ("UNKNOWN", None),
+                    "file.ok": ("VERIFIED", True), "file.missing": ("VERIFIED", False), "kind.bad": ("UNKNOWN", None),
+                    "rx.bad": ("UNKNOWN", None), "contains.gone": ("VERIFIED", False), "custom.invalid": ("UNKNOWN", None),
+                    "tests.integration.1": ("VERIFIED", True), "coverage": ("VERIFIED", False)}
+        self.assertEqual({k: got[k] for k in expected}, expected)
+        self.assertIn("exit=4", self.check(report, "coverage").evidence, "a failing coverage command is a failure, not UNKNOWN")
+        self.assertFalse(report.verified, "a failing or misconfigured rule fails closed")
+
+    def test_a_broken_verify_py_fails_closed(self):
+        self.make_python_project()
+        for source in ("CONFIG = []\nRULES = []\n", "raise RuntimeError('boom')\n"):
+            self.write(".agents/VERIFY.py", source)
+            report = verify(self.repo, ["calc.py"])
+            self.assertFalse(report.verified, source)
+            self.assertNotEqual(self.check(report, "verifier.config").value, True, source)
+
+    def test_cli_verify_and_prose_report_exit_codes(self):
+        self.make_python_project()
+        cli = [PY, str(ROOT / "scripts/vae.py")]
+        ok = subprocess.run([*cli, "verify", "--repo", str(self.repo), "--json"], text=True, capture_output=True, check=False)
+        data = json.loads(ok.stdout)
+        self.assertEqual((ok.returncode, data["status"], data["value"]), (0, "VERIFIED", True))
+        self.write(".agents/VERIFY.py", "CONFIG = {'prose': {'phrases': ['(']}}\nRULES = []\n")
+        bad = subprocess.run([*cli, "prose", "--repo", str(self.repo), "README.md"], text=True, capture_output=True, check=False)
+        self.assertEqual(bad.returncode, 2)
+        self.assertIn("UNKNOWN[prose] BC invalid CONFIG['prose']['phrases'] regex", bad.stdout)
+        self.assertEqual(self.check(verify(self.repo, ["README.md"]), "prose").status, "UNKNOWN", "the gate fails closed too")
+        (self.repo / ".agents/VERIFY.py").unlink()
+        missing = subprocess.run([*cli, "verify", "--repo", str(self.repo)], text=True, capture_output=True, check=False)
+        self.assertEqual(missing.returncode, 2)
+        self.assertIn("UNKNOWN[verifier.overall]=?", missing.stdout, "no policy file: verification cannot conclude")
 
     def test_new_projects_start_strict_and_old_configs_keep_warnings(self):
         # Option B (0.6.0): the template blocks from day one; a config without the key, like every 0.5.x project's

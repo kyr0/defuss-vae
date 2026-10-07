@@ -12,7 +12,7 @@ Tests use real git repositories, real processes and real files in temporary dire
 
 ## Operations
 
-- **Resources:** the suite runs in about 30 s plus the e2e; CI runs it on macOS and Ubuntu and once on Python 3.9.
+- **Resources:** the suite runs in about 40 s plus the e2e; CI runs it on macOS and Ubuntu and once on Python 3.9.
 - **Reliability:** service tests poll for readiness instead of sleeping, swarm tests stop any job still running in `tearDown`, and the e2e service uses a raw socket listener because `VERIFIED:` `http.server` performs a reverse DNS lookup that took more than 30 s on a CI runner.
 
 ## Security and privacy

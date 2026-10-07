@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from vae_testkit import ROOT, RepoCase, sh  # first: puts plugin/scripts on sys.path
+from vae_testkit import PY, ROOT, RepoCase, sh  # first: puts plugin/scripts on sys.path
 
 # isort: split
 from vae_hooks import STATE_BUDGET
@@ -119,6 +119,9 @@ class InitDoctorTests(RepoCase):
         self.assertFalse(passes()["state.MEMORY.md"])
         memory.write_text("- VERIFIED[x] " + "y" * STATE_BUDGET["MEMORY.md"] + "\n")
         self.assertFalse(passes()["state.MEMORY.md"])
+        cli = sh(f"{PY} {ROOT}/scripts/vae.py doctor --repo .", self.repo, check=False)
+        self.assertEqual(cli.returncode, 2, "the CLI exits 2 while a check remains")
+        self.assertIn("REMAINS: state.MEMORY.md", cli.stdout)
         # A promoted lesson states its reason and stays one concise line.
         memory.write_text("- VERIFIED[src/db] pool size 4 BC load test deadlocked at 8\n")
         self.assertTrue(passes()["state.MEMORY.md"])
