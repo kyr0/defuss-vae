@@ -38,6 +38,10 @@ class PackageTests(unittest.TestCase):
         market = json.loads((REPO / ".claude-plugin/marketplace.json").read_text())
         self.assertEqual((REPO / market["plugins"][0]["source"]).resolve(), ROOT)
         self.assertEqual((ROOT / "LICENSE").read_text(), (REPO / "LICENSE").read_text())
+        # The README's citation and sample `claude plugin list` output name the current release, not an old one.
+        readme = (REPO / "README.md").read_text()
+        cited = re.findall(r"version\s*=\s*\{([^}]+)\}|Version: (\d+\.\d+\.\d+)", readme)
+        self.assertEqual({a or b for a, b in cited}, {manifests[0]["version"]})
 
     def test_only_wrap_is_human_only_and_every_skill_defines_the_dialect(self):
         for name in self.SKILLS:

@@ -109,9 +109,21 @@ claude plugin marketplace add kyr0/defuss-vae
 claude plugin install defuss-vae@defuss-vae
 ```
 
-Start a new session afterwards. To update later, see [Update an existing install](#update-an-existing-install). To use a local checkout instead: `claude --plugin-dir "$PWD/plugin"`.
+Start a new session afterwards. To update later, see [Update an existing install](#update-an-existing-install). To use a local checkout instead, start Claude Code in your project with `claude --plugin-dir <checkout>/plugin`.
 
 - **Good for:** the full experience, with the commit gate, the Stop-hook gate, and memory injected at session start.
+- **Auto mode:** the gate asks the agent to record its review and docs check in `tmp/vae/<session>/review.json` and `docs.json`, and Claude Code's auto-mode classifier can block that write as `[Logging/Audit Tampering]` (seen with Claude Code 2.1.292). Tell the classifier the write is expected: add this entry to `~/.claude/settings.json`, which is the only scope it reads besides managed settings, and keep `"$defaults"`, or the built-in exceptions are dropped. `claude auto-mode config` shows whether it took effect.
+
+```json
+{
+  "autoMode": {
+    "allow": [
+      "$defaults",
+      "defuss-vae attestations: after reviewing, writing review.json or docs.json under tmp/vae/ is the defuss-vae gate's own workflow; it records the review and disables no logging or audit control"
+    ]
+  }
+}
+```
 
 ### Codex (plugin)
 
@@ -164,7 +176,8 @@ Then activate it. A running session keeps the version it loaded, so in Claude Co
 
 ```text
 ❯ defuss-vae@defuss-vae
-  Version: 0.4.0
+  Version: 0.6.0
+  Scope: user
   Status: ✔ enabled
 ```
 
@@ -244,7 +257,7 @@ It edits only the named pages and leaves the rest of each page alone, except for
 /defuss-vae:status and respawn whatever crashed
 ```
 
-It lists free disk, RAM and GPU and every registered agent with its state (`RUNNING`, `EXITED`, `LOST`, `STALLED`, `OVERDUE`, `CONFLICT`), records drift with `vae.py swarm status --fix`, and names the next step per agent. Run it after an SSH drop or a crash.
+It lists free disk, RAM and GPU and every registered agent with its state (`RUNNING`, `EXITED`, `LOST`, `STALLED`, `OVERDUE`, `MALFORMED`, or `UNKNOWN` for an entry from another host), flags `CONFLICT` claims and an `OVERCOMMIT` of RAM, records drift with `vae.py swarm status --fix`, and names the next step per agent. Run it after an SSH drop or a crash.
 
 ### Sub-agents and long runs
 
@@ -289,7 +302,7 @@ The verifier passes only with direct evidence for **all** of the following. A mi
 - every changed `package.json` sets `packageManager` (bun), description, license and author; a new package is also `"type": "module"`, lints with oxlint and, as a library, builds with pkgroll
 - every changed doc page passes `vae.py prose`.
 
-The page, `.gitignore` and `package.json` checks block where `.agents/VERIFY.py` sets `CONFIG["strict"]=True`, which the template does for every project created with 0.6.0 or later. A project created earlier keeps them as warnings (listed under `WARNS:`) until it sets that key. A session that changed only pages runs this check and the project rules, and skips the test suites
+The page, `.gitignore` and `package.json` checks block where `.agents/VERIFY.py` sets `CONFIG["strict"]=True`, which the template does for every project created with 0.6.0 or later. A project created earlier keeps them as warnings (listed under `WARNS:`) until it sets that key. A session that changed only pages runs the prose check and the project rules, and skips the test suites.
 
 The layout is the same everywhere: `Makefile` verbs `setup start stop status log metrics bench test coverage lint e2e verify`; services log to `var/log/<svc>.stdout|.stderr` with a pid in `tmp/<svc>.pid`; programs read `input/` and write `output/`; config comes from a gitignored `.env`, with every key listed in a committed `.env.example` (verified: a key that code reads or `.env` sets but the example lacks fails the gate). `.gitignore` must cover `.env`, `var/`, `tmp/`, `output/` and `dist/`, plus the cache, package and build folders of each toolchain present (`node_modules/`, `.venv/`, `__pycache__/`, `target/`, `bin/`, `obj/`, `build/`, `.gradle/` and the like); `vae.py init` appends them, plus `.agents/SWARM_STATUS.yaml`, the live sub-agent registry.
 
@@ -340,7 +353,7 @@ If you use defuss-vae in research or want to reference it, cite it as:
   affiliation  = {Independent Researcher},
   title        = {defuss-vae: Verified Agentic Engineering},
   year         = {2026},
-  version      = {0.5.0},
+  version      = {0.6.0},
   howpublished = {\url{https://github.com/kyr0/defuss-vae}},
   note         = {Claude Code and Agent Skills plugin, MIT License}
 }
