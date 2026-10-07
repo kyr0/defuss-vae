@@ -1,6 +1,6 @@
 {
   "name": "defuss-vae",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Verified agentic engineering: lean plan, implement, verify, doc, doc-edit, wrap and status skills with forced deterministic verification, review and docs gates.",
   "author": {
     "name": "defuss"

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.0
 
 - `vae.py prose --walk <page> [--part N]` drives the catalog review of a page window by window: each step prints the part to review, the part before it as context, every catalog rule (the whole catalog on the first step), the static hits in that part and the command for the next step; past the last part it runs the static check and prints `VERIFIED[walk]`. A stdlib block scanner splits the page at headings, fences and list items and never cuts a fence.
 - `doc` and `doc-edit` review pages through the walk. `doc-edit` walks the whole page unless the prompt names parts, and its separate static-check step is gone, since the walk ends with that check.
