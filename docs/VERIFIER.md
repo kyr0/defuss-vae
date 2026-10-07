@@ -128,6 +128,8 @@ Why opt-in instead of a default heuristic such as "unit test files never affect 
 
 The agent and the hook must agree on attestation paths without environment plumbing, and writing inside the project avoids permission prompts that an out-of-project data directory triggers. Both directories write a `.gitignore` containing `*`, so they never reach `git status` even before the project adopts the layout.
 
+Each session gets the folder `tmp/vae/<yyyy-mm-dd>_<hh_mm_ss>_<n>/`, named by its UTC start time; `n` is 1, or the next free number when two sessions start in the same second, which an atomic `mkdir` settles. The harness's session id is a UUID, and a directory of UUIDs reads like leaked keys to a person and to tools that scan paths for secrets, while a start time sorts and reads at a glance. `tmp/vae/sessions.tsv` maps each session id to its folder, one line per session, and the first line for an id wins if two processes of one session register at once. A line that names no dated folder is ignored, so a damaged index cannot send a write outside `tmp/vae/`. The gate prints the full attestation path in its instructions, so the agent never derives it. `VERIFIED:` `test_session_folders_are_named_by_start_time_and_keep_their_session` covers the naming, the next number in an occupied second, the mapping across processes and the damaged line; the e2e reads the path from the gate text, as an agent does. Folders made before this change keep their session-id names until removed, and a session that started under the old naming falls back to a fresh baseline in which every dirty file counts as changed.
+
 ## Learning
 
 `VERIFIED:` a deterministic failure already represented by a failing test or rule needs no duplicate rule.

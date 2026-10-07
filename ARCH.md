@@ -14,7 +14,7 @@ flowchart LR
     C["vae.py CLI"] --> G
     L --> G["gate: verify → review → docs"]
     G -->|"runs"| P["project Makefile verbs<br/>.agents/VERIFY.py rules"]
-    G -->|"state"| S[("tmp/vae/{session}/")]
+    G -->|"state"| S[("tmp/vae/{start time}/<br/>one per session")]
     G -->|"logs"| V[("var/log/vae/")]
     G -->|"episodes"| A[(".agents/EPISODES.md")]
     C -->|"swarm"| W[(".agents/SWARM_STATUS.yaml<br/>var/log/swarm/")]

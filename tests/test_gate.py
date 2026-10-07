@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import time
 import unittest
 from pathlib import Path
 
@@ -27,6 +28,8 @@ from vae_state import (
     attestation_path,
     episode_entries,
     init_session,
+    latest_session,
+    session_dir,
     state_path,
 )
 
@@ -246,7 +249,7 @@ class GateTests(RepoCase):
         out = bounded(self.repo, "big", text)
         self.assertLess(len(out), 9000)
         self.assertTrue(out.startswith("HEAD") and out.endswith("LOOP: python3 vae.py gate"))
-        self.assertEqual((self.repo / "tmp/vae/big/gate.txt").read_text(), text)
+        self.assertEqual((session_dir(self.repo, "big") / "gate.txt").read_text(), text)
         self.assertEqual(bounded(self.repo, "big", "short"), "short")
 
     def test_commit_detection_covers_global_options(self):
@@ -288,6 +291,30 @@ class GateTests(RepoCase):
         s2 = read_json(state_path(self.repo, "same"))
         self.assertEqual(s1["baseline"], s2["baseline"])
         self.assertIn("calc.py", changed_since(self.repo, s2["baseline"]))
+
+    def test_session_folders_are_named_by_start_time_and_keep_their_session(self):
+        a = session_dir(self.repo, "2f5972a7-7149-4ace-8d4b-ea4c5a52b8b4")
+        b = session_dir(self.repo, "other")
+        self.assertRegex(a.name, r"^\d{4}-\d\d-\d\d_\d\d_\d\d_\d\d_\d+$")
+        self.assertNotEqual(a, b)
+        self.assertNotIn("2f5972a7", "".join(p.name for p in a.parent.iterdir()), "no folder carries the id")
+        # A session starting in an occupied second takes the next number (seconds ahead are taken too: the clock ticks).
+        for t in (time.time(), time.time() + 1, time.time() + 2):
+            (a.parent / (time.strftime("%Y-%m-%d_%H_%M_%S", time.gmtime(t)) + "_1")).mkdir(exist_ok=True)
+        c = session_dir(self.repo, "third")
+        self.assertNotIn(c, (a, b))
+        self.assertGreater(int(c.name.rsplit("_", 1)[1]), 1, c.name)
+        # The mapping survives a new process: the hooks run one per event.
+        code = ("import sys; sys.path.insert(0, sys.argv[1]); from vae_state import session_dir; "
+                "print(session_dir(__import__('pathlib').Path(sys.argv[2]), 'other'))")
+        p = subprocess.run([PY, "-c", code, str(ROOT / "scripts"), str(self.repo)], text=True, capture_output=True, check=True)
+        self.assertEqual(p.stdout.strip(), str(b))
+        init_session(self.repo, "other")
+        self.assertEqual(latest_session(self.repo), "other", "the CLI default resolves the id, not the folder name")
+        # A damaged index line must not redirect writes outside tmp/vae/.
+        with open(a.parent / "sessions.tsv", "a") as fh:
+            fh.write("../../escape\tevil\n")
+        self.assertEqual(session_dir(self.repo, "evil").parent, a.parent)
 
     def test_session_start_injects_only_the_newest_open_episodes(self):
         init_project(self.repo, ROOT)

@@ -96,9 +96,16 @@ def edit_feature(proj: Path) -> None:
     )
 
 
-def attest(proj: Path, fp: str) -> None:
-    vae = proj / "tmp/vae" / SID
-    (vae / "review.json").write_text(json.dumps({
+def written(text: str, kind: str) -> Path:
+    """The attestation path the gate text names: an agent learns where to write from the gate, not from the layout."""
+    m = re.search(rf"THEN write (\S+?/{kind}\.json)", text)
+    if not m:
+        raise SystemExit(f"no {kind} path in gate text:\n" + text)
+    return Path(m.group(1))
+
+
+def attest(path: Path, fp: str) -> None:
+    path.write_text(json.dumps({
         "schema": 1, "status": "VERIFIED", "code_fingerprint": fp, "reviewed_paths": ["calc.py", "test_calc.py"],
         "checklist": ["requirements", "correctness", "callers", "errors", "state-concurrency", "security", "tests", "e2e",
                       "observability", "structure", "reuse", "yagni", "smells-gotchas", "abstraction", "performance", "docs"],
@@ -106,8 +113,8 @@ def attest(proj: Path, fp: str) -> None:
     }))
 
 
-def attest_docs(proj: Path, fp: str) -> None:
-    (proj / "tmp/vae" / SID / "docs.json").write_text(json.dumps({"schema": 1, "status": "VERIFIED", "code_fingerprint": fp, "files": [{
+def attest_docs(path: Path, fp: str) -> None:
+    path.write_text(json.dumps({"schema": 1, "status": "VERIFIED", "code_fingerprint": fp, "files": [{
         "path": "calc.py", "status": "VERIFIED", "file": "not-applicable", "method": "updated", "inline": "not-applicable",
         "alternative": "operator.sub import would hide nothing and add an import", "why": "VERIFIED: subtraction is the whole contract.",
     }]}))
@@ -192,10 +199,12 @@ def main() -> int:
         step("hook.stop.ends_turn_when_active", set(again) == {"systemMessage"}, json.dumps(again)[:300])
         denied = hook(root, proj, {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "git commit -am feat"}})
         step("hook.commit.denied", denied["hookSpecificOutput"]["permissionDecision"] == "deny", denied["hookSpecificOutput"]["permissionDecisionReason"])
-        attest(proj, fp)
+        review_path = written(reason, "review")
+        step("state.dated_folder", re.fullmatch(r"\d{4}-\d\d-\d\d_\d\d_\d\d_\d\d_\d+", review_path.parent.name) is not None, review_path.parent.name)
+        attest(review_path, fp)
         docs = gate(root, proj)
         step("cli.gate.docs", docs.returncode == 2 and "GATE 3/3 docs" in docs.stdout, docs.stdout[:200])
-        attest_docs(proj, fp)
+        attest_docs(written(docs.stdout, "docs"), fp)
         done = gate(root, proj)
         step("cli.gate.done", done.returncode == 0 and "VERIFIED[gate]=true" in done.stdout, done.stdout.strip())
         step("hook.stop.allows", hook(root, proj, {"hook_event_name": "Stop", "stop_hook_active": False}) is None, "no block after gates")
@@ -222,8 +231,8 @@ def main() -> int:
         (proj / "README.md").write_text('"Calc" adds numbers, fast.\n')
         review = run([*vae, "gate", "--repo", str(proj), "--session", docs_sid], proj, ok=(2,))
         step("gate.docs_only.review", 'PAGES ["README.md"]' in review.stdout and "references/PROSE.md" in review.stdout, review.stdout[:300])
-        (proj / "tmp/vae" / docs_sid / "review.json").write_text(json.dumps({
-            **json.loads((proj / "tmp/vae" / SID / "review.json").read_text()),
+        written(review.stdout, "review").write_text(json.dumps({
+            **json.loads(review_path.read_text()),
             "code_fingerprint": fingerprint(review.stdout), "reviewed_paths": ["README.md"],
         }))
         done = run([*vae, "gate", "--repo", str(proj), "--session", docs_sid], proj)

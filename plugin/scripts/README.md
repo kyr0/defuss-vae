@@ -9,7 +9,7 @@ python3 plugin/scripts/vae.py gate --repo .
 | Command | What it does | Exit 0 when |
 |---|---|---|
 | `init` | Scaffolds what's missing: `.agents/`, `Makefile`, `.gitignore` lines, the managed `AGENTS.md` block and, on a GitHub remote, the CI workflow (unless `CONFIG["ci"]` is `False` or a workflow already runs the verification). Never overwrites. | always |
-| `gate [--session ID]` | Runs verify → review → docs for a session (default: the latest under `tmp/vae/`) and prints what's missing. | `VERIFIED[gate]=true` |
+| `gate [--session ID]` | Runs verify → review → docs for a session (default: the one whose state changed last) and prints what's missing. | `VERIFIED[gate]=true` |
 | `verify [--json] [--changed PATH]...` | The verifier alone, on the current changes or the given paths. | every required check passes |
 | `prose [--fix] [PAGE]...` | Static prose check of doc pages (default: every Markdown page). `--fix` first applies the replacements that cannot change meaning. | no findings |
 | `doctor [--repo]` | Without `--repo`: the plugin's own files. With it: the project's memory budgets, epistemic tags and layout. | nothing missing |
