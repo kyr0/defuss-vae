@@ -18,4 +18,4 @@ Only the human starts `wrap`, which commits: it sets `disable-model-invocation: 
 
 ## Security and privacy
 
-The payload contains no credentials, makes no network requests and collects no telemetry. Its attack surface is the hook input (JSON from the harness) and the project files it reads; see [`hooks/ARCH.md`](hooks/ARCH.md) and [`scripts/ARCH.md`](scripts/ARCH.md). No personal data.
+The payload contains no credentials and collects no telemetry. The hook adapter and the programs open no network connection. Their attack surface is the hook input (JSON from the harness) and the project files they read; see [`hooks/ARCH.md`](hooks/ARCH.md) and [`scripts/ARCH.md`](scripts/ARCH.md). The Makefile template that `init` copies has a `setup` verb that downloads installers, pinned tools and locked dependencies for the toolchains a project declares ([`templates/ARCH.md`](templates/ARCH.md)). Data the payload writes can identify the user: the sub-agent registry's host name and absolute paths can contain the user's name, and logs keep whatever the project's commands print.

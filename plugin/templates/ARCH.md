@@ -17,4 +17,4 @@ The `Makefile` declares the verbs the gate runs, and a bare `make` lists them wi
 
 ## Security and privacy
 
-`setup` downloads the official mise, uv and bun installers over HTTPS only when `mise.toml` or a lockfile needs them, and `mise install` fetches the pinned tools; nothing else fetches from the network. Templates contain no secrets and no personal data; `.env` stays gitignored.
+Of the Makefile template's own recipes, only `setup` reaches the network, and only for toolchains the project declares. With `mise.toml` or `.tool-versions`, it downloads the official mise installer over HTTPS when mise is missing, and `mise install` fetches the pinned tools. With `uv.lock`, `bun.lock` or `bun.lockb`, it downloads the official uv or bun installer over HTTPS when that tool is missing, and `uv sync --locked` or `bun install --frozen-lockfile` fetches the locked dependencies. `verify.yml` runs on GitHub's runners, which pull its checkout and setup actions before running `make setup` and `make verify`. Templates contain no secrets and no personal data; `.env` stays gitignored.
