@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Architecture pages match the code. The root and `plugin/` `ARCH.md` say the gate, CLI and hook adapter open no network connection while the Makefile template's `setup` downloads installers, pinned tools and locked dependencies (both had said the plugin makes no network requests), and name the host name, paths and command output that can identify the user. `plugin/templates/ARCH.md` lists every download `setup` makes and the actions `verify.yml` pulls on GitHub's runners; the root page names the release steps and the gate's cache keys.
+
 ## 0.8.0
 
 - `vae.py prose --walk <page> [--part N]` drives the catalog review of a page window by window: each step prints the part to review, the part before it as context, every catalog rule (the whole catalog on the first step), the static hits in that part and the command for the next step; past the last part it runs the static check and prints `VERIFIED[walk]`. A stdlib block scanner splits the page at headings, fences and list items and never cuts a fence.
