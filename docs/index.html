@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>defuss-vae · verified agentic engineering</title>
+  <meta name="description" content="Seven skills and small stdlib-only Python programs that verify, gate and remember: hooks deny git commit until the current code passes verify, review and docs.">
+  <script>
+    // Before paint, before df$ exists (defuss-shadcn Dark Mode guide): the saved choice, else the OS default.
+    let saved = '';
+    try { const raw = JSON.parse(localStorage.getItem('defuss-shadcn-theme')); saved = raw && raw.format === 'defuss-store' ? raw.value : raw; } catch {}
+    if (saved === 'dark' || (!saved && matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+      document.documentElement.style.colorScheme = 'dark';
+    }
+  </script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237c6cf0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/kyr0/defuss-shadcn@0.9.7/dist/components/core.min.css" integrity="sha384-XTkN5+CRRKO70LZ4OcV6O+kj6BY5lxdsRQ02oMz3kDCm9kd4B+16jbojkbgrbL0e" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/kyr0/defuss-shadcn@0.9.7/dist/theme/utils/shapes.min.css" integrity="sha384-rExm9IhHhoT1LadbK2Lip6FVim8iSP+aRnHcT+YZ6qgrYhEEjgYQsr9snhV2zr/u" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/kyr0/defuss-shadcn@0.9.7/dist/components/all.min.css" integrity="sha384-KNQj/Dk66BgA6c4mbwGVJt0hPZbRc8WN1s34HBwecCHZnN3vp631ctFMQgIjDo2f" crossorigin="anonymous">
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<svg class="sr-only" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2m-7.07-17.07 1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-7-7 7 7-7 7"/></symbol>
+  <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14m7-7-7 7-7-7"/></symbol>
+  <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7M12 19V5"/></symbol>
+  <symbol id="i-external" viewBox="0 0 24 24"><path d="M7 7h10v10M7 17 17 7"/></symbol>
+  <symbol id="i-github" viewBox="0 0 24 24"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></symbol>
+  <symbol id="i-linkedin" viewBox="0 0 24 24"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2z"/><circle cx="4" cy="4" r="2"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 24 24"><path d="m4 17 6-6-6-6m8 14h8"/></symbol>
+  <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.14-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.14a.5.5 0 0 1 .96 0l1.58 6.14a2 2 0 0 0 1.44 1.44l6.14 1.58a.5.5 0 0 1 0 .96l-6.14 1.58a2 2 0 0 0-1.44 1.44l-1.58 6.14a.5.5 0 0 1-.96 0z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M10 12.5 8 15l2 2.5m4-5 2 2.5-2 2.5M14 2v4a2 2 0 0 0 2 2h4"/><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+  <symbol id="i-bot" viewBox="0 0 24 24"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2m16 0h2m-7-1v2m-6-2v2"/></symbol>
+  <symbol id="i-package" viewBox="0 0 24 24"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12m0 0 8.7-5M12 12 3.3 7"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12.83 2.18 8.58 3.9a1 1 0 0 1 0 1.83l-8.58 3.9a2 2 0 0 1-1.66 0L2.6 7.91a1 1 0 0 1 0-1.83l8.58-3.9a2 2 0 0 1 1.66 0Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65M22 12.65l-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+</svg>
+
+<div class="vae-page" id="top">
+  <header class="mk-header" data-variant="floating">
+    <div class="mk-header-inner">
+      <a href="#top" class="mk-header-brand"><svg class="vae-icon" aria-hidden="true"><use href="#i-logo"/></svg><span class="mk-header-name">defuss-vae</span></a>
+      <nav class="mk-header-nav" aria-label="Main">
+        <ul class="nav-menu-list">
+          <li class="nav-menu-item"><a class="nav-menu-link" href="#how">How it works</a></li>
+          <li class="nav-menu-item"><a class="nav-menu-link" href="#workflow">Workflow</a></li>
+          <li class="nav-menu-item"><a class="nav-menu-link" href="#evidence">Evidence</a></li>
+          <li class="nav-menu-item"><a class="nav-menu-link" href="#install">Install</a></li>
+        </ul>
+      </nav>
+      <div class="mk-header-actions">
+        <a class="btn mk-header-wide" data-variant="outline" data-size="sm" href="https://shadcn.defuss.org/full-paper.html" target="_blank" rel="noopener"><svg class="vae-icon" aria-hidden="true"><use href="#i-book"/></svg>Paper<span class="sr-only"> (opens in a new tab)</span></a>
+        <label class="swap" data-variant="rotate" data-size="sm">
+          <input type="checkbox" id="theme-toggle" aria-label="Dark mode">
+          <span class="swap-on"><svg class="vae-icon" aria-hidden="true"><use href="#i-moon"/></svg></span>
+          <span class="swap-off"><svg class="vae-icon" aria-hidden="true"><use href="#i-sun"/></svg></span>
+        </label>
+        <a class="btn mk-header-wide" data-variant="ghost" data-size="icon" href="https://github.com/kyr0/defuss-vae" aria-label="defuss-vae on GitHub"><svg class="vae-icon" aria-hidden="true"><use href="#i-github"/></svg></a>
+        <button type="button" class="btn mk-header-menu" data-variant="ghost" data-size="icon" data-sheet-trigger="vae-menu" aria-haspopup="dialog" aria-label="Open menu"><svg class="vae-icon" aria-hidden="true"><use href="#i-menu"/></svg></button>
+      </div>
+    </div>
+    <dialog id="vae-menu" class="sheet" data-side="right" role="dialog" aria-modal="true" aria-labelledby="vae-menu-title">
+      <div class="sheet-content">
+        <div class="sheet-header">
+          <h2 class="sheet-title" id="vae-menu-title">defuss-vae</h2>
+        </div>
+        <div class="sheet-body">
+          <p class="mk-header-sheet-label">This page</p>
+          <ul class="mk-header-sheet-nav">
+            <li><a href="#how" data-sheet-close>How it works <small>Two loops: fix the work, codify the lessons</small></a></li>
+            <li><a href="#workflow" data-sheet-close>Workflow <small>Hooks, skills and your part</small></a></li>
+            <li><a href="#evidence" data-sheet-close>Evidence <small>What the paper observed</small></a></li>
+            <li><a href="#install" data-sheet-close>Install <small>Claude Code, Codex, any agent</small></a></li>
+          </ul>
+        </div>
+        <div class="sheet-footer mk-header-sheet-actions">
+          <a class="btn" data-variant="outline" href="https://shadcn.defuss.org/full-paper.html" target="_blank" rel="noopener"><svg class="vae-icon" aria-hidden="true"><use href="#i-book"/></svg>Read the paper<span class="sr-only"> (opens in a new tab)</span></a>
+          <a class="btn" data-variant="outline" href="https://github.com/kyr0/defuss-vae">GitHub</a>
+        </div>
+      </div>
+    </dialog>
+  </header>
+
+  <main class="vae-main">
+
+    <section class="parallax" aria-label="Introduction" style="padding-block:clamp(4rem, 10vw, 7rem) 1rem">
+      <div class="parallax-layer" data-depth="far" aria-hidden="true">
+        <div class="pattern-grid" style="width:100%;height:100%;--shape-ink:color-mix(in oklch, var(--foreground) 7%, transparent);--shape-pattern:32px;mask-image:radial-gradient(55% 60% at 50% 45%, #000, transparent 75%)"></div>
+      </div>
+      <div class="parallax-layer" data-depth="mid" aria-hidden="true" style="--parallax-speed:22%;mask-image:linear-gradient(#000 55%, transparent 92%)">
+        <div class="corner-blob" style="position:absolute;inset-block-start:10%;inset-inline-start:8%;width:min(22rem, 45%);aspect-ratio:1;background:color-mix(in oklch, var(--chart-1) 40%, transparent);filter:blur(60px);opacity:.55"></div>
+        <div class="corner-blob-3" style="position:absolute;inset-block-start:28%;inset-inline-end:6%;width:min(18rem, 40%);aspect-ratio:1;background:color-mix(in oklch, var(--chart-3) 40%, transparent);filter:blur(60px);opacity:.5"></div>
+      </div>
+      <div class="parallax-content">
+        <section class="mk-hero" style="width:100%">
+          <div class="mk-hero-copy">
+            <a class="mk-hero-pill" href="#how"><span class="badge" data-variant="default" data-size="sm">v0.8.0</span>Verified Agentic Engineering: no commit until the gate is green <svg class="vae-icon" aria-hidden="true"><use href="#i-arrow"/></svg></a>
+            <h1 class="mk-hero-title">Your agents <strong>learn to write</strong> the programs that <i>decide</i> when work is done</h1>
+            <p class="vae-flip"><span class="text-rotate"><span>
+                <span class="vae-accent">verify → review → docs</span>
+                <span class="vae-accent">hooks that fail closed</span>
+                <span class="vae-accent">your own make verbs</span>
+                <span class="vae-accent">lessons that become tests</span>
+                <span class="vae-accent">about 0.1&nbsp;s of overhead</span>
+                <span class="vae-accent">Claude Code, Codex &amp; more</span>
+            </span></span></p>
+            <p class="mk-hero-desc">A prompt can ask a coding agent to run the tests, mock nothing and clean up its debug prints, but it cannot make the agent do it. defuss-vae moves the checks out of the prompt and into code: hooks deny <code>git commit</code> and send the agent back to work when it stops early, until the current code passes <strong>verify → review → docs</strong>. With <code>wrap</code>, the agent codifies each lesson into the verifier, as a test or a rule that every later gate runs; only a lesson no program can check stays a memory line.</p>
+            <div class="mk-hero-actions">
+              <a class="btn" data-size="lg" href="#install">Install in a minute<svg class="vae-icon" aria-hidden="true"><use href="#i-arrow-down"/></svg></a>
+              <a class="btn" data-variant="outline" data-size="lg" href="https://shadcn.defuss.org/full-paper.html" target="_blank" rel="noopener">Read the paper<svg class="vae-icon vae-ext" aria-hidden="true"><use href="#i-external"/></svg><span class="sr-only"> (opens in a new tab)</span></a>
+            </div>
+            <p class="mk-hero-note">Method, plugin and paper by <a href="https://www.linkedin.com/in/aronhomberg/" target="_blank" rel="noopener">Aron Homberg (kyr0)<svg class="vae-icon vae-ext" aria-hidden="true"><use href="#i-external"/></svg><span class="sr-only"> (opens in a new tab)</span></a> – Open Source (<a href="https://github.com/kyr0/defuss-vae/blob/main/LICENSE" target="_blank" rel="noopener">MIT<svg class="vae-icon vae-ext" aria-hidden="true"><use href="#i-external"/></svg><span class="sr-only"> (opens in a new tab)</span></a>)</p>
+          </div>
+        </section>
+        <div class="vae-intro" id="benefits">
+          <section class="vae-intro-item" aria-labelledby="b-1">
+            <span class="vae-intro-icon" aria-hidden="true"><svg class="vae-icon"><use href="#i-lock"/></svg></span>
+            <h3 id="b-1">A gate the agent can't talk past</h3>
+            <p>Hooks deny <code>git commit</code> until the exact code fingerprint is <strong>verified, reviewed and documented</strong>. A prompt can be ignored; a denied commit cannot. Any edit changes the fingerprint and restarts the gate.</p>
+          </section>
+          <section class="vae-intro-item" aria-labelledby="b-2">
+            <span class="vae-intro-icon" aria-hidden="true"><svg class="vae-icon"><use href="#i-ban"/></svg></span>
+            <h3 id="b-2">Fails closed</h3>
+            <p>A crashing gate <strong>denies the commit</strong> and blocks the stop once, instead of waving changes through. Hooks run on plain <code>python3</code> 3.9 or newer, stdlib only: no dependencies, no daemon, no <code>uv</code> in the hook path.</p>
+          </section>
+          <section class="vae-intro-item" aria-labelledby="b-3">
+            <span class="vae-intro-icon" aria-hidden="true"><svg class="vae-icon"><use href="#i-terminal"/></svg></span>
+            <h3 id="b-3">Your checks, your toolchain</h3>
+            <p>The gate runs <strong>your Makefile verbs</strong> (lint, test, coverage, e2e) and the rules in <code>.agents/VERIFY.py</code>. Defaults for Go, Rust, JVM, .NET, JS/TS and Python fill the gaps, and an existing toolchain stays.</p>
+          </section>
+          <section class="vae-intro-item" aria-labelledby="b-4">
+            <span class="vae-intro-icon" aria-hidden="true"><svg class="vae-icon"><use href="#i-sparkles"/></svg></span>
+            <h3 id="b-4">Lessons become verifier code</h3>
+            <p><code>wrap</code> codifies each lesson into <strong>a test or a <code>VERIFY.py</code> rule</strong>, so every later gate checks for it, whatever the agent remembers. Only a lesson no program can check stays one memory line, within 4&nbsp;KiB.</p>
+          </section>
+          <section class="vae-intro-item" aria-labelledby="b-5">
+            <span class="vae-intro-icon" aria-hidden="true"><svg class="vae-icon"><use href="#i-file"/></svg></span>
+            <h3 id="b-5">Docs are gated too</h3>
+            <p>Every changed page passes a static prose check and a review, window by window, against a <strong>58-rule catalog</strong>: evidence, logic, terms, relevance, structure, language and typography.</p>
+          </section>
+          <section class="vae-intro-item" aria-labelledby="b-6">
+            <span class="vae-intro-icon" aria-hidden="true"><svg class="vae-icon"><use href="#i-user"/></svg></span>
+            <h3 id="b-6">You stay in charge</h3>
+            <p>The agent starts six skills when their step comes. A risky task without your plan gets one <strong>for your review first</strong>; only you start <code>wrap</code>, which commits, and nothing is pushed or released without you.</p>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <div class="vae-flythrough">
+      <section class="parallax" data-sticky style="--parallax-length:4" aria-label="From plan to release">
+        <div class="parallax-stage" style="background:radial-gradient(circle at 50% 50%, color-mix(in oklch, var(--chart-3) 55%, #05060f), #05060f 72%);color:#fff;border-radius:var(--radius-xl)">
+          <div class="parallax-layer" data-motion="zoom fade" style="--parallax-scale:6"><svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><circle cx="200" cy="200" r="60" fill="none" stroke="#7c8cff" stroke-width="1.5" opacity=".7"/><circle cx="200" cy="200" r="110" fill="none" stroke="#b07cff" stroke-width="1" opacity=".5"/><circle cx="200" cy="200" r="170" fill="none" stroke="#7cf0ff" stroke-width=".8" opacity=".35"/></svg></div>
+          <div class="parallax-layer" data-motion="pass" style="animation-range:contain 0% contain 24%;z-index:1"><p class="vae-fly-line">Plan agentic</p></div>
+          <div class="parallax-layer" data-motion="pass" style="animation-range:contain 15% contain 39%;z-index:2"><p class="vae-fly-line">Agent swarm implements</p></div>
+          <div class="parallax-layer" data-motion="pass" style="animation-range:contain 30% contain 54%;z-index:3"><p class="vae-fly-line">Verifier binds agent to quality</p></div>
+          <div class="parallax-layer" data-motion="pass" style="animation-range:contain 46% contain 70%;z-index:4"><p class="vae-fly-line">Tiny review for humans</p></div>
+          <div class="parallax-layer" data-motion="pass" style="animation-range:contain 61% contain 85%;z-index:5"><p class="vae-fly-line">Agentic self-learning, semantic commits, changelog updates</p></div>
+          <div class="parallax-layer" data-motion="pass" style="animation-range:contain 76% contain 100%;z-index:6"><p class="vae-fly-line">Human in control for every release</p></div>
+          <div class="parallax-layer" data-motion="spin" style="--parallax-turn:180deg;--parallax-speed:0%;z-index:-1;opacity:.25"><svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width=".6"><line x1="200" y1="200" x2="460" y2="200"/><line x1="200" y1="200" x2="425.2" y2="330"/><line x1="200" y1="200" x2="330" y2="425.2"/><line x1="200" y1="200" x2="200" y2="460"/><line x1="200" y1="200" x2="70" y2="425.2"/><line x1="200" y1="200" x2="-25.2" y2="330"/><line x1="200" y1="200" x2="-60" y2="200"/><line x1="200" y1="200" x2="-25.2" y2="70"/><line x1="200" y1="200" x2="70" y2="-25.2"/><line x1="200" y1="200" x2="200" y2="-60"/><line x1="200" y1="200" x2="330" y2="-25.2"/><line x1="200" y1="200" x2="425.2" y2="70"/></g></svg></div>
+        </div>
+      </section>
+    </div>
+
+    <section id="how" class="container vae-section parallax-reveal" aria-labelledby="how-title">
+      <section class="mk-features" style="width:100%">
+        <div class="mk-features-head">
+          <span class="mk-features-eyebrow">How it works</span>
+          <h2 class="mk-features-title" id="how-title">🔁 Two loops: one fixes the work, one codifies the lessons</h2>
+          <p class="mk-features-desc">Programs check the work and tell the agent what remains; the agent fixes it and runs the gate again. The second loop codifies what the work taught into the verifier itself, so every later gate checks it; memory holds only what no program can check. <a href="https://shadcn.defuss.org/full-paper.html" target="_blank" rel="noopener">Figure 1 of the paper<svg class="vae-icon vae-ext" aria-hidden="true"><use href="#i-external"/></svg><span class="sr-only"> (opens in a new tab)</span></a> describes the general mechanism; this is how defuss-vae 0.8.0 implements it.</p>
+        </div>
+        <figure class="diagram vae-loop" id="loop" data-type="flow" data-steps data-autoplay="400" data-fit="none" aria-label="The defuss-vae loop: you set the goal, the SessionStart hook loads rules and memory, the agent edits code, tests and pages, the gate verifies, reviews and checks docs; remaining work returns to the agent and a green gate allows the commit. Every outcome becomes an episode; wrap codifies each lesson into the verifier, which every later gate runs, and only a lesson no program can check becomes a memory line for the next session">
+          <div class="diagram-canvas" style="--cols:5;--diagram-node-w:11rem">
+            <div class="diagram-node" data-node="you" data-tone="link" data-shape="pill" data-step="1" data-step-label="You set the goal" style="--col:2;--row:1">
+              <span class="diagram-node-name">You</span>
+              <span class="diagram-node-meta">goal · plan · approval</span>
+            </div>
+            <div class="diagram-node" data-node="start" data-step="2" data-step-label="Session start loads the context" style="--col:1;--row:2">
+              <span class="diagram-node-eyebrow">SessionStart hook</span>
+              <span class="diagram-node-name">Task context</span>
+              <span class="diagram-node-meta">rules · stack defaults · memory</span>
+            </div>
+            <div class="diagram-node" data-node="agent" data-tone="accent" data-step="3" data-step-label="The agent works" style="--col:2;--row:2">
+              <span class="diagram-node-eyebrow">Model in harness</span>
+              <span class="diagram-node-name">Coding agent</span>
+              <span class="diagram-node-meta">plan · implement · fix</span>
+            </div>
+            <div class="diagram-node" data-node="work" data-step="4" data-step-label="Code, tests and pages change" style="--col:3;--row:2">
+              <span class="diagram-node-eyebrow">Artifacts</span>
+              <span class="diagram-node-name">Code · tests · pages</span>
+              <span class="diagram-node-meta">one content fingerprint</span>
+            </div>
+            <div class="diagram-node" data-node="gate" data-step="5" data-step-label="The gate checks the fingerprint" style="--col:4;--row:2">
+              <span class="diagram-node-eyebrow">Stop hook · vae.py gate</span>
+              <span class="diagram-node-name">Gate</span>
+              <span class="diagram-node-meta">verify → review → docs</span>
+              <ul class="diagram-node-chips"><li>your make verbs</li></ul>
+            </div>
+            <div class="diagram-node" data-node="out" data-tone="warn" data-step="6" data-step-label="Remaining work goes back to the agent" style="--col:3;--row:3">
+              <span class="diagram-node-eyebrow">Program output</span>
+              <span class="diagram-node-name">FIX · REMAINS</span>
+              <span class="diagram-node-meta">the next instruction</span>
+            </div>
+            <div class="diagram-node" data-node="commit" data-tone="ok" data-shape="pill" data-step="7" data-step-label="A green gate allows the commit" style="--col:5;--row:2">
+              <span class="diagram-node-name">git commit</span>
+              <span class="diagram-node-meta">denied until green</span>
+            </div>
+            <div class="diagram-node" data-node="episodes" data-shape="store" data-step="8" data-step-label="Every outcome becomes an episode" style="--col:5;--row:3">
+              <span class="diagram-node-name">EPISODES.md</span>
+              <span class="diagram-node-meta">FAIL · DONE · FINDING</span>
+            </div>
+            <div class="diagram-node" data-node="wrap" data-step="9" data-step-label="wrap reconciles the lessons" style="--col:5;--row:4">
+              <span class="diagram-node-eyebrow">You start wrap</span>
+              <span class="diagram-node-name">Reconcile</span>
+              <span class="diagram-node-meta">codify · audit · commit</span>
+            </div>
+            <div class="diagram-node" data-node="verifier" data-tone="accent" data-step="10" data-step-label="wrap codifies each lesson into the verifier, which every later gate runs" style="--col:4;--row:4">
+              <span class="diagram-node-eyebrow">Codified lessons</span>
+              <span class="diagram-node-name">Verifier code</span>
+              <span class="diagram-node-meta">tests · VERIFY.py rules</span>
+            </div>
+            <div class="diagram-node" data-node="memory" data-step="11" data-step-label="Only a lesson no program can check stays a memory line" style="--col:1;--row:3">
+              <span class="diagram-node-eyebrow">Only if no check fits</span>
+              <span class="diagram-node-name">MEMORY.md</span>
+              <span class="diagram-node-meta">one line with its reason</span>
+            </div>
+          </div>
+          <ol class="diagram-edges">
+            <li class="diagram-edge" data-from="you" data-to="agent" data-line="dashed">goal</li>
+            <li class="diagram-edge" data-from="start" data-to="agent">load</li>
+            <li class="diagram-edge" data-from="agent" data-to="work" data-flow="2400" data-flow-delay="0"></li>
+            <li class="diagram-edge" data-from="work" data-to="gate" data-flow="2400" data-flow-delay="700"></li>
+            <li class="diagram-edge" data-from="gate" data-to="out" data-tone="accent" data-flow="2400" data-flow-delay="1400">remaining</li>
+            <li class="diagram-edge" data-from="out" data-to="agent" data-tone="accent" data-flow="2400" data-flow-delay="2100">next call</li>
+            <li class="diagram-edge" data-from="gate" data-to="commit" data-tone="ok">green</li>
+            <li class="diagram-edge" data-from="gate:bottom" data-to="episodes:left">outcomes</li>
+            <li class="diagram-edge" data-from="episodes:bottom" data-to="wrap:top">leads</li>
+            <li class="diagram-edge" data-from="wrap:left" data-to="verifier:right" data-tone="accent" data-line="thick">codify</li>
+            <li class="diagram-edge" data-from="verifier:top" data-to="gate:bottom" data-tone="accent" data-line="thick">every gate runs it</li>
+            <li class="diagram-edge" data-from="wrap:bottom" data-to="memory:bottom" data-line="dashed">else one line</li>
+            <li class="diagram-edge" data-from="memory" data-to="start" data-line="dashed">next session</li>
+          </ol>
+        </figure>
+        <p class="vae-footnote vae-scroll-hint">Scroll the diagram sideways to see the whole loop.</p>
+      </section>
+
+      <div class="vae-reads">
+        <div class="vae-prose">
+          <h3>What the agent reads</h3>
+          <p>The gate's output is plain text the harness hands to the model's next call: which checks passed, which remain, and the command that fixes each one. Checking, selecting the next window of a page and formatting the output make no model call.</p>
+          <p>The output lines are captured verbatim from defuss-vae 0.8.0 on a small fixture, as printed in the paper's Figure 2: a temporary probe marker on line 2 fails the built-in hygiene rule, and the same check passes once the agent removes it.</p>
+        </div>
+        <div class="mockup-code" data-chrome="mac" data-title="vae.py gate" data-wrap>
+          <pre data-prefix="$"><code>python3 vae.py gate --repo .</code></pre>
+          <pre data-tone="destructive"><code>VERIFIED[hygiene.probes]=false BC glob='*' files=1; hits=['component.ts:2']</code></pre>
+          <pre><code>PROVEN: ∅</code></pre>
+          <pre data-tone="warning"><code>REMAINS: hygiene.probes</code></pre>
+          <pre data-tone="info"><code>AGENT_CMD: FIX hygiene.probes: component.ts:2</code></pre>
+          <pre data-prefix="#" data-tone="muted"><code>the agent removes the marker and calls the gate again</code></pre>
+          <pre data-prefix="$"><code>python3 vae.py gate --repo .</code></pre>
+          <pre data-tone="success"><code>VERIFIED[hygiene.probes]=true BC glob='*' files=1</code></pre>
+          <pre><code>PROVEN: hygiene.probes</code></pre>
+          <pre data-tone="success"><code>REMAINS: ∅</code></pre>
+          <pre data-cursor><code>AGENT_CMD: ∅</code></pre>
+        </div>
+      </div>
+
+      <div class="vae-codify" id="lessons">
+        <div class="vae-prose">
+          <h3>Lessons become code, not just memory</h3>
+          <p>A lesson the agent only remembers depends on the next session reading it and acting on it. A lesson codified into the verifier is checked by every later gate, in every session, whatever the agent remembers. So <code>wrap</code> promotes each lesson to the strongest form that fits: a test or a <code>.agents/VERIFY.py</code> rule first, a memory line only when no program can check it, and it deletes the written lesson once a check enforces it.</p>
+          <p>The paper records this in its study: one human correction (the rendered API pages lacked each state's configuration) became an end-to-end audit of all 59 component pages, so later work checks that requirement without the original exchange (section 5.1). Over the study the verifier grew from 33 to 87 checks, while <code>MEMORY.md</code> held eight entries in 2,311 bytes from October 6 to the end (sections 2.4 and 4.1).</p>
+        </div>
+        <div class="vae-codify-side">
+          <ol class="vae-ladder" aria-label="Where a lesson goes, strongest form first">
+            <li class="vae-rung" data-rank="1"><span class="vae-rung-name">Test or <code>VERIFY.py</code> rule</span><span class="vae-rung-desc">A program: every later gate runs it, and its failure tells the agent what to fix.</span></li>
+            <li class="vae-rung" data-rank="2"><span class="vae-rung-name"><code>MEMORY.md</code> line</span><span class="vae-rung-desc">One line with its reason, loaded at every session start: 240 characters, 4&nbsp;KiB in all.</span></li>
+            <li class="vae-rung" data-rank="3"><span class="vae-rung-name"><code>EPISODES.md</code> entry</span><span class="vae-rung-desc">A lead the gate logs; <code>wrap</code> promotes it to a rung above or deletes it with evidence.</span></li>
+          </ol>
+          <div class="mockup-code" data-chrome="mac" data-title=".agents/VERIFY.py">
+            <pre data-prefix="#" data-tone="muted"><code>every rule has this shape; this one ships in the template</code></pre>
+            <pre data-prefix="#" data-tone="muted"><code>(pattern shortened)</code></pre>
+            <pre><code>RULES = [{</code></pre>
+            <pre><code>    "id": "tests.no-mocks",</code></pre>
+            <pre><code>    "kind": "not_regex",</code></pre>
+            <pre><code>    "glob": "*",</code></pre>
+            <pre><code>    "pattern": r"unittest\.mock|MagicMock\(|…",</code></pre>
+            <pre><code>    "claim": "tests exercise real subsystems, not mock frameworks",</code></pre>
+            <pre><code>}]</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="workflow" class="container vae-section parallax-reveal" aria-labelledby="workflow-title">
+      <header class="mk-section-header">
+        <div class="mk-section-header-copy">
+          <span class="mk-section-header-eyebrow">Workflow</span>
+          <h2 class="mk-section-header-title" id="workflow-title">🧭 What runs by itself, what the agent starts, what stays yours</h2>
+          <p class="mk-section-header-desc">Seven skills, one gate the hooks enforce, and two steps no program takes for you. Skill names show the skills-CLI form; the Claude Code plugin namespaces them (<code>/defuss-vae:plan</code>) and Codex writes <code>$plan</code>.</p>
+        </div>
+      </header>
+      <div class="vae-kinds">
+        <section class="vae-kind" data-kind="hook" aria-labelledby="k-hook">
+          <h3 id="k-hook"><svg class="vae-icon" aria-hidden="true"><use href="#i-zap"/></svg>Hook · plugin</h3>
+          <p>Runs by itself. SessionStart loads rules and memory; the Stop hook runs the same gate the agent loops in-turn and blocks once per turn; PreToolUse denies <code>git commit</code> until that gate is green for the current code.</p>
+        </section>
+        <section class="vae-kind" data-kind="skill" aria-labelledby="k-skill">
+          <h3 id="k-skill"><svg class="vae-icon" aria-hidden="true"><use href="#i-bot"/></svg>Skill</h3>
+          <p>A slash command with its own procedure. You can start any of them; the agent starts six when their condition holds.</p>
+        </section>
+        <section class="vae-kind" data-kind="manual" aria-labelledby="k-manual">
+          <h3 id="k-manual"><svg class="vae-icon" aria-hidden="true"><use href="#i-user"/></svg>Manual</h3>
+          <p>Your call. You read the commits and decide what is pushed, tagged and released.</p>
+        </section>
+      </div>
+      <div class="table-container vae-table">
+        <table class="table">
+          <caption class="table-caption">The stages of a task, from plan to release.</caption>
+          <thead>
+            <tr class="table-row">
+              <th class="table-head" scope="col">Stage</th>
+              <th class="table-head" scope="col">Kind</th>
+              <th class="table-head" scope="col">Who drives it</th>
+              <th class="table-head" scope="col">What it does</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="table-row">
+              <td class="table-cell">/plan</td>
+              <td class="table-cell"><span class="badge" data-variant="secondary" data-size="sm">Skill</span></td>
+              <td class="table-cell">you; the agent only for a risky task you gave no plan for</td>
+              <td class="table-cell">Traces the real code path, probes unknowns instead of guessing and writes the smallest plan, in which every acceptance criterion is an executable check, to <code>plans/</code>. A plan the agent started waits for your review.</td>
+            </tr>
+            <tr class="table-row">
+              <td class="table-cell">/implement</td>
+              <td class="table-cell"><span class="badge" data-variant="secondary" data-size="sm">Skill</span></td>
+              <td class="table-cell">you or the agent, fully agentic</td>
+              <td class="table-cell">Understands first, fixes the root cause and its sibling callers, writes the minimum code, adds tests against real subsystems and loops the gate in-turn.</td>
+            </tr>
+            <tr class="table-row">
+              <td class="table-cell">/verify</td>
+              <td class="table-cell"><span class="badge" data-variant="secondary" data-size="sm">Skill</span></td>
+              <td class="table-cell">the agent at a goal or milestone; you any time</td>
+              <td class="table-cell">Reviews against requirements, callers and tests, and fixes the defects it confirms: the whole change when it is large, otherwise its paths and tests.</td>
+            </tr>
+            <tr class="table-row">
+              <td class="table-cell">gate</td>
+              <td class="table-cell"><span class="badge" data-variant="default" data-size="sm">Hook</span></td>
+              <td class="table-cell">hooks, automatic</td>
+              <td class="table-cell"><strong>verify</strong> runs the project's own <code>make</code> verbs; <strong>review</strong> checks requirements, every changed path and its callers; <strong>docs</strong> records why this design beats the plausible alternative. Doc pages get the prose check and catalog review instead of the test suites.</td>
+            </tr>
+            <tr class="table-row">
+              <td class="table-cell">/doc</td>
+              <td class="table-cell"><span class="badge" data-variant="secondary" data-size="sm">Skill</span></td>
+              <td class="table-cell">you any time; the agent after implementing</td>
+              <td class="table-cell">Writes and checks documentation pages: claims grounded in code and tests, Mermaid where the content is schematic, then the static prose check and a walk through each page against every catalog rule.</td>
+            </tr>
+            <tr class="table-row">
+              <td class="table-cell">/doc-edit</td>
+              <td class="table-cell"><span class="badge" data-variant="secondary" data-size="sm">Skill</span></td>
+              <td class="table-cell">you any time; the agent after <code>doc</code></td>
+              <td class="table-cell">Edits the named pages as instructed with the same grounding, then walks each one against every catalog rule, the whole page unless you name parts.</td>
+            </tr>
+            <tr class="table-row">
+              <td class="table-cell">/wrap</td>
+              <td class="table-cell"><span class="badge" data-variant="secondary" data-size="sm">Skill</span></td>
+              <td class="table-cell">only you, since it commits</td>
+              <td class="table-cell">Splits the work into coherent Conventional Commits, updates <code>CHANGELOG.md</code> and codifies what the work taught into the verifier as tests or <code>VERIFY.py</code> rules; only a lesson no program can check becomes a concise memory line with its reason. Then it audits agent memory against the current code.</td>
+            </tr>
+            <tr class="table-row">
+              <td class="table-cell">/status</td>
+              <td class="table-cell"><span class="badge" data-variant="secondary" data-size="sm">Skill</span></td>
+              <td class="table-cell">you or the agent, any time</td>
+              <td class="table-cell">Shows what runs (sub-agents, the service, free disk, RAM and GPU), reconciles the sub-agent registry with the process table and names the next step per agent.</td>
+            </tr>
+            <tr class="table-row">
+              <td class="table-cell">human review</td>
+              <td class="table-cell"><span class="badge" data-variant="outline" data-size="sm">Manual</span></td>
+              <td class="table-cell">you</td>
+              <td class="table-cell">You read the commits. Nothing has been pushed yet.</td>
+            </tr>
+            <tr class="table-row">
+              <td class="table-cell">release</td>
+              <td class="table-cell"><span class="badge" data-variant="outline" data-size="sm">Manual</span></td>
+              <td class="table-cell">you, via CI/CD</td>
+              <td class="table-cell">Push, tag, publish to package managers. On GitHub, <code>init</code> adds a workflow that runs the same <code>make setup</code> and <code>make verify</code>, so CI runs the same gate.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="evidence" class="container vae-section parallax-reveal" aria-labelledby="evidence-title">
+      <section class="mk-stats" style="width:100%">
+        <div class="mk-stats-layout">
+          <div class="mk-stats-copy">
+            <div class="mk-stats-head">
+              <h2 class="mk-stats-title" id="evidence-title">Observed, not promised<sup class="vae-footnote-mark">*</sup></h2>
+              <p class="mk-stats-desc">From the technical report <a href="https://shadcn.defuss.org/full-paper.html" target="_blank" rel="noopener">Verified Agentic Engineering in Practice<svg class="vae-icon vae-ext" aria-hidden="true"><use href="#i-external"/></svg><span class="sr-only"> (opens in a new tab)</span></a> (Homberg, October 2026): the defuss-shadcn component system, developed under the VAE method from 2026-09-05 to 2026-10-07, measured from git, verifier output and session transcripts.</p>
+            </div>
+            <div class="mk-stats-grid">
+              <div class="mk-stat"><span class="mk-stat-value">55 → 231</span><span class="mk-stat-label">components in 33 days, across 220 commits and 17 releases, while the verifier grew from 33 to 87 checks</span></div>
+              <div class="mk-stat"><span class="mk-stat-value">59 / 59</span><span class="mk-stat-label">interactive components got typed API documentation in one session, with one human correction</span></div>
+              <div class="mk-stat"><span class="mk-stat-value">31.6% → 75.6%</span><span class="mk-stat-label">line coverage in 20.6 minutes; two contract tests exercised every interactive component</span></div>
+              <div class="mk-stat"><span class="mk-stat-value">85 / 85</span><span class="mk-stat-label">minified artifacts byte-identical after the agent removed 1,147 type errors</span></div>
+            </div>
+            <p class="vae-footnote">* One project, one maintainer, one model family, no control group; the task windows include contemporaneous work and are not controlled benchmarks (report, section 6). A green gate establishes its encoded checks, not unspecified behavior, and a review attestation records the agent's claim, not its quality. The gate's own share of a cold run is about 105&nbsp;ms (<code>make bench</code>, defuss-vae 0.6.0, Apple M4, medians of 7 runs; see the README).</p>
+          </div>
+          <figure class="mk-stats-media card vae-tasks">
+            <figcaption class="card-header"><h3 class="card-title">Four repository-wide changes, one session</h3><p class="card-description">2026-10-06, from each request to its reported endpoint (report, Table 2).</p></figcaption>
+            <div class="card-content">
+              <div class="table-container">
+                <table class="table" data-size="sm">
+                  <thead>
+                    <tr class="table-row">
+                      <th class="table-head" scope="col">Task</th>
+                      <th class="table-head" scope="col" data-numeric>Minutes</th>
+                      <th class="table-head" scope="col" data-numeric>Tool calls</th>
+                      <th class="table-head" scope="col" data-numeric>Human corrections</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr class="table-row"><td class="table-cell">Typed API docs, 59 components</td><td class="table-cell" data-numeric>241.9</td><td class="table-cell" data-numeric>437</td><td class="table-cell" data-numeric>1</td></tr>
+                    <tr class="table-row"><td class="table-cell">Test coverage 31.6% → 75.6%</td><td class="table-cell" data-numeric>20.6</td><td class="table-cell" data-numeric>48</td><td class="table-cell" data-numeric>0</td></tr>
+                    <tr class="table-row"><td class="table-cell">Layout: 228 folders, 19 sections</td><td class="table-cell" data-numeric>43.4</td><td class="table-cell" data-numeric>98</td><td class="table-cell" data-numeric>0</td></tr>
+                    <tr class="table-row"><td class="table-cell">Type errors 1,147 → 0</td><td class="table-cell" data-numeric>27.3</td><td class="table-cell" data-numeric>130</td><td class="table-cell" data-numeric>0</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </figure>
+        </div>
+      </section>
+    </section>
+
+    <div class="vae-flythrough">
+      <section class="parallax" data-sticky style="--parallax-length:4" aria-label="What keeps the agent efficient">
+        <div class="parallax-stage" style="background:radial-gradient(circle at 50% 50%, color-mix(in oklch, var(--chart-5) 70%, #120612), #0a0510 72%);color:#fff;border-radius:var(--radius-xl)">
+          <div class="parallax-layer" data-motion="zoom fade" style="--parallax-scale:6"><svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><rect x="140" y="140" width="120" height="120" rx="18" fill="none" stroke="#ffb27c" stroke-width="1.5" opacity=".7"/><rect x="95" y="95" width="210" height="210" rx="32" fill="none" stroke="#ff7cc8" stroke-width="1" opacity=".5"/><rect x="40" y="40" width="320" height="320" rx="48" fill="none" stroke="#ffe07c" stroke-width=".8" opacity=".35"/></svg></div>
+          <div class="parallax-layer" data-motion="pass" style="animation-range:contain 0% contain 24%;z-index:1"><p class="vae-fly-line" data-tone="warm">Templates to counter agentic derails</p></div>
+          <div class="parallax-layer" data-motion="pass" style="animation-range:contain 15% contain 39%;z-index:2"><p class="vae-fly-line" data-tone="warm">A symbolic dialect to save tokens</p></div>
+          <div class="parallax-layer" data-motion="pass" style="animation-range:contain 30% contain 54%;z-index:3"><p class="vae-fly-line" data-tone="warm">Semantic rules to reduce hallucinations</p></div>
+          <div class="parallax-layer" data-motion="pass" style="animation-range:contain 46% contain 70%;z-index:4"><p class="vae-fly-line" data-tone="warm">Expert coding guidelines</p></div>
+          <div class="parallax-layer" data-motion="pass" style="animation-range:contain 61% contain 85%;z-index:5"><p class="vae-fly-line" data-tone="warm">Expert architecture guidelines</p></div>
+          <div class="parallax-layer" data-motion="pass" style="animation-range:contain 76% contain 100%;z-index:6"><p class="vae-fly-line" data-tone="warm">Increased efficiency and scalability</p></div>
+          <div class="parallax-layer" data-motion="spin" style="--parallax-turn:-180deg;--parallax-speed:0%;z-index:-1;opacity:.2"><svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width=".6"><circle cx="200" cy="200" r="40"/><circle cx="200" cy="200" r="90"/><circle cx="200" cy="200" r="150"/><circle cx="200" cy="200" r="220"/><line x1="200" y1="200" x2="460" y2="200"/><line x1="200" y1="200" x2="200" y2="460"/><line x1="200" y1="200" x2="-60" y2="200"/><line x1="200" y1="200" x2="200" y2="-60"/></g></svg></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="container vae-section parallax-reveal" data-reveal="zoom">
+      <div class="corner-leaf vae-consult">
+        <section class="mk-cta" data-variant="split" aria-labelledby="consult-title">
+          <div class="mk-cta-inner">
+            <div class="mk-cta-copy">
+              <div class="vae-cta-head">
+                <div class="aura aura-glow aura-gold vae-cta-portrait" style="--shape-round:1.25rem"><img class="shape-squircle" src="assets/aron-homberg.jpg" width="400" height="400" alt="Portrait of Aron Homberg" loading="lazy"></div>
+                <h2 class="mk-cta-title" id="consult-title">Want verified agentic engineering in your team?</h2>
+              </div>
+              <p class="mk-cta-desc">Aron is a freelance AI researcher with over 25 years of professional software engineering experience. His interest in machine learning and AI began long before ChatGPT. He is an O’Reilly author (2011), conference speaker, and longtime mentor to software engineering teams.</p>
+            </div>
+            <div class="mk-cta-actions vae-consult-actions">
+              <a class="btn" data-size="lg" href="https://www.linkedin.com/in/aronhomberg/" target="_blank" rel="noopener"><svg class="vae-icon vae-icon-fill" aria-hidden="true"><use href="#i-linkedin"/></svg>Talk to Aron on LinkedIn<svg class="vae-icon vae-ext" aria-hidden="true"><use href="#i-external"/></svg><span class="sr-only"> (opens in a new tab)</span></a>
+              <p class="mk-cta-note vae-consult-note">...if you're looking for a remote training/mentoring session for you or your engineering team.</p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <section id="install" class="container vae-section parallax-reveal" aria-labelledby="install-title">
+      <div class="corner-leaf pattern-dots vae-install">
+        <header class="mk-section-header">
+          <div class="mk-section-header-copy">
+            <span class="mk-section-header-eyebrow">Install</span>
+            <h2 class="mk-section-header-title" id="install-title">🧑‍💻 Up and running in a minute</h2>
+            <p class="mk-section-header-desc">Requirements: <code>python3</code> 3.9 or newer, <code>git</code> and <code>make</code>. Hooks and CLI are stdlib-only.</p>
+          </div>
+        </header>
+        <div class="tabs vae-tabs">
+          <div class="tab-list" role="tablist" aria-label="Install for your agent">
+            <button class="tab-trigger vae-tab" role="tab" aria-selected="true" aria-controls="panel-claude" id="tab-claude">
+              <svg class="vae-icon vae-tab-icon" aria-hidden="true"><use href="#i-terminal"/></svg>
+              <span><span class="vae-tab-title">Claude Code</span><span class="vae-tab-desc">Plugin, hooks included</span></span>
+            </button>
+            <button class="tab-trigger vae-tab" role="tab" aria-selected="false" aria-controls="panel-codex" id="tab-codex" tabindex="-1">
+              <svg class="vae-icon vae-tab-icon" aria-hidden="true"><use href="#i-package"/></svg>
+              <span><span class="vae-tab-title">Codex</span><span class="vae-tab-desc">Plugin, hooks to trust</span></span>
+            </button>
+            <button class="tab-trigger vae-tab" role="tab" aria-selected="false" aria-controls="panel-skills" id="tab-skills" tabindex="-1">
+              <svg class="vae-icon vae-tab-icon" aria-hidden="true"><use href="#i-layers"/></svg>
+              <span><span class="vae-tab-title">Any agent</span><span class="vae-tab-desc">Skills only</span></span>
+            </button>
+          </div>
+
+          <div class="tab-content" role="tabpanel" id="panel-claude" aria-labelledby="tab-claude" tabindex="0">
+            <div class="vae-way">
+              <div class="vae-way-copy">
+                <h3><svg class="vae-icon" aria-hidden="true"><use href="#i-terminal"/></svg>Claude Code <span class="badge" data-variant="secondary" data-size="sm">recommended</span></h3>
+                <p>The full experience: the commit gate, the Stop-hook gate and memory injected at session start.</p>
+                <ul>
+                  <li>Run the two commands inside Claude Code, or the shell form from your terminal.</li>
+                  <li>Start a new session afterwards.</li>
+                  <li>Then describe a task, e.g. <code>/defuss-vae:plan</code> followed by your request in plain words.</li>
+                </ul>
+              </div>
+              <div class="vae-terms">
+                <div class="vae-term">
+                  <div class="mockup-code" data-chrome="mac" data-title="Claude Code" data-wrap id="cmd-claude">
+                    <pre data-prefix=">"><code>/plugin marketplace add kyr0/defuss-vae</code></pre>
+                    <pre data-prefix=">"><code>/plugin install defuss-vae@defuss-vae</code></pre>
+                  </div>
+                  <button type="button" class="btn vae-copy" data-variant="secondary" data-size="sm" data-copy="cmd-claude"><svg class="vae-icon" aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button>
+                  <span class="sr-only" role="status" id="cmd-claude-status"></span>
+                </div>
+                <div class="vae-term">
+                  <div class="mockup-code" data-chrome="mac" data-title="your shell" data-wrap id="cmd-shell">
+                    <pre data-prefix="$"><code>claude plugin marketplace add kyr0/defuss-vae</code></pre>
+                    <pre data-prefix="$"><code>claude plugin install defuss-vae@defuss-vae</code></pre>
+                  </div>
+                  <button type="button" class="btn vae-copy" data-variant="secondary" data-size="sm" data-copy="cmd-shell"><svg class="vae-icon" aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button>
+                  <span class="sr-only" role="status" id="cmd-shell-status"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-content" role="tabpanel" id="panel-codex" aria-labelledby="tab-codex" tabindex="0" hidden>
+            <div class="vae-way">
+              <div class="vae-way-copy">
+                <h3><svg class="vae-icon" aria-hidden="true"><use href="#i-package"/></svg>Codex</h3>
+                <p>The same plugin folder ships an Agent Plugins 1.0 manifest (<code>plugin/plugin.json</code>) and <code>plugin/.codex-plugin/plugin.json</code>.</p>
+                <ul>
+                  <li>Install defuss-vae from <code>/plugins</code>, then trust its hooks in <code>/hooks</code>; the README marks this route as untested.</li>
+                  <li><strong>Untested:</strong> hook parity with Claude Code, including the Stop-hook block; see <a href="https://github.com/kyr0/defuss-vae/blob/main/docs/COMPATIBILITY.md">COMPATIBILITY.md</a>.</li>
+                  <li>Start a skill with <code>$plan</code> followed by your request.</li>
+                </ul>
+              </div>
+              <div class="vae-terms">
+                <div class="mockup-code" data-chrome="mac" data-title="Codex" data-wrap>
+                  <pre data-prefix=">"><code>/plugins</code></pre>
+                  <pre data-prefix="#" data-tone="muted"><code>install defuss-vae</code></pre>
+                  <pre data-prefix=">"><code>/hooks</code></pre>
+                  <pre data-prefix="#" data-tone="muted"><code>review and trust the defuss-vae hooks</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-content" role="tabpanel" id="panel-skills" aria-labelledby="tab-skills" tabindex="0" hidden>
+            <div class="vae-way">
+              <div class="vae-way-copy">
+                <h3><svg class="vae-icon" aria-hidden="true"><use href="#i-layers"/></svg>Cursor, Gemini CLI, Copilot, Windsurf and more</h3>
+                <p>The open <a href="https://www.npmjs.com/package/skills">skills</a> CLI detects your agents and installs the seven skills into any Agent Skills host.</p>
+                <ul>
+                  <li><strong>Skills only:</strong> no hooks and no CLI, so nothing blocks <code>git commit</code>.</li>
+                  <li>Clone the repository once and run the gate yourself, as in the second window.</li>
+                  <li>Pick agents with <code>--agent</code>; add <code>--global</code> for all projects.</li>
+                </ul>
+              </div>
+              <div class="vae-terms">
+                <div class="vae-term">
+                  <div class="mockup-code" data-chrome="mac" data-title="your shell" data-wrap id="cmd-skills">
+                    <pre data-prefix="$"><code>npx skills add kyr0/defuss-vae --skill '*'</code></pre>
+                  </div>
+                  <button type="button" class="btn vae-copy" data-variant="secondary" data-size="sm" data-copy="cmd-skills"><svg class="vae-icon" aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button>
+                  <span class="sr-only" role="status" id="cmd-skills-status"></span>
+                </div>
+                <div class="vae-term">
+                  <div class="mockup-code" data-chrome="mac" data-title="run the gate yourself" data-wrap id="cmd-gate">
+                    <pre data-prefix="$"><code>git clone https://github.com/kyr0/defuss-vae ~/defuss-vae</code></pre>
+                    <pre data-prefix="$"><code>python3 ~/defuss-vae/plugin/scripts/vae.py gate --repo .</code></pre>
+                  </div>
+                  <button type="button" class="btn vae-copy" data-variant="secondary" data-size="sm" data-copy="cmd-gate"><svg class="vae-icon" aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button>
+                  <span class="sr-only" role="status" id="cmd-gate-status"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="container vae-section parallax-reveal" data-reveal="zoom">
+      <section class="mk-cta" data-variant="dark" aria-labelledby="cta-title">
+        <div class="mk-cta-inner">
+          <div class="mk-cta-copy">
+            <h2 class="mk-cta-title" id="cta-title">Let your agents learn to write programs that review your code and decide when work is done</h2>
+            <p class="mk-cta-desc">Seven skills, a gate the hooks enforce, and lessons codified into checks that every later gate runs. The agent does the work; you review the risky plans and the commits.</p>
+          </div>
+          <div class="mk-cta-actions">
+            <a class="btn" data-size="lg" href="https://github.com/kyr0/defuss-vae" target="_blank" rel="noopener">View on GitHub<svg class="vae-icon vae-ext" aria-hidden="true"><use href="#i-external"/></svg><span class="sr-only"> (opens in a new tab)</span></a>
+            <a class="btn" data-variant="outline" data-size="lg" href="https://shadcn.defuss.org/full-paper.html" target="_blank" rel="noopener">Read the paper<svg class="vae-icon vae-ext" aria-hidden="true"><use href="#i-external"/></svg><span class="sr-only"> (opens in a new tab)</span></a>
+          </div>
+          <p class="mk-cta-note">MIT licensed · python3 ≥ 3.9 · git · make</p>
+        </div>
+      </section>
+    </div>
+
+  </main>
+
+  <footer class="mk-footer" style="width:100%">
+    <div class="mk-footer-inner">
+      <nav class="mk-footer-nav vae-footer-nav" aria-label="Footer">
+        <div class="mk-footer-col">
+          <h3 class="mk-footer-heading">Project</h3>
+          <ul class="mk-footer-list">
+            <li><a href="https://github.com/kyr0/defuss-vae" target="_blank" rel="noopener">Source code<svg class="vae-icon vae-ext" aria-hidden="true"><use href="#i-external"/></svg><span class="sr-only"> (opens in a new tab)</span></a></li>
+            <li><a href="https://github.com/kyr0/defuss-vae/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog<svg class="vae-icon vae-ext" aria-hidden="true"><use href="#i-external"/></svg><span class="sr-only"> (opens in a new tab)</span></a></li>
+            <li><a href="https://github.com/kyr0/defuss-vae/blob/main/ARCH.md" target="_blank" rel="noopener">Architecture<svg class="vae-icon vae-ext" aria-hidden="true"><use href="#i-external"/></svg><span class="sr-only"> (opens in a new tab)</span></a></li>
+          </ul>
+        </div>
+        <div class="mk-footer-col">
+          <h3 class="mk-footer-heading">Research</h3>
+          <ul class="mk-footer-list">
+            <li><a href="https://shadcn.defuss.org/full-paper.html" target="_blank" rel="noopener">VAE in Practice (paper)<svg class="vae-icon vae-ext" aria-hidden="true"><use href="#i-external"/></svg><span class="sr-only"> (opens in a new tab)</span></a></li>
+            <li><a href="https://github.com/kyr0/defuss-shadcn" target="_blank" rel="noopener">Study repository<svg class="vae-icon vae-ext" aria-hidden="true"><use href="#i-external"/></svg><span class="sr-only"> (opens in a new tab)</span></a></li>
+            <li><a href="https://github.com/kyr0/defuss-vae/blob/main/docs/PROMPT_DESIGN.md" target="_blank" rel="noopener">Prompt design<svg class="vae-icon vae-ext" aria-hidden="true"><use href="#i-external"/></svg><span class="sr-only"> (opens in a new tab)</span></a></li>
+          </ul>
+        </div>
+        <div class="mk-footer-col">
+          <h3 class="mk-footer-heading">Reference</h3>
+          <ul class="mk-footer-list">
+            <li><a href="https://github.com/kyr0/defuss-vae/blob/main/docs/VERIFIER.md" target="_blank" rel="noopener">Gate and verifier<svg class="vae-icon vae-ext" aria-hidden="true"><use href="#i-external"/></svg><span class="sr-only"> (opens in a new tab)</span></a></li>
+            <li><a href="https://github.com/kyr0/defuss-vae/blob/main/plugin/references/PROSE.md" target="_blank" rel="noopener">Prose catalog<svg class="vae-icon vae-ext" aria-hidden="true"><use href="#i-external"/></svg><span class="sr-only"> (opens in a new tab)</span></a></li>
+            <li><a href="https://github.com/kyr0/defuss-shadcn" target="_blank" rel="noopener">Built with defuss-shadcn<svg class="vae-icon vae-ext" aria-hidden="true"><use href="#i-external"/></svg><span class="sr-only"> (opens in a new tab)</span></a></li>
+          </ul>
+        </div>
+        <div class="mk-footer-col">
+          <h3 class="mk-footer-heading">Professional consulting services</h3>
+          <aside class="corner-leaf vae-ad" aria-label="Consulting by Aron Homberg">
+            <div class="vae-ad-head">
+              <div class="aura aura-glow aura-gold vae-ad-portrait" style="--shape-round:1.5rem"><img class="shape-squircle" src="assets/aron-homberg.jpg" width="400" height="400" alt="Portrait of Aron Homberg" loading="lazy"></div>
+              <div>
+                <p class="vae-ad-name">Aron Homberg</p>
+                <p class="vae-ad-role">Freelance expert · independent AI researcher</p>
+              </div>
+            </div>
+            <a class="btn" data-size="sm" href="https://www.linkedin.com/in/aronhomberg/" target="_blank" rel="noopener"><svg class="vae-icon vae-icon-fill" aria-hidden="true"><use href="#i-linkedin"/></svg>Connect on LinkedIn<svg class="vae-icon vae-ext" aria-hidden="true"><use href="#i-external"/></svg><span class="sr-only"> (opens in a new tab)</span></a>
+          </aside>
+        </div>
+      </nav>
+      <hr class="separator mk-footer-rule">
+      <div class="mk-footer-bottom">
+        <a href="#top" class="mk-footer-brand" aria-label="Back to the top"><svg class="vae-icon" aria-hidden="true"><use href="#i-logo"/></svg><span class="mk-footer-brand-name">defuss-vae</span></a>
+        <div class="mk-footer-meta">
+          <p class="mk-footer-copy">© 2026 <a href="https://www.linkedin.com/in/aronhomberg/" target="_blank" rel="noopener">Aron Homberg (kyr0)<svg class="vae-icon vae-ext" aria-hidden="true"><use href="#i-external"/></svg><span class="sr-only"> (opens in a new tab)</span></a> · MIT. Figures from the technical report <a href="https://shadcn.defuss.org/full-paper.html" target="_blank" rel="noopener">Verified Agentic Engineering in Practice<svg class="vae-icon vae-ext" aria-hidden="true"><use href="#i-external"/></svg><span class="sr-only"> (opens in a new tab)</span></a> and this repository's README.</p>
+        </div>
+      </div>
+    </div>
+  </footer>
+</div>
+<div class="fab" data-scroll-top>
+  <a class="btn fab-trigger" href="#top" aria-label="Back to top"><span class="fab-icon" aria-hidden="true"><svg class="vae-icon"><use href="#i-arrow-up"/></svg></span></a>
+</div>
+
+<script type="module" src="https://cdn.jsdelivr.net/gh/kyr0/defuss-shadcn@0.9.7/dist/components/all.min.js" integrity="sha384-JmEU+8ZPWy1rlTlMFk/KEDwAGEFHBY5hz8soLiLVFnshIEAAcwjMUoF40IHEv6aR" crossorigin="anonymous"></script>
+<script type="module" src="assets/site.js"></script>
+</body>
+</html>

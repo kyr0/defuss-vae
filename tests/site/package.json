@@ -1,0 +1,18 @@
+{
+  "name": "defuss-vae-site-e2e",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Browser e2e for the defuss-vae website in docs/: Playwright drives the installed Google Chrome against the static site.",
+  "license": "MIT",
+  "author": "defuss",
+  "type": "module",
+  "packageManager": "bun@1.4.2",
+  "scripts": {
+    "e2e": "bun e2e.mjs",
+    "lint": "oxlint --deny-warnings"
+  },
+  "devDependencies": {
+    "oxlint": "1.87.0",
+    "playwright-core": "1.55.0"
+  }
+}

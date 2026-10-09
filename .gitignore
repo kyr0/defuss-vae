@@ -11,3 +11,6 @@ dist/
 .venv/
 .pytest_cache/
 .coverage
+node_modules/
+coverage/
+.cache/

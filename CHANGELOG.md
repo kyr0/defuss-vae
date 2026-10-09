@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- A project website in `docs/index.html`, built with defuss-shadcn: what defuss-vae does, its two loops as an animated diagram, with `wrap` codifying each lesson into the verifier that every later gate runs, which stages are hooks, skills or your own steps, the observations of the paper *Verified Agentic Engineering in Practice* and the install commands per agent. `make e2e` checks it in Chrome (`tests/site`, bun with `playwright-core` on the installed browser), `make lint` runs oxlint on that test, and `make setup` installs bun and the test's locked dependencies.
 - Architecture pages match the code. The root and `plugin/` `ARCH.md` say the gate, CLI and hook adapter open no network connection while the Makefile template's `setup` downloads installers, pinned tools and locked dependencies (both had said the plugin makes no network requests), and name the host name, paths and command output that can identify the user. `plugin/templates/ARCH.md` lists every download `setup` makes and the actions `verify.yml` pulls on GitHub's runners; the root page names the release steps and the gate's cache keys.
 
 ## 0.8.0

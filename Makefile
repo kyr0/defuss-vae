@@ -10,14 +10,19 @@ ACTIONLINT := actionlint-py==1.7.12.25
 # Resolved at parse time with the installer's default dir as fallback: make 3.81 execs simple recipes with its
 # original PATH, so a uv that `make setup` just installed would otherwise be invisible until a new shell.
 UV ?= $(shell command -v uv 2>/dev/null || echo $(HOME)/.local/bin/uv)
+BUN ?= $(shell command -v bun 2>/dev/null || echo $(HOME)/.bun/bin/bun)
+SITE_E2E := tests/site
 COVERAGE_MIN ?= 60
 
 help: ## list the verbs with their usage (default goal)
 	@awk -F':.*## ' '/^[a-zA-Z0-9_ -]+:.*## /{printf "  %-12s %s\n", $$1, $$2}' $(firstword $(MAKEFILE_LIST))
 
-# Dev tooling only (coverage, compat, lint run through uv); the hooks themselves need just python3.
-setup: ## install uv if missing (dev tooling; the hooks need only python3)
+# Dev tooling only (coverage, compat, lint run through uv; the website's browser e2e through bun); the hooks themselves
+# need just python3.
+setup: ## install uv and bun if missing, then the site e2e's locked deps (dev tooling; the hooks need only python3)
 	@[ -x "$(UV)" ] || curl -LsSf https://astral.sh/uv/install.sh | sh
+	@[ -x "$(BUN)" ] || curl -fsSL https://bun.sh/install | bash
+	cd $(SITE_E2E) && $(BUN) install --frozen-lockfile
 
 # Uniform layout verbs (plugin/templates/Makefile); this plugin is hooks + CLI, so there is no service.
 start stop restart status log: ## no service: this plugin is hooks + CLI
@@ -43,12 +48,14 @@ coverage: ## coverage.py in an ephemeral uv env, subprocesses included (.coverag
 	  && COVERAGE_FILE=tmp/.coverage $(UV) run -q --no-project --with coverage python -m coverage report --fail-under=$(COVERAGE_MIN) > tmp/coverage.txt; \
 	  s=$$?; tail -1 tmp/coverage.txt 2>/dev/null; exit $$s
 
-lint: ## pinned ruff (py39 target) + actionlint on both CI workflows
+lint: ## pinned ruff (py39 target) + actionlint on both CI workflows + oxlint on the site e2e
 	$(UV) run -q --no-project --with $(RUFF) ruff check $(PLUGIN) tests
 	$(UV) run -q --no-project --with $(ACTIONLINT) actionlint .github/workflows/verify.yml $(PLUGIN)/templates/verify.yml
+	cd $(SITE_E2E) && $(BUN) run lint
 
-e2e: dist ## dogfood: install the release zip, drive only its CLI + hook adapter
+e2e: dist ## dogfood: install the release zip, drive only its CLI + hook adapter; then the docs/ website in Chrome
 	$(PYTHON) tests/e2e.py $(DIST)
+	cd $(SITE_E2E) && $(BUN) e2e.mjs
 
 doctor: ## plugin files, manifests, budgets; compile every module
 	$(PYTHON) $(PLUGIN)/scripts/vae.py doctor

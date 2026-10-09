@@ -1,0 +1,168 @@
+/* Page layout and composition. Colours, radii and shadows come from defuss-shadcn tokens only. */
+@layer components {
+  /* the base reset the defuss-shadcn docs site applies, which its Landing Page template assumes */
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; line-height: 1.6; background: var(--background); color: var(--foreground); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+  [hidden] { display: none !important; }
+  .vae-page { overflow-x: clip; }
+  .vae-main { display: flex; flex-direction: column; gap: clamp(5rem, 11vw, 9rem); padding-block-end: clamp(5rem, 11vw, 9rem); }
+  .vae-section { width: 100%; max-width: 76rem; padding-inline: 1rem; scroll-margin-top: 5rem; }
+  .vae-icon { width: 1em; height: 1em; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .vae-icon-fill { fill: currentColor; stroke: none; }
+  .vae-ext { width: .75em; height: .75em; margin-inline-start: .15em; vertical-align: -.05em; opacity: .75; }
+  .mk-hero-note a, .mk-footer-copy a, .mk-features-desc a, .mk-stats-desc a, .vae-footnote a, .vae-prose a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+  .mk-hero-desc code, .vae-intro code, .vae-prose code, .vae-table code, .mk-section-header-desc code { font-family: var(--font-mono); font-size: .875em; }
+
+  /* hero: a rotating accent line under the title */
+  .vae-flip { max-width: 100%; margin: 0; font-size: clamp(1.25rem, 4.5vw, 2.5rem); font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
+  /* the pill and the rotating line are single lines by default; on a phone their min-content width would widen the
+     whole hero past the viewport, so the pill wraps and the rotating window never exceeds its column */
+  .mk-hero-pill { max-width: 100%; white-space: normal; text-align: start; }
+  .vae-flip .text-rotate { max-width: 100%; }
+  .mk-hero-copy { min-width: 0; max-width: 100%; }
+  .vae-accent { background: linear-gradient(90deg, var(--chart-1), var(--chart-3)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  /* the six benefits: three columns of muted prose under the CTA, so the buttons stay above the fold */
+  .vae-intro { display: grid; gap: 2rem 2.25rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+    width: 100%; max-width: 64rem; margin: clamp(5.5rem, 13vw, 10rem) auto 0; padding-inline: 1.25rem; text-align: start; }
+  .vae-intro-item { display: flex; flex-direction: column; gap: .5rem; }
+  .vae-intro-icon { display: grid; place-items: center; width: 4.5rem; height: 4.5rem; border-radius: var(--radius-xl); font-size: 2.25rem;
+    color: var(--foreground); background: color-mix(in oklch, var(--chart-2) 22%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--chart-2) 35%, transparent); }
+  .vae-intro h3 { margin: .25rem 0 0; font-size: .9375rem; font-weight: 600; }
+  .vae-intro p { margin: 0; font-size: .8125rem; line-height: 1.6; color: var(--muted-foreground); text-wrap: pretty; }
+
+  /* flythrough: the stage is viewport-high (so the animation spans exactly the pinned stretch) and only its middle
+     28rem band shows; the empty top and bottom are pulled into the neighbouring gaps */
+  .vae-flythrough { width: 100%; padding-inline: 1rem; margin-block: calc(-1 * clamp(4rem, 12vh, 9rem)); }
+  .vae-flythrough .parallax-stage { clip-path: inset(max(0px, calc((100dvh - 28rem) / 2)) 0 round var(--radius-xl)); }
+  /* whole phrases, not single words: smaller, balanced over at most three lines, centred in the 28rem band */
+  .vae-fly-line { max-width: min(18ch, 90vw); margin: 0 auto; padding-inline: 1rem; text-align: center; text-wrap: balance;
+    font-size: clamp(2rem, 6vw, 4.25rem); font-weight: 800; line-height: 1.05; letter-spacing: -.04em;
+    background: linear-gradient(90deg, #9db2ff, #e3a6ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .vae-fly-line[data-tone="warm"] { background-image: linear-gradient(90deg, #ffd59e, #ff9ecf); }
+
+  /* how it works: the loop diagram, then what the agent reads */
+  .vae-loop { margin-block-start: 2.5rem; }
+  /* narrow screens: the loop keeps its desktop proportions (data-fit="none") and the figure scrolls sideways,
+     instead of squeezing ten nodes into a phone-wide grid where every label wraps word by word */
+  @media (max-width: 60rem) { .vae-loop .diagram-canvas { min-width: 60rem; } }
+  .vae-scroll-hint { text-align: center; }
+  @media (min-width: 60.001rem) { .vae-scroll-hint { display: none; } }
+  .vae-reads { display: grid; gap: 2rem 3rem; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); align-items: center; margin-block-start: clamp(3rem, 7vw, 5rem); }
+  .vae-reads .mockup-code { margin: 0; }
+  .vae-prose { display: flex; flex-direction: column; gap: .75rem; }
+  .vae-prose h3 { margin: 0; font-size: 1.25rem; font-weight: 600; }
+  .vae-prose p { margin: 0; color: var(--muted-foreground); text-wrap: pretty; }
+  @media (max-width: 56rem) { .vae-reads { grid-template-columns: minmax(0, 1fr); } }
+
+  /* lessons become code: the reasoning beside the ladder of retention forms, strongest first, and a rule's shape */
+  .vae-codify { display: grid; gap: 2rem 3rem; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: start; margin-block-start: clamp(3rem, 7vw, 5rem); }
+  .vae-codify-side { display: flex; flex-direction: column; gap: 1.25rem; min-width: 0; }
+  .vae-codify-side .mockup-code { margin: 0; }
+  .vae-ladder { display: flex; flex-direction: column; gap: .625rem; margin: 0; padding: 0; list-style: none; }
+  .vae-rung { position: relative; display: flex; flex-direction: column; gap: .25rem; padding: .875rem 1rem .875rem 3.5rem;
+    border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); }
+  .vae-rung::before { content: attr(data-rank); position: absolute; inset-block-start: .875rem; inset-inline-start: 1rem; display: grid; place-items: center;
+    width: 1.75rem; height: 1.75rem; border-radius: 999px; font-family: var(--font-mono); font-size: .8125rem; font-weight: 600;
+    background: var(--muted); color: var(--muted-foreground); }
+  /* the first rung is the one the method aims for: a program every later gate runs */
+  .vae-rung[data-rank="1"] { border-color: color-mix(in oklch, var(--chart-2) 60%, var(--border));
+    box-shadow: 0 0 0 1px color-mix(in oklch, var(--chart-2) 35%, transparent), 0 12px 32px -18px color-mix(in oklch, var(--chart-2) 70%, transparent); }
+  .vae-rung[data-rank="1"]::before { background: var(--chart-2); color: #fff; }
+  .vae-rung-name { font-weight: 600; }
+  .vae-rung-desc { font-size: .875rem; color: var(--muted-foreground); text-wrap: pretty; }
+  .vae-rung code { font-family: var(--font-mono); font-size: .875em; }
+  @media (max-width: 56rem) { .vae-codify { grid-template-columns: minmax(0, 1fr); } }
+
+  /* workflow: a legend of the three kinds, then the stage table */
+  .vae-kinds { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); margin-block: 2.5rem 1.5rem; }
+  .vae-kind { display: flex; flex-direction: column; gap: .5rem; padding: 1.25rem; border: 1px solid var(--border); border-radius: var(--radius-xl);
+    background: color-mix(in oklch, var(--card) 80%, transparent); }
+  /* the same three emphasis levels as the table's badges: solid, tinted, outline */
+  .vae-kind[data-kind="hook"] { box-shadow: inset 4px 0 0 var(--primary); }
+  .vae-kind[data-kind="skill"] { box-shadow: inset 4px 0 0 var(--chart-2); }
+  .vae-kind[data-kind="manual"] { box-shadow: inset 4px 0 0 var(--border); }
+  .vae-kind h3 { display: flex; align-items: center; gap: .5rem; margin: 0; font-size: 1rem; font-weight: 600; }
+  .vae-kind p { margin: 0; font-size: .875rem; color: var(--muted-foreground); text-wrap: pretty; }
+  .vae-table .table-cell, .vae-table .table-head { vertical-align: top; }
+  .vae-table .table-cell:first-child { white-space: nowrap; font-family: var(--font-mono); font-weight: 600; }
+  .vae-table .table-cell:nth-child(3) { min-width: 11rem; color: var(--muted-foreground); }
+  .vae-table .table-cell:last-child { min-width: 20rem; }
+  .vae-footnote { margin: 1rem 0 0; font-size: .75rem; color: var(--muted-foreground); text-wrap: pretty; }
+  .vae-footnote-mark { font-size: .5em; color: var(--muted-foreground); }
+
+  /* evidence: the stats band with the four-task table as its figure */
+  .vae-tasks { margin: 0; align-self: start; aspect-ratio: auto; overflow: visible; background: var(--card); }
+  .vae-tasks .table-container { border: 0; }
+  .vae-tasks .table-cell[data-numeric], .vae-tasks .table-head[data-numeric] { text-align: end; font-variant-numeric: tabular-nums; }
+  .mk-stat-value { font-variant-numeric: tabular-nums; }
+  .mk-stats-desc code { font-family: var(--font-mono); font-size: .875em; }
+
+  /* install: tabs of terminal windows, each with a copy button in its title bar */
+  .vae-install {
+    --shape-round: 3rem; --shape-ink: color-mix(in oklch, var(--foreground) 9%, transparent); --shape-pattern: 18px;
+    padding: clamp(1.5rem, 4vw, 3rem); border: 1px solid var(--border);
+    background-color: color-mix(in oklch, var(--card) 75%, transparent);
+    box-shadow: var(--shadow-xl), 0 30px 80px -40px color-mix(in oklch, var(--chart-2) 45%, transparent);
+  }
+  .vae-tabs { margin-block-start: 2rem; }
+  .vae-tabs .tab-list { width: fit-content; max-width: 100%; margin-inline: auto; margin-block-end: 1.5rem; }
+  .vae-tab { display: flex; align-items: center; gap: .75rem; height: auto; padding-block: .625rem; text-align: start; white-space: normal; overflow: visible; }
+  .vae-tab-icon { width: 1.5rem; height: 1.5rem; flex: none; }
+  .vae-tab-title { display: block; font-weight: 600; line-height: 1.25; }
+  .vae-tab-desc { display: block; font-size: .75rem; font-weight: 400; line-height: 1.3; color: var(--muted-foreground); }
+  @media (max-width: 40rem) { .vae-tab-icon, .vae-tab-desc { display: none; } .vae-tab { padding-inline: .75rem; } }
+  .vae-way { display: grid; gap: 1.5rem 2.5rem; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); align-items: start; }
+  .vae-way-copy { display: flex; flex-direction: column; gap: .875rem; }
+  .vae-way-copy h3 { display: flex; align-items: center; gap: .5rem; margin: 0; font-size: 1.25rem; font-weight: 600; }
+  .vae-way-copy p { margin: 0; color: var(--muted-foreground); text-wrap: pretty; }
+  .vae-way-copy ul { margin: 0; padding-inline-start: 1.1rem; color: var(--muted-foreground); font-size: .9375rem; }
+  .vae-way-copy li + li { margin-block-start: .25rem; }
+  .vae-way-copy strong { color: var(--foreground); }
+  .vae-terms { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+  .vae-term { position: relative; }
+  .vae-term .mockup-code { margin: 0; }
+  .vae-copy { position: absolute; inset-block-start: .3rem; inset-inline-end: .5rem; }
+  @media (max-width: 56rem) { .vae-way { grid-template-columns: minmax(0, 1fr); } }
+
+  /* consulting CTA: a leaf-cornered panel; portrait + heading, then the text column, then the action */
+  .vae-consult { --shape-round: 3rem; overflow: hidden; border: 1px solid var(--border); background-color: var(--card); }
+  .vae-consult .mk-cta, .vae-consult .mk-cta[data-variant] { background: transparent; }
+  .vae-consult .mk-cta[data-variant] .mk-cta-inner { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; align-items: center; gap: 1.25rem 2rem; text-align: start;
+    padding: clamp(1.5rem, 3vw, 2.25rem) clamp(1.5rem, 3vw, 2.5rem); background: transparent; border-radius: 0; }
+  .vae-consult .mk-cta[data-variant] .mk-cta-copy { display: contents; }
+  .vae-consult .vae-cta-head { grid-column: 1; display: flex; align-items: center; gap: 1.25rem; }
+  .vae-consult .mk-cta[data-variant] .mk-cta-title { margin: 0; font-size: clamp(1.25rem, 2.2vw, 1.625rem); }
+  .vae-consult .mk-cta[data-variant] .mk-cta-desc { grid-column: 2; margin: 0; font-size: .875rem; }
+  .vae-consult .mk-cta[data-variant] .mk-cta-actions { grid-column: 3; justify-content: flex-end; }
+  /* the note under the button finishes its sentence ("Talk to Aron on LinkedIn ...if you're looking for ...") */
+  .vae-consult .vae-consult-actions { flex-direction: column; align-items: flex-end; gap: .625rem; }
+  .vae-consult .vae-consult-note { max-width: 17rem; margin: 0; font-size: .8125rem; line-height: 1.45; text-align: end; color: var(--muted-foreground); text-wrap: pretty; }
+  .vae-cta-portrait { width: 4rem; flex: none; }
+  .vae-cta-portrait img { display: block; width: 100%; height: auto; }
+  @media (max-width: 56rem) {
+    .vae-consult .mk-cta[data-variant] .mk-cta-inner { grid-template-columns: minmax(0, 1fr); }
+    .vae-consult .vae-cta-head, .vae-consult .mk-cta[data-variant] .mk-cta-desc, .vae-consult .mk-cta[data-variant] .mk-cta-actions { grid-column: auto; justify-content: flex-start; }
+    .vae-consult .vae-consult-actions { align-items: flex-start; }
+    .vae-consult .vae-consult-note { text-align: start; }
+  }
+
+  /* footer ad: a leaf-cornered panel with a squircle portrait in a gold halo */
+  .vae-ad {
+    --shape-round: 2rem; display: flex; flex-direction: column; gap: .875rem; padding: 1.25rem;
+    border: 1px solid var(--border); box-shadow: var(--shadow-lg);
+    background: linear-gradient(135deg, color-mix(in oklch, var(--chart-1) 16%, var(--card)), var(--card) 65%);
+  }
+  .vae-ad-head { display: flex; align-items: center; gap: .875rem; }
+  .vae-ad-portrait { width: 5.5rem; flex: none; }
+  .vae-ad-portrait img { display: block; width: 100%; height: auto; }
+  .vae-ad-name { margin: 0; font-size: 1.25rem; font-weight: 600; color: var(--foreground); }
+  .vae-ad-role { margin: 0; font-size: .8125rem; line-height: 1.5; color: var(--muted-foreground); }
+  .vae-ad .btn { align-self: flex-start; }
+  /* the ad is the footer's widest column on large screens */
+  @media (min-width: 64rem) { .vae-footer-nav.mk-footer-nav { grid-template-columns: 1fr 1fr 1fr 1.8fr; } }
+
+  @media (forced-colors: active) {
+    .vae-accent, .vae-fly-line { color: CanvasText; background: none; }
+  }
+}
