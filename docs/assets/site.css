@@ -10,26 +10,117 @@
   .vae-icon { width: 1em; height: 1em; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .vae-icon-fill { fill: currentColor; stroke: none; }
   .vae-ext { width: .75em; height: .75em; margin-inline-start: .15em; vertical-align: -.05em; opacity: .75; }
-  .mk-hero-note a, .mk-footer-copy a, .mk-features-desc a, .mk-stats-desc a, .vae-footnote a, .vae-prose a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+  .mk-hero-note a, .mk-footer-copy a, .mk-features-desc a, .mk-stats-desc a, .vae-footnote a, .vae-prose a, .vae-table a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
   .mk-hero-desc code, .vae-intro code, .vae-prose code, .vae-table code, .mk-section-header-desc code { font-family: var(--font-mono); font-size: .875em; }
 
-  /* hero: a rotating accent line under the title */
-  .vae-flip { max-width: 100%; margin: 0; font-size: clamp(1.25rem, 4.5vw, 2.5rem); font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
-  /* the pill and the rotating line are single lines by default; on a phone their min-content width would widen the
-     whole hero past the viewport, so the pill wraps and the rotating window never exceeds its column */
+  /* A compact, inspectable example makes the gate concrete before the technical walkthrough. */
+  .vae-skip { position: fixed; z-index: 100; inset-block-start: .75rem; inset-inline-start: .75rem;
+    padding: .75rem 1rem; border-radius: var(--radius-lg); background: var(--background); color: var(--foreground);
+    box-shadow: var(--shadow-lg); transform: translateY(-200%); }
+  .vae-skip:focus { transform: none; }
+  .vae-page :is(a, button, input, summary, [tabindex]):focus-visible, .vae-skip:focus-visible {
+    outline: 2px solid var(--ring); outline-offset: 4px;
+  }
+  .vae-opening { padding-block: clamp(3.5rem, 7vw, 6rem) 1rem; }
+  .vae-hero { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: clamp(2rem, 4vw, 4rem);
+    max-width: 76rem; align-items: center; }
+  .vae-hero .mk-hero-copy { min-width: 0; max-width: 100%; gap: 1.25rem; }
   .mk-hero-pill { max-width: 100%; white-space: normal; text-align: start; }
+  .vae-hero .mk-hero-title { font-size: clamp(2.75rem, 4.7vw, 4.4rem); font-weight: 650; line-height: 1.06; letter-spacing: -.045em; }
+  .vae-hero .mk-hero-title .vae-accent { display: block; }
+  .vae-accent { background: linear-gradient(100deg, color-mix(in oklch, var(--chart-1) 70%, var(--foreground)), color-mix(in oklch, var(--chart-3) 70%, var(--foreground)));
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  /* a rotating accent line under the title; the rotating window never exceeds its column, or its min-content width
+     would widen the hero past a phone viewport */
+  .vae-flip { max-width: 100%; margin: 0; font-size: clamp(1.25rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
   .vae-flip .text-rotate { max-width: 100%; }
-  .mk-hero-copy { min-width: 0; max-width: 100%; }
-  .vae-accent { background: linear-gradient(90deg, var(--chart-1), var(--chart-3)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .vae-hero-lead { margin: 0; font-size: clamp(1.125rem, 2vw, 1.375rem); font-weight: 550; letter-spacing: -.02em; }
+  .vae-hero .mk-hero-desc { font-size: 1.0625rem; max-width: 43ch; }
+  .vae-hero .mk-hero-desc strong { color: var(--foreground); font-weight: 600; }
+  .vae-hero .mk-hero-actions { margin-block-start: .25rem; flex-wrap: wrap; }
+  .vae-hero .mk-hero-note { margin: 0; max-width: 49ch; font-size: .75rem; line-height: 1.6; text-wrap: pretty; }
+  .vae-trust { display: flex; flex-wrap: wrap; gap: .4rem 1.1rem; list-style: none; margin: 0; padding: 0;
+    color: var(--muted-foreground); font-size: .75rem; }
+  .vae-trust li { display: flex; align-items: center; gap: .4rem; }
+  .vae-trust li::before { content: ''; width: .3rem; height: .3rem; border-radius: 50%; background: var(--chart-2); }
+
+  /* Uses the existing tabs component: click and keyboard behavior stay owned by defuss-shadcn. */
+  .vae-demo-wrap { min-width: 0; }
+  .vae-demo { display: flex; flex-direction: column; gap: 0; overflow: hidden; border: 1px solid var(--border);
+    border-radius: var(--radius-xl); background: var(--card); box-shadow: var(--shadow-xl), 0 24px 60px -30px color-mix(in oklch, var(--chart-1) 35%, transparent); }
+  .vae-demo-head { display: flex; align-items: center; gap: .65rem; padding: 1rem 1.25rem; border-block-end: 1px solid var(--border); }
+  .vae-demo-head h2 { margin: 0; font-size: .75rem; font-weight: 600; }
+  .vae-demo-lights { display: flex; gap: .25rem; flex: none; }
+  .vae-demo-lights i { width: .375rem; height: .375rem; border-radius: 50%; background: var(--border); }
+  .vae-demo-label { margin-inline-start: auto; color: var(--muted-foreground); font-size: .625rem; white-space: nowrap; }
+  /* the tabs component pins .tab-list to align-self: flex-start (shrink to fit); stretch it so the three steps share
+     the card's width */
+  .vae-demo .tab-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: auto; height: auto; align-self: stretch;
+    margin: 1rem 1.25rem 0; padding: .25rem; }
+  .vae-demo .tab-trigger { min-height: 2.75rem; min-width: 0; padding: .4rem .5rem; font-size: .8125rem; }
+  .vae-demo .vae-demo-panel { padding: 1.25rem; margin: 0; }
+  .vae-demo-state { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-block-end: 1.25rem; }
+  .vae-demo-step { color: var(--muted-foreground); font-family: var(--font-mono); font-size: .6875rem; }
+  .vae-demo-status { display: inline-flex; align-items: center; gap: .4rem; padding: .25rem .625rem; border: 1px solid var(--border);
+    border-radius: 999px; background: var(--muted); color: var(--foreground); font-size: .6875rem; font-weight: 600; }
+  .vae-demo-status[data-state="blocked"] { background: color-mix(in oklch, var(--destructive) 10%, var(--card)); border-color: color-mix(in oklch, var(--destructive) 35%, var(--border)); }
+  .vae-demo-status[data-state="working"] { background: color-mix(in oklch, var(--chart-1) 12%, var(--card)); }
+  .vae-demo-status[data-state="passed"] { background: color-mix(in oklch, var(--chart-2) 15%, var(--card)); border-color: color-mix(in oklch, var(--chart-2) 40%, var(--border)); }
+  .vae-demo-panel h3 { margin: 0 0 .5rem; font-size: 1.1875rem; line-height: 1.35; letter-spacing: -.025em; font-weight: 600; }
+  .vae-demo-panel > p { margin: 0; min-height: 4.8em; color: var(--muted-foreground); font-size: .875rem; line-height: 1.6; }
+  .vae-demo-code { margin-block: 1rem 1.25rem; padding: .875rem 1rem; border: 1px solid var(--border); border-radius: var(--radius-lg);
+    background: var(--muted); color: var(--foreground); overflow-wrap: anywhere; }
+  .vae-demo-code code { font-family: var(--font-mono); font-size: .75rem; line-height: 1.8; }
+  .vae-demo-code code > span { font-weight: 650; }
+  .vae-demo-checks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin: 0; padding: 0; list-style: none; }
+  .vae-demo-checks li { padding-block-start: .625rem; border-block-start: 2px solid var(--border); font-size: .75rem; font-weight: 600; }
+  .vae-demo-checks li span { display: block; font-size: .6875rem; font-weight: 400; color: var(--muted-foreground); }
+  .vae-demo-checks li[data-state="blocked"] { border-color: var(--destructive); }
+  .vae-demo-checks li[data-state="passed"] { border-color: var(--chart-2); }
+  .vae-demo-note { display: flex; justify-content: center; align-items: flex-start; gap: .5rem; margin: 1rem 0 0;
+    color: var(--muted-foreground); font-size: .75rem; line-height: 1.5; }
+  .vae-demo-note .vae-icon { margin-block-start: .2em; color: var(--foreground); }
+
+  /* Early evidence links to its full context, instead of presenting study results as forecasts. */
+  .vae-proof { display: grid; grid-template-columns: 1fr 1.6fr auto; align-items: center; gap: 2rem;
+    width: calc(100% - 2.5rem); max-width: 73.5rem; margin: clamp(3rem, 6vw, 5rem) auto 0; padding-block: 1.5rem;
+    border-block: 1px solid var(--border); }
+  .vae-eyebrow { display: block; color: var(--muted-foreground); font-size: .6875rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+  .vae-proof-intro a { display: inline-flex; align-items: center; gap: .5rem; color: var(--foreground); font-size: .875rem; font-weight: 550; text-decoration: none; }
+  .vae-proof dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin: 0; }
+  .vae-proof dl > div { display: flex; flex-direction: column-reverse; }
+  .vae-proof dt { font-size: .6875rem; color: var(--muted-foreground); }
+  .vae-proof dd { margin: 0; font-size: clamp(1.125rem, 2.1vw, 1.625rem); font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .vae-proof-source { color: var(--foreground); font-size: .75rem; text-underline-offset: .2em; }
+  .vae-evidence-detail { padding-block: .875rem; border-block: 1px solid var(--border); font-size: .8125rem; color: var(--muted-foreground); }
+  .vae-evidence-detail summary { color: var(--foreground); cursor: pointer; font-weight: 550; }
+  .vae-evidence-detail p { margin: .875rem 0 0; }
+  .vae-evidence-detail a { color: inherit; text-decoration: underline; text-underline-offset: .2em; }
+  @media (max-width: 62rem) {
+    .vae-hero { grid-template-columns: minmax(0, 1fr); max-width: 44rem; gap: 2.5rem; }
+    .vae-hero .mk-hero-title { font-size: clamp(2.75rem, 7.5vw, 4.4rem); }
+    .vae-hero .mk-hero-desc { max-width: 50ch; }
+    .vae-proof { grid-template-columns: 1fr; gap: 1rem; max-width: 41.5rem; }
+    .vae-proof dd { font-size: 1.5rem; }
+    .vae-demo-panel > p { min-height: 3.2em; }
+  }
+  @media (max-width: 30rem) {
+    .vae-demo-head, .vae-demo .vae-demo-panel { padding: 1rem; }
+    .vae-demo .tab-list { margin-inline: 1rem; }
+    .vae-demo-head { flex-wrap: wrap; }
+    .vae-demo-lights { display: none; }
+    .vae-proof dd { font-size: 1.25rem; }
+    .vae-proof dl { gap: .625rem; }
+  }
 
   /* the six benefits: three columns of muted prose under the CTA, so the buttons stay above the fold */
   .vae-intro { display: grid; gap: 2rem 2.25rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
-    width: 100%; max-width: 64rem; margin: clamp(5.5rem, 13vw, 10rem) auto 0; padding-inline: 1.25rem; text-align: start; }
+    width: 100%; max-width: 64rem; margin: clamp(3rem, 6vw, 5rem) auto 0; padding-inline: 1.25rem; text-align: start; }
   .vae-intro-item { display: flex; flex-direction: column; gap: .5rem; }
-  .vae-intro-icon { display: grid; place-items: center; width: 4.5rem; height: 4.5rem; border-radius: var(--radius-xl); font-size: 2.25rem;
+  .vae-intro-icon { display: grid; place-items: center; width: 3rem; height: 3rem; border-radius: var(--radius-xl); font-size: 1.375rem;
     color: var(--foreground); background: color-mix(in oklch, var(--chart-2) 22%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--chart-2) 35%, transparent); }
-  .vae-intro h3 { margin: .25rem 0 0; font-size: .9375rem; font-weight: 600; }
-  .vae-intro p { margin: 0; font-size: .8125rem; line-height: 1.6; color: var(--muted-foreground); text-wrap: pretty; }
+  .vae-intro h3 { margin: .25rem 0 0; font-size: 1rem; font-weight: 600; }
+  .vae-intro p { margin: 0; font-size: .875rem; line-height: 1.6; color: var(--muted-foreground); text-wrap: pretty; }
 
   /* flythrough: the stage is viewport-high (so the animation spans exactly the pinned stretch) and only its middle
      28rem band shows; the empty top and bottom are pulled into the neighbouring gaps */
@@ -40,6 +131,28 @@
     font-size: clamp(2rem, 6vw, 4.25rem); font-weight: 800; line-height: 1.05; letter-spacing: -.04em;
     background: linear-gradient(90deg, #9db2ff, #e3a6ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .vae-fly-line[data-tone="warm"] { background-image: linear-gradient(90deg, #ffd59e, #ff9ecf); }
+
+  /* Disabled scroll animation must also unstack the absolutely positioned text layers. */
+  @media (prefers-reduced-motion: reduce), print {
+    .vae-flythrough { margin-block: 0; }
+    .vae-flythrough .parallax[data-sticky] { height: auto; }
+    .vae-flythrough .parallax-stage { position: relative; inset: auto; height: auto; clip-path: none;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: 1.5rem; padding: 2rem; }
+    .vae-flythrough .parallax-layer { display: none; }
+    .vae-flythrough .parallax-layer[data-motion="pass"] { display: block; position: static; inset: auto;
+      animation: none; opacity: 1; scale: 1; }
+    .vae-flythrough .vae-fly-line { max-width: none; padding: 0; font-size: 1.25rem; line-height: 1.4; }
+  }
+  @supports not (animation-timeline: view()) {
+    .vae-flythrough { margin-block: 0; }
+    .vae-flythrough .parallax[data-sticky] { height: auto; }
+    .vae-flythrough .parallax-stage { position: relative; inset: auto; height: auto; clip-path: none;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: 1.5rem; padding: 2rem; }
+    .vae-flythrough .parallax-layer { display: none; }
+    .vae-flythrough .parallax-layer[data-motion="pass"] { display: block; position: static; inset: auto;
+      animation: none; opacity: 1; scale: 1; }
+    .vae-flythrough .vae-fly-line { max-width: none; padding: 0; font-size: 1.25rem; line-height: 1.4; }
+  }
 
   /* how it works: the loop diagram, then what the agent reads */
   .vae-loop { margin-block-start: 2.5rem; }
@@ -59,6 +172,13 @@
   .vae-codify { display: grid; gap: 2rem 3rem; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: start; margin-block-start: clamp(3rem, 7vw, 5rem); }
   .vae-codify-side { display: flex; flex-direction: column; gap: 1.25rem; min-width: 0; }
   .vae-codify-side .mockup-code { margin: 0; }
+  /* the VERIFY.py listing, coloured like JSON: keys, strings, the name and the punctuation take the window's own line
+     tones (mockup-code's --_info / --_success / --_warning / --_dim), so they keep the contrast it tunes per variant;
+     hand-marked spans, because a highlighter (the docs load Shiki from esm.sh) would add a second CDN for seven lines */
+  .vae-tok-key { color: var(--_info); }
+  .vae-tok-str { color: var(--_success); }
+  .vae-tok-name { color: var(--_warning); }
+  .vae-tok-punct { color: var(--_dim); }
   .vae-ladder { display: flex; flex-direction: column; gap: .625rem; margin: 0; padding: 0; list-style: none; }
   .vae-rung { position: relative; display: flex; flex-direction: column; gap: .25rem; padding: .875rem 1rem .875rem 3.5rem;
     border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); }
@@ -135,7 +255,7 @@
   .vae-consult .mk-cta[data-variant] .mk-cta-title { margin: 0; font-size: clamp(1.25rem, 2.2vw, 1.625rem); }
   .vae-consult .mk-cta[data-variant] .mk-cta-desc { grid-column: 2; margin: 0; font-size: .875rem; }
   .vae-consult .mk-cta[data-variant] .mk-cta-actions { grid-column: 3; justify-content: flex-end; }
-  /* the note under the button finishes its sentence ("Talk to Aron on LinkedIn ...if you're looking for ...") */
+  /* Keep the service description adjacent to its contact action. */
   .vae-consult .vae-consult-actions { flex-direction: column; align-items: flex-end; gap: .625rem; }
   .vae-consult .vae-consult-note { max-width: 17rem; margin: 0; font-size: .8125rem; line-height: 1.45; text-align: end; color: var(--muted-foreground); text-wrap: pretty; }
   .vae-cta-portrait { width: 4rem; flex: none; }

@@ -2,10 +2,10 @@
 
 ## Required claims
 
-For changes to code or doc pages (`*.md`, `*.mdx`, `*.markdown`; paths outside `.agents/`, `tmp/`, `var/`, `output/`), `VERIFIED[gate]=true` REQUIRES, in order:
+For changes to code or doc pages (`*.md`, `*.mdx`, `*.markdown`; paths outside `.vae/`, `tmp/`, `var/`, `output/`), `VERIFIED[gate]=true` REQUIRES, in order:
 
 1. **verify**: every required check passes:
-   - `.agents/VERIFY.py` exists and loads (`init` writes it);
+   - `.vae/VERIFY.py` exists and loads (`init` writes it);
    - `prose` (unless `CONFIG["prose"]=False`): every changed doc page passes the static prose check (below);
    - `docs.pages` (strict only, see below): a `README.md` at the root and covering every folder that directly holds a changed interface (an executable script with a shebang, `__main__.py`, a package manifest with `bin` or a public API, OpenAPI, proto or GraphQL definitions), and an `ARCH.md` covering every folder that directly holds changed production source or deployment and schema definitions (Dockerfile, compose, `.tf`, `.sql`, `.proto`, GraphQL). A page covers its folder and every folder below it up to the next package manifest (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `setup.py`, Maven or Gradle build); a missing page is named at that boundary. Tests, fixtures, examples, docs, hidden folders, pure config and data need neither; `CONFIG["readme"|"arch"]` exempts more folders or drops a requirement;
    - `prose` on `README.md` and `ARCH.md` also rejects `HYPOTHESIS:`/`UNKNOWN:` labels (and VAE-DIALECT `HYPOTHESIS[x]` in prose): those pages state only verified facts;
@@ -60,7 +60,7 @@ The gate's job is to make the agent finish the work, so its text treats a failur
 
 ## Why the verifier must exist and be wired
 
-A gate that silently falls back to defaults verifies less than the project thinks: without `.agents/VERIFY.py` the template rules (e.g. no mocks) never run, and before this check only `doctor` noticed. `make verify` is what CI runs while the gate runs the verbs one by one, so a `verify` that skips e2e passed every local gate and only CI was hollow. The wiring check parses the Makefile statically instead of asking make (`make -pn`): `VERIFIED:` with GNU Make 3.81 a dry run still evaluates `$(shell …)` and spawns the recursive `$(MAKE)` line (probed), so reading the wiring would run project code. `UNKNOWN:` whether `make -p` database output is stable enough across make 3.81 and 4.x to parse. `UNKNOWN:` prerequisites built from functions (`$(foreach …)`, `$(wildcard …)`) or computed variables are not expanded, so such a `verify` reports a gap; list the verbs literally.
+A gate that silently falls back to defaults verifies less than the project thinks: without `.vae/VERIFY.py` the template rules (e.g. no mocks) never run, and before this check only `doctor` noticed. `make verify` is what CI runs while the gate runs the verbs one by one, so a `verify` that skips e2e passed every local gate and only CI was hollow. The wiring check parses the Makefile statically instead of asking make (`make -pn`): `VERIFIED:` with GNU Make 3.81 a dry run still evaluates `$(shell …)` and spawns the recursive `$(MAKE)` line (probed), so reading the wiring would run project code. `UNKNOWN:` whether `make -p` database output is stable enough across make 3.81 and 4.x to parse. `UNKNOWN:` prerequisites built from functions (`$(foreach …)`, `$(wildcard …)`) or computed variables are not expanded, so such a `verify` reports a gap; list the verbs literally.
 
 `wiring` is its own check rather than part of `layout` because `layout` is the one check projects legitimately turn off, and turning it off must not make CI hollow again.
 
@@ -114,7 +114,7 @@ The Stop hook runs the gate at the end of every turn and PreToolUse runs before 
 
 ## Why a verification cache
 
-`VERIFIED:` the fingerprint hashes every changed code file; `.agents/VERIFY.py` and `.gitignore` hashes join it in the cache key because they change verification results without being code. Identical key ⇒ identical inputs, so the review and docs loop turns skip re-running suites. `UNKNOWN:` environment drift (installed toolchain changes) is not part of the key; editing any code file or policy re-runs everything.
+`VERIFIED:` the fingerprint hashes every changed code file; the hashes of `.vae/VERIFY.py`, of every project check script in `.vae/checks/` and of `.gitignore` join it in the cache key because they change verification results without being code. Identical key ⇒ identical inputs, so the review and docs loop turns skip re-running suites. `UNKNOWN:` environment drift (installed toolchain changes) is not part of the key; editing any code file or policy re-runs everything.
 
 ## Why e2e has its own cache key, and only on request
 
@@ -134,16 +134,20 @@ Each session gets the folder `tmp/vae/<yyyy-mm-dd>_<hh_mm_ss>_<n>/`, named by it
 
 `VERIFIED:` a deterministic failure already represented by a failing test or rule needs no duplicate rule.
 
-IF review finds a deterministic recurrence class with a VERIFIED root cause that is not yet encoded THEN the agent adds a regression test OR a `.agents/VERIFY.py` rule; IF encoding is not feasible THEN the finding's learning is `UNKNOWN` with a reason. Rules encode invariants, not taste. A failure caused by the environment, configuration or an external system gets a fix and startup validation, not a test: one that pins the values that worked once fails on every other correct setup. `glob` rules apply only to changed files so policy covers new work without blocking on untouched legacy code.
+IF review finds a deterministic recurrence class with a VERIFIED root cause that is not yet encoded THEN the agent adds a regression test OR a `.vae/VERIFY.py` rule; IF encoding is not feasible THEN the finding's learning is `UNKNOWN` with a reason. Rules encode invariants, not taste. A failure caused by the environment, configuration or an external system gets a fix and startup validation, not a test: one that pins the values that worked once fails on every other correct setup. `glob` rules apply only to changed files so policy covers new work without blocking on untouched legacy code.
 
 ## Why the episode log never repeats a finding
 
-The gate appends a `FINDING` line only if the same line is not already in `.agents/EPISODES.md`. A review attestation carried from one fingerprint to the next re-lists its earlier findings, and logging them again flooded the 100-entry window: `VERIFIED:` in this repository 71 of 100 entries were such repeats, which pushed older, distinct history out. `FAIL` lines are not deduplicated, because a failure that keeps recurring is exactly the signal wrap uses to promote a lesson into a test or rule.
+The gate appends a `FINDING` line only if the same line is not already in `.vae/EPISODES.md`. A review attestation carried from one fingerprint to the next re-lists its earlier findings, and logging them again flooded the 100-entry window: `VERIFIED:` in this repository 71 of 100 entries were such repeats, which pushed older, distinct history out. `FAIL` lines are not deduplicated, because a failure that keeps recurring is exactly the signal wrap uses to promote a lesson into a test or rule.
+
+## Why project check scripts instead of more rule kinds
+
+The five rule kinds (`command`, `file_exists`, `contains`, `regex`, `not_regex`) cover invariants a pattern can state. An invariant that needs parsing, several files, a running program or the project's own semantics goes into a script the project owns, `.vae/checks/<id>.py`, run by a `command` rule: it exits non-zero and prints what to fix, and the agent plans it like a test. A sixth built-in kind for each such case would move project semantics into the plugin, where every project pays for them and none can adapt them. The rule text reaches the agent in three places: the session-start rules (and the `AGENTS.md` block for hosts without hooks), the `plan` skill's proof step and the comment above `RULES` in the `VERIFY.py` template. `VERIFIED:` (2026-10-11) before this, no skill or rule text named a way forward when no kind fit; the `command` kind existed, but nothing told an agent to write a check for it.
 
 ## Why project-local Python
 
 `VERIFIED:` the Python stdlib covers process execution, matching, JSON, git state and rule loading; hooks need no package installs.
 
-`VERIFIED:` `.agents/VERIFY.py` is versioned and agent-editable, so learned constraints survive sessions and harnesses.
+`VERIFIED:` `.vae/VERIFY.py` is versioned and agent-editable, so learned constraints survive sessions and harnesses.
 
 `UNKNOWN:` hosts without Python 3 cannot run the gates; they need an equivalent adapter. The skills themselves still work.
