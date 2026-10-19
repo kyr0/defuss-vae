@@ -4,13 +4,13 @@ description: "Deep review against requirements, callers and tests; fixes confirm
 allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py *)
 ---
 
-# defuss-vae / verify
+# defuss-vae 0.9.0 / verify
 
 Default = review + fix actionable findings; IF the human asks report-only THEN NOT edit.
 
 ## Method
 
-Scope: named paths|tests, ELSE the current change; review it in context, NOT an isolated diff: read requirements|plan, `AGENTS.md`, `.agents/MEMORY.md`, `.agents/CLI_GIST.md`, `.agents/VERIFY.py`, changed files, relevant callers|callees, tests; `grep` `.agents/EPISODES.md` for changed paths|symbols|symptoms. NOT infer behavior from filenames|untraced diff fragments.
+Scope: named paths|tests, ELSE the current change; review it in context, NOT an isolated diff: read requirements|plan, `AGENTS.md`, `.vae/MEMORY.md`, `.vae/CLI_GIST.md`, `.vae/VERIFY.py`, changed files, relevant callers|callees, tests; `grep` `.vae/EPISODES.md` for changed paths|symbols|symptoms. NOT infer behavior from filenames|untraced diff fragments.
 
 **Correctness / contract pass**
 
@@ -36,7 +36,7 @@ precision > volume. Actionable finding REQUIRES `path:line|symbol`, causal failu
 
 ## Fix + learn
 
-EVERY actionable finding (fix mode): root-cause fix, smallest correct diff → regression test IF the root cause is a VERIFIED code defect → IF recurrence mechanically checkable THEN `.agents/VERIFY.py` rule ELSE `.agents/MEMORY.md` line only IF future agents need it → rerun `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py gate --repo . --session ${CLAUDE_SESSION_ID}`. Source|test edits invalidate prior attestations.
+EVERY actionable finding (fix mode): root-cause fix, smallest correct diff → regression test IF the root cause is a VERIFIED code defect → IF recurrence mechanically checkable THEN `.vae/VERIFY.py` rule ELSE `.vae/MEMORY.md` line only IF future agents need it → rerun `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py gate --repo . --session ${CLAUDE_SESSION_ID}`. Source|test edits invalidate prior attestations.
 Clean review valid only after inspecting the changed contract in context; "tests pass" ≠ semantic review.
 
 ## Output contract

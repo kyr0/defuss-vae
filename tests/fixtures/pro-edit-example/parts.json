@@ -1,0 +1,45 @@
+[
+  {
+    "id": 1,
+    "start": 0,
+    "end": 95,
+    "line": 1,
+    "headings": [
+      "# Importprüfung"
+    ],
+    "text": "# Importprüfung\n\nDieses Dokument beschreibt einen konstruierten Testfall, keine reale Studie.\n\n"
+  },
+  {
+    "id": 2,
+    "start": 95,
+    "end": 285,
+    "line": 5,
+    "headings": [
+      "# Importprüfung",
+      "## Pilotversuch"
+    ],
+    "text": "## Pilotversuch\n\nIn der Pilotgruppe mit 40 Erwachsenen könnte die Vorlage unter Aufsicht die Bearbeitungszeit um 12 % verringern. Eine Wirkung auf die Fehlerquote wurde nicht nachgewiesen.\n\n"
+  },
+  {
+    "id": 3,
+    "start": 285,
+    "end": 392,
+    "line": 9,
+    "headings": [
+      "# Importprüfung",
+      "## Betrieb"
+    ],
+    "text": "## Betrieb\n\nDie Durchführung der Prüfung erfolgt täglich. Alle Importvorgänge werden automatisch geprüft.\n\n"
+  },
+  {
+    "id": 4,
+    "start": 392,
+    "end": 561,
+    "line": 13,
+    "headings": [
+      "# Importprüfung",
+      "## Einschränkung"
+    ],
+    "text": "## Einschränkung\n\nDie automatische Prüfung gilt nicht für manuell hochgeladene CSV-Dateien. Die tägliche Prüfung beweist die einzigartige Zuverlässigkeit des Verfahren.\n"
+  }
+]

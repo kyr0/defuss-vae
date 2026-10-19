@@ -7,13 +7,17 @@ consumer's own suites, so the gate's overhead is the difference. Evidence -> out
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
 import tempfile
 import time
+import urllib.request
 import zipfile
 from pathlib import Path
+
+import research_kit as rk  # fixture servers on 127.0.0.1 for the research steps; the steps drive only the zip's CLI
 
 PY = sys.executable
 SID = "e2e"
@@ -156,6 +160,11 @@ def benchmark(root: Path, proj: Path, zip_name: str) -> dict:
     result = {
         "python3_startup": timed(lambda i: run([PY, "-c", "pass"], proj)),
         "hook.pretooluse.other_command": timed(lambda i: hook(root, proj, cmd("ls -la"))),
+        # Fires before every Edit|Write: the fast path must stay import-free for any file but a memory file.
+        "hook.pretooluse.edit_other_file": timed(lambda i: hook(root, proj, {"hook_event_name": "PreToolUse", "tool_name": "Edit",
+                                                                             "tool_input": {"file_path": str(proj / "calc.py")}})),
+        "hook.pretooluse.edit_memory": timed(lambda i: hook(root, proj, {"hook_event_name": "PreToolUse", "tool_name": "Edit",
+                                                                         "tool_input": {"file_path": str(proj / ".vae/MEMORY.md")}})),
         "hook.session_start": timed(lambda i: hook(root, proj, {"hook_event_name": "SessionStart", "source": "startup"})),
         "project_suites": timed(lambda i: [run(["make", "-s", v], proj) for v in ("lint", "test", "coverage", "e2e")]),
         "gate.cold_verify": timed(cold),
@@ -170,6 +179,51 @@ def benchmark(root: Path, proj: Path, zip_name: str) -> dict:
     return result
 
 
+def research(vae: list[str], proj: Path) -> None:
+    """Research from the installed copy: scaffold the config pairs, then probe, list, call and run against local fixture
+    servers (a scripted LLM, a decision server, the stdio MCP fixture); nothing reaches a real endpoint."""
+    rv = [*vae, "research"]
+    init = run([*rv, "init", "--repo", str(proj)], proj)
+    names = [".env.openai", ".env.openai.json", ".env.mcp", ".env.mcp.json", ".env.typed-decisions", ".env.typed-decisions.json"]
+    step("cli.research.init", all((proj / ".vae" / n).is_file() for n in names) and ".vae/.env.*" in (proj / ".gitignore").read_text()
+         and "never overwrites" in init.stdout, init.stdout.strip().splitlines()[0])
+    unfilled = run([*vae, "doctor", "--repo", str(proj)], proj, ok=(2,)).stdout
+    step("cli.doctor.research_unfilled", "VERIFIED[research.config.openai]=false" in unfilled, "templates name what to fill in")
+
+    def script(body):
+        system = body["messages"][0]["content"]
+        if "find evidence" in system:
+            return '<tool_use_required>[{"tool": "websearch", "query": "answer"}]</tool_use_required>'
+        if "Split and re-print" in system:
+            return '["What is the answer?"]'
+        if "compares reasoning paths" in system:
+            return "4.1. Final Answer: 42. P(correct): 0.93"
+        return "<deductive_conclusion>42</deductive_conclusion>"
+
+    llm = rk.HttpFixture(rk.llm(script, key="e2e-secret-123456"))
+    decide = rk.HttpFixture(rk.typesafe())
+    try:
+        def write(rel: str, text: str) -> None:
+            (proj / rel).write_text(text)
+        caps = {"websearch": [{"server": "fx", "tool": "fail"}, {"server": "fx", "tool": "echo", "args": {"text": "42 per https://example.org/$query"}}]}
+        rk.write_pairs(write, llm_url=llm.url, decide_url=decide.url, secret="e2e-secret-123456",
+                       mcp={"servers": {"fx": rk.stdio_server()}, "capabilities": caps, "timeout_s": 20})
+        doctor = run([*vae, "doctor", "--repo", str(proj)], proj).stdout
+        step("cli.doctor.research", all(f"VERIFIED[research.{c}]=true" in doctor for c in ("openai", "typed-decisions", "mcp.fx", "capability.websearch", "secrets-ignored")),
+             "LLM, decision endpoint, MCP server, capability providers, ignored secrets")
+        tools = run([*rv, "tools", "--repo", str(proj)], proj).stdout
+        step("cli.research.tools", "mcp fx: echo, fail, token, exit" in tools and "capability websearch {query}: fx.fail → fx.echo" in tools, tools.splitlines()[0])
+        called = run([*rv, "call", "websearch", "--repo", str(proj), "query=answer"], proj).stdout
+        step("cli.research.call", "42 per https://example.org/answer" in called and "via fx.echo" in called and "FALLBACK fx.fail" in called, called.strip().splitlines()[-1])
+        ran = run([*rv, "run", "--repo", str(proj), "--no-experiments", "What", "is", "the", "answer?"], proj).stdout
+        report = next((proj / "tmp/vae/research").glob("*/report.md")).read_text()
+        step("cli.research.run", "VERIFIED[research]=true" in ran and "Final Answer: 42" in report and "<https://example.org/answer>" in report
+             and "e2e-secret" not in report, ran.strip().splitlines()[-1])
+    finally:
+        llm.close()
+        decide.close()
+
+
 def main() -> int:
     zip_path = Path(sys.argv[1]).resolve()
     bench = "--bench" in sys.argv
@@ -178,6 +232,9 @@ def main() -> int:
     started = time.time()
     with tempfile.TemporaryDirectory(prefix="vae-e2e-") as raw:
         td = Path(raw).resolve()
+        # Session starts here never reach GitHub or the user's cache; `update check` below reads a local manifest.
+        os.environ.setdefault("VAE_UPDATE_CHECK", "0")
+        os.environ["XDG_CACHE_HOME"] = str(td / "cache")
         with zipfile.ZipFile(zip_path) as z:
             root = td / "install" / "defuss-vae"
             z.extractall(root)
@@ -210,7 +267,7 @@ def main() -> int:
         step("hook.stop.allows", hook(root, proj, {"hook_event_name": "Stop", "stop_hook_active": False}) is None, "no block after gates")
         step("hook.commit.allowed", hook(root, proj, {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "git commit -am feat"}}) is None, "gate clear")
         run(["git", "commit", "-qam", "feat: add sub"], proj)
-        episodes = (proj / ".agents/EPISODES.md").read_text()
+        episodes = (proj / ".vae/EPISODES.md").read_text()
         step("episodes.done", " DONE fp=" in episodes, episodes.strip().splitlines()[-1])
         step("consumer.output", (proj / "output/sum.txt").read_text() == "5", "input/pair.txt → artifact → output/sum.txt")
 
@@ -229,9 +286,45 @@ def main() -> int:
         blocked = run([*vae, "gate", "--repo", str(proj), "--session", docs_sid], proj, ok=(2,))
         step("gate.docs_only.prose", "prose" in blocked.stdout and "tests.unit" not in blocked.stdout, blocked.stdout[:300])
         (proj / "README.md").write_text('"Calc" adds numbers, fast.\n')
-        first = run([*vae, "prose", "--repo", str(proj), "--walk", "README.md"], proj, ok=(2,))
-        last = run([*vae, "prose", "--repo", str(proj), "--walk", "README.md", "--part", "2"], proj)
-        step("prose.walk", "part 1/1" in first.stdout and "--part 2" in first.stdout and "VERIFIED[walk]=true" in last.stdout, last.stdout.strip())
+        # The anchored review of the page: start, one checked submission, apply, then the human's comments read back.
+        start = run([*vae, "edit", "--repo", str(proj), "start", "README.md", "--model", "e2e"], proj)
+        rel = start.stdout.split(" run=")[1].split()[0]
+        (proj / rel / "draft/0001.json").write_text(json.dumps([{
+            "zitat": '"Calc" adds numbers, fast.', "vorkommen": 1, "typ": "satz", "umformulierung": '"Calc" adds two numbers.',
+            "befunde": [{"regel": "P05", "schwere": "gering", "sicherheit": "hoch", "aktion": "praezisieren",
+                         "kommentar": "Name what it adds; fast against what?", "belege": []}]}]))
+        sub = run([*vae, "edit", "--repo", str(proj), "submit", "--run", rel, "--part", "1", "--findings", f"{rel}/draft/0001.json",
+                   "--confidence", "high"], proj)
+        applied = run([*vae, "edit", "--repo", str(proj), "apply", "--run", rel], proj)
+        step("edit.review_apply", "VERIFIED[edit.review]" in sub.stdout and "APPLIED 1/1" in applied.stdout
+             and (proj / "README.md").read_text() == '"Calc" adds two numbers.\n', applied.stdout.splitlines()[0])
+        folder = re.search(r"^RESPONSE: (\S+)/response\.json ", applied.stdout, re.MULTILINE).group(1)
+        page_url = re.search(r"^PAGE: (http://127\.0\.0\.1:\d+/\S+/) ", applied.stdout, re.MULTILINE).group(1)
+        with urllib.request.urlopen(page_url, timeout=5) as r:
+            page = r.read().decode("utf-8")
+        step("edit.review_link", 'id="vae-data"' in page and folder.startswith(".vae/doc-reviews/README.md-1-"), page_url)
+        data = json.loads(re.search(r'id="vae-data">(.*?)</script>', page, re.DOTALL).group(1))
+        # the human's response as the page's "Send to agent" saves it: a reply and one edited sentence
+        (proj / folder / "response.json").write_text(json.dumps({"vae": data["meta"], "version": 1, "comments": [
+            {"id": "p1-1", "author": "Agent", "body": "P05"}, {"id": "r1", "author": "You", "parent": "p1-1", "body": "Two, yes. Say integers."}],
+            "document": {"baseline": '"Calc" adds numbers, fast.', "edited": '"Calc" adds two numbers.'}}))
+        back = run([*vae, "comments", folder, "--repo", str(proj)], proj)
+        step("cli.comments", "REPLY README.md:1 p1-1" in back.stdout and "by You: Two, yes." in back.stdout
+             and "+\"Calc\" adds two numbers." in back.stdout, back.stdout.splitlines()[0])
+        # the agent's revision: only what the reply asked for, checked against the page as the response found it
+        (proj / "README.md").write_text('"Calc" adds two integers.\n')
+        (proj / rel / "notes.json").write_text(json.dumps([{"on": "p1-1", "quote": "two integers.", "body": "Integers, as you asked."}]))
+        revise = [*vae, "edit", "--repo", str(proj), "review", folder, "--notes", f"{rel}/notes.json"]
+        checked, made = run([*revise, "--check"], proj), run(revise, proj)
+        second = re.search(r"^PAGE: (http://127\.0\.0\.1:\d+/\S+/) ", made.stdout, re.MULTILINE).group(1)
+        with urllib.request.urlopen(second, timeout=5) as r:
+            page = r.read().decode("utf-8")
+        step("cli.edit.review", "VERIFIED[revision]" in checked.stdout and "/README.md-2-" in second and "Integers, as you asked." in page,
+             made.stdout.splitlines()[0])
+        served = run([*vae, "edit", "--repo", str(proj), "serve"], proj)
+        stopped = run([*vae, "edit", "--repo", str(proj), "serve", "--stop"], proj)
+        step("cli.edit.serve", served.stdout.startswith(f"SERVING {page_url.rsplit('/', 2)[0]}/") and "STOPPED" in stopped.stdout,
+             served.stdout.strip())
         review = run([*vae, "gate", "--repo", str(proj), "--session", docs_sid], proj, ok=(2,))
         step("gate.docs_only.review", 'PAGES ["README.md"]' in review.stdout and "references/PROSE.md" in review.stdout, review.stdout[:300])
         written(review.stdout, "review").write_text(json.dumps({
@@ -274,6 +367,36 @@ def main() -> int:
         step("swarm.lifecycle", "VERIFIED[swarm.spawn]=true" in spawned.stdout and "EXITED e2e-job" in listing and "code=0" in listing
              and "Z swarm-ok\n" in swlog and "VERIFIED[swarm.rm]=true" in reaped.stdout, listing.strip().splitlines()[-1])
         step("doctor.repo", run([PY, str(root / "scripts/vae.py"), "doctor", "--repo", str(proj)], proj).returncode == 0, "budgets, tags, layout")
+
+        # Memory history: the adapter archives the version an edit replaces; the gate's check logs keep their history.
+        memory = proj / ".vae/MEMORY.md"
+        memory.write_text(memory.read_text() + "- VERIFIED[e2e] edited before an Edit event BC e2e\n")
+        hook(root, proj, {"hook_event_name": "PreToolUse", "tool_name": "Edit", "tool_input": {"file_path": str(memory)}})
+        metas = [json.loads(m.read_text()) for m in (proj / "tmp/vae/memory").glob("MEMORY.md.*.meta.json")]
+        step("hook.memory.archives_before_edit", any(m["reason"] == "alter" for m in metas), f"{len(metas)} MEMORY.md versions")
+        logs = list((proj / "var/log/vae/archive").glob("*.log.*.gz"))
+        step("logs.archived_before_overwrite", bool(logs), f"{len(logs)} archived check logs")
+        tidy = run([*vae, "doctor", "--repo", str(proj), "--tidy", "--apply"], proj)
+        step("cli.doctor.tidy", "tidy.tmp" in tidy.stdout and "tidy.logs" in tidy.stdout, tidy.stdout.strip().splitlines()[0])
+
+        # Update: the version this copy ships, the release check (a file:// manifest, no network), the state move.
+        version = run([*vae, "update", "version"], proj).stdout.strip()
+        step("cli.update.version", version == json.loads((root / "plugin.json").read_text())["version"], version)
+        release = td / "release.json"
+        release.write_text(json.dumps({"version": "99.0.0"}))
+        checked = subprocess.run([*vae, "update", "check"], cwd=proj, text=True, capture_output=True, timeout=60, check=False,
+                                 env={**os.environ, "VAE_UPDATE_URL": release.as_uri()})
+        step("cli.update.check", "defuss-vae 99.0.0 is released" in checked.stdout, checked.stdout.strip())
+        legacy = td / "legacy"
+        (legacy / ".agents").mkdir(parents=True)
+        (legacy / ".agents/VERIFY.py").write_text("CONFIG = {}\nRULES = []\n")
+        run(["git", "init", "-q"], legacy)
+        notice = hook(root, legacy, {"hook_event_name": "SessionStart", "session_id": "legacy"})
+        moved = run([*vae, "update", "migrate", "--repo", str(legacy)], legacy)
+        step("cli.update.migrate", "update migrate" in notice["hookSpecificOutput"]["additionalContext"]
+             and (legacy / ".vae/VERIFY.py").is_file() and not (legacy / ".agents").exists(), moved.stdout.strip())
+
+        research(vae, proj)
 
     evidence = {"zip": zip_path.name, "seconds": round(time.time() - started, 2), "steps": steps}
     (out_dir / "e2e.json").write_text(json.dumps(evidence, indent=2) + "\n")

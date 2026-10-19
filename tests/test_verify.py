@@ -79,7 +79,7 @@ class VerifyTests(RepoCase):
     def test_timeout_with_partial_output_fails_closed_instead_of_crashing(self):
         # Regression: TimeoutExpired.stdout is bytes even with text=True; str + bytes crashed the Stop hook (fail-open).
         self.make_python_project(test_command="echo partial; sleep 5")
-        self.write(".agents/VERIFY.py", self.repo.joinpath(".agents/VERIFY.py").read_text().replace("'timeout_s':60", "'timeout_s':1"))
+        self.write(".vae/VERIFY.py", self.repo.joinpath(".vae/VERIFY.py").read_text().replace("'timeout_s':60", "'timeout_s':1"))
         unit = self.check(verify(self.repo, ["calc.py"]), "tests.unit")
         self.assertFalse(unit.value)
         self.assertIn("exit=124", unit.evidence)
@@ -88,7 +88,7 @@ class VerifyTests(RepoCase):
 
     def test_coverage_without_metric_fails_closed(self):
         self.make_python_project()
-        self.write(".agents/VERIFY.py", f"CONFIG={{'test_command':{TEST_CMD!r},'coverage_command':'echo no metric here','layout':False}}\nRULES=[]\n")
+        self.write(".vae/VERIFY.py", f"CONFIG={{'test_command':{TEST_CMD!r},'coverage_command':'echo no metric here','layout':False}}\nRULES=[]\n")
         report = verify(self.repo, ["calc.py"])
         self.assertFalse(report.verified)
         self.assertEqual(self.check(report, "coverage").status, "UNKNOWN")
@@ -141,15 +141,33 @@ class VerifyTests(RepoCase):
 
     def test_prose_allow_and_disable_per_page(self):
         self.make_python_project()
-        with (self.repo / ".agents/VERIFY.py").open("a") as f:
+        with (self.repo / ".vae/VERIFY.py").open("a") as f:
             f.write("CONFIG['prose'] = {'allow': {'docs/de/*.md': '\\u201c'}}\n")
         self.write("docs/de/a.md", "Er sagte \u201eja\u201c.\n")
         self.write("docs/b.md", "He said \u201cyes\u201d.\n")
         self.assertTrue(self.check(verify(self.repo, ["docs/de/a.md"]), "prose").value)
         self.assertFalse(self.check(verify(self.repo, ["docs/b.md"]), "prose").value)
-        with (self.repo / ".agents/VERIFY.py").open("a") as f:
+        with (self.repo / ".vae/VERIFY.py").open("a") as f:
             f.write("CONFIG['prose'] = False\n")
         self.assertTrue(verify(self.repo, ["docs/b.md"]).verified)
+
+    def test_prose_checks_the_html_pages_a_project_names(self):
+        self.make_python_project()
+        with (self.repo / ".vae/VERIFY.py").open("a") as f:
+            f.write("CONFIG['prose'] = {'html': ['docs/*.html']}\n")
+        self.write("docs/index.html", "<p>Coverage 31.6% \u2192 75.6%</p>\n<pre>a \u2192 b</pre>\n")
+        self.write("app/view.html", "<p>a \u2192 b</p>\n")
+        prose = self.check(verify(self.repo, ["docs/index.html", "app/view.html"], suites=False), "prose")
+        self.assertFalse(prose.value)
+        self.assertIn("docs/index.html:1 T06", prose.evidence)
+        self.assertNotIn("app/view.html", prose.evidence, "an HTML file is a page only where the project names it")
+        p = sh(f"{PY} {ROOT}/scripts/vae.py prose --repo {self.repo}", self.repo, check=False)
+        self.assertIn("docs/index.html:1 T06", p.stdout)
+        self.assertNotIn("docs/index.html:2", p.stdout)
+        with (self.repo / ".vae/VERIFY.py").open("a") as f:
+            f.write("CONFIG['prose'] = {'html': 'docs/*.html'}\n")
+        prose = self.check(verify(self.repo, ["docs/index.html", "app/view.html"], suites=False), "prose")
+        self.assertNotIn("app/view.html", prose.evidence, "one glob as a string is one glob, not one per character")
 
     def test_prose_cli_fixes_then_reports_only_rewrites(self):
         self.make_python_project()
@@ -386,7 +404,7 @@ class VerifyTests(RepoCase):
     def test_missing_verbs_cite_the_detected_stacks_defaults(self):
         self.write("go.mod", "module example.com/calc\n\ngo 1.26\n")
         self.write("calc.go", "package calc\n\nfunc Add(a, b int) int { return a + b }\n")
-        self.write(".agents/VERIFY.py", "CONFIG = {'layout': False}\nRULES = []\n")
+        self.write(".vae/VERIFY.py", "CONFIG = {'layout': False}\nRULES = []\n")
         self.commit_all()
         report = verify(self.repo, ["calc.go"])
         self.assertIn("go: `golangci-lint run`", self.check(report, "lint").next)
@@ -398,7 +416,7 @@ class VerifyTests(RepoCase):
         # CI runs only `make verify`; the gate runs the verbs one by one, so a hollow `verify` would pass locally only.
         verbs = "lint test coverage e2e:\n\t@true\n"
         self.write("Makefile", verbs + "verify: lint test coverage\n\tcd sub && $(MAKE) -C sub e2e\n")
-        self.write(".agents/VERIFY.py", "CONFIG={'layout':False}\nRULES=[]\n")
+        self.write(".vae/VERIFY.py", "CONFIG={'layout':False}\nRULES=[]\n")
         wiring = self.check(verify(self.repo, []), "wiring")
         self.assertEqual((wiring.value, wiring.evidence), (False, "verify→coverage,lint,test; missing=e2e"))
         self.assertIn("verify: lint test coverage e2e", wiring.next)
@@ -443,7 +461,7 @@ class VerifyTests(RepoCase):
     def test_defuss_vae_policy_file_does_not_make_a_repo_python(self):
         self.write(".gitignore", "var/*\ntmp/*\n.env\noutput/*\ndist/\nnode_modules/\ncoverage/\n.cache/\n")
         self.write("package.json", "{}")
-        self.write(".agents/VERIFY.py", "CONFIG = {}\n")
+        self.write(".vae/VERIFY.py", "CONFIG = {}\n")
         self.write(".github/scripts/release.py", "")
         self.assertTrue(check_gitignore(self.repo, {}).value, check_gitignore(self.repo, {}).evidence)
 
@@ -479,7 +497,7 @@ class VerifyTests(RepoCase):
     def test_a_broken_verify_py_fails_closed(self):
         self.make_python_project()
         for source in ("CONFIG = []\nRULES = []\n", "raise RuntimeError('boom')\n"):
-            self.write(".agents/VERIFY.py", source)
+            self.write(".vae/VERIFY.py", source)
             report = verify(self.repo, ["calc.py"])
             self.assertFalse(report.verified, source)
             self.assertNotEqual(self.check(report, "verifier.config").value, True, source)
@@ -490,12 +508,12 @@ class VerifyTests(RepoCase):
         ok = subprocess.run([*cli, "verify", "--repo", str(self.repo), "--json"], text=True, capture_output=True, check=False)
         data = json.loads(ok.stdout)
         self.assertEqual((ok.returncode, data["status"], data["value"]), (0, "VERIFIED", True))
-        self.write(".agents/VERIFY.py", "CONFIG = {'prose': {'phrases': ['(']}}\nRULES = []\n")
+        self.write(".vae/VERIFY.py", "CONFIG = {'prose': {'phrases': ['(']}}\nRULES = []\n")
         bad = subprocess.run([*cli, "prose", "--repo", str(self.repo), "README.md"], text=True, capture_output=True, check=False)
         self.assertEqual(bad.returncode, 2)
         self.assertIn("UNKNOWN[prose] BC invalid CONFIG['prose']['phrases'] regex", bad.stdout)
         self.assertEqual(self.check(verify(self.repo, ["README.md"]), "prose").status, "UNKNOWN", "the gate fails closed too")
-        (self.repo / ".agents/VERIFY.py").unlink()
+        (self.repo / ".vae/VERIFY.py").unlink()
         missing = subprocess.run([*cli, "verify", "--repo", str(self.repo)], text=True, capture_output=True, check=False)
         self.assertEqual(missing.returncode, 2)
         self.assertIn("UNKNOWN[verifier.overall]=?", missing.stdout, "no policy file: verification cannot conclude")
@@ -504,7 +522,7 @@ class VerifyTests(RepoCase):
         # Option B (0.6.0): the template blocks from day one; a config without the key, like every 0.5.x project's
         # explicit False, keeps warnings until the project opts in.
         init_project(self.repo, ROOT)
-        config = runpy.run_path(str(self.repo / ".agents/VERIFY.py"))["CONFIG"]
+        config = runpy.run_path(str(self.repo / ".vae/VERIFY.py"))["CONFIG"]
         self.assertIs(config["strict"], True)
         self.write("package.json", "{}")
         self.assertTrue(check_gitignore(self.repo, config).required, "a new project blocks on its gaps")

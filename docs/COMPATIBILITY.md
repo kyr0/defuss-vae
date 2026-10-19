@@ -27,11 +27,11 @@ Hooks run on plain `python3`, not `uv run`. `VERIFIED:` `uv run` adds 5.4 ms (+1
 
 ## WHY two Codex hook declarations?
 
-`VERIFIED:` OpenAI's Codex plugin docs keep `.codex-plugin/plugin.json` supported as a compatibility fallback next to the Agent Plugins root manifest ([Package your plugin](https://developers.openai.com/codex/plugins/build)).
+`VERIFIED:` OpenAI's Codex plugin docs ([Package your plugin](https://developers.openai.com/codex/plugins/build), checked 2026-10-19) make `extensions.com.openai` in the root `plugin.json` the source of OpenAI settings: hooks, presentation (`interface`), apps. `.codex-plugin/plugin.json` is a compatibility fallback, read only when that object is absent, and the two are never merged. Codex sets `CLAUDE_PLUGIN_ROOT` for plugin hooks, so `hooks/hooks.json` runs unchanged ([Hooks](https://learn.chatgpt.com/docs/hooks)).
 
-`UNKNOWN:` whether every current Codex build loads hooks declared under `extensions.com.openai` in the root manifest.
+`VERIFIED:` (the human's report, 2026-10-19) a Codex build ignored the hooks of `.codex-plugin/plugin.json` while the root manifest existed without the extension, so defuss-vae ran without its gate there. `UNKNOWN:` which Codex version that was.
 
-Therefore the portable root manifest (`plugin/plugin.json`) stays free of the OpenAI extension and the overlay declares hooks explicitly, which works either way.
+Therefore the root manifest declares the hooks and the presentation under `extensions.com.openai`, and the overlay keeps the same values for builds that read only the fallback. `test_codex_finds_the_hooks_in_the_root_manifest` keeps both equal. The rejected alternative, deleting the overlay, would drop every build that still reads only `.codex-plugin/plugin.json`.
 
 ## Swarm registry
 

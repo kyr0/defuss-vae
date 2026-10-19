@@ -1,19 +1,27 @@
-"""Repository facts: git state, path classification, process execution, JSON state I/O.
+"""Repository facts: git state, path classification, process execution, JSON state I/O, history archives.
 
 VERIFIED: stdlib-only, so lifecycle hooks need no installs and run on any python3 >= 3.9."""
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import os
 import re
 import subprocess
+import tarfile
 import time
+import zlib
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
+# The one owner of defuss-vae's state folder: every module builds its paths from these. WHY `.vae/` over the
+# earlier `.agents/`: other agent tools write to `.agents/` too, so a shared name could collide (vae_update.migrate).
+STATE_DIR = ".vae"
+LEGACY_STATE_DIR = ".agents"
+STATE_FILES = ("VERIFY.py", "MEMORY.md", "EPISODES.md", "CLI_GIST.md", "SWARM_STATUS.yaml")
 SOURCE_EXT = {
     ".py", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".mts", ".cts",
     ".go", ".rs", ".java", ".kt", ".kts", ".c", ".h", ".cc", ".cpp", ".hpp",
@@ -166,7 +174,7 @@ def changed_since(repo: Path, baseline: dict[str, Any]) -> list[str]:
 def in_scope(path: str) -> bool:
     """Project-owned files: not runtime state, agent memory or vendored/build directories."""
     p = Path(path)
-    if not p.parts or p.parts[0] in RUNTIME_TOP or path.startswith(".agents/"):
+    if not p.parts or p.parts[0] in RUNTIME_TOP or p.parts[0] in (STATE_DIR, LEGACY_STATE_DIR):
         return False
     return not any(part in IGNORE_DIRS for part in p.parts)
 
@@ -230,7 +238,7 @@ def is_library(pkg: dict[str, Any]) -> bool:
 
 
 def stacks(files: Iterable[str]) -> set[str]:
-    """Toolchains the project's own files use. WHY in_scope and no hidden dirs: `.agents/VERIFY.py` is defuss-vae's
+    """Toolchains the project's own files use. WHY in_scope and no hidden dirs: `.vae/VERIFY.py` is defuss-vae's
     policy, not the project's code, and would make every initialized repo look like a Python project."""
     found = set()
     for f in files:
@@ -390,8 +398,128 @@ def read_json(path: Path) -> dict[str, Any] | None:
         return None
 
 
-def write_json(path: Path, obj: dict[str, Any]) -> None:
+def write_text_atomic(path: Path, text: str) -> None:
+    """Write through a temp file and `replace`, so a reader never sees half a file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(obj, indent=2, sort_keys=True) + "\n", "utf-8")
+    tmp.write_text(text, "utf-8")
     tmp.replace(path)
+
+
+def write_private(path: Path, data: str | bytes) -> None:
+    """Atomic like `write_text_atomic`, readable by the owner only (mode 600): for files that hold page text,
+    prompts or model traces. WHY the mode at creation: a chmod after the write would leave the file readable by others
+    for a moment."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{time.monotonic_ns()}.tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "wb") as f:
+        f.write(data.encode("utf-8") if isinstance(data, str) else data)
+    tmp.replace(path)
+
+
+def write_json(path: Path, obj: dict[str, Any]) -> None:
+    write_text_atomic(path, json.dumps(obj, indent=2, sort_keys=True) + "\n")
+
+
+# -- history archives: gzip + .meta.json per version, never deleted ------------------------------------------------
+
+ARCHIVE_POINTER = "LATEST.json"
+BUNDLE_AFTER_DAYS = 7
+STAMP_RE = re.compile(r"\.(\d{8})T\d{9}Z(?:-\d+)?\.gz(?:\.meta\.json)?$")
+
+
+def archive_copy(src: Path, folder: Path, reason: str) -> Path | None:
+    """Gzip `src` into `folder` as `<name>.<UTC stamp>.gz` with `<same>.meta.json` beside it, whose `prev` names the
+    previous archive of the same file; `LATEST.json` names the newest per file. Identical content is archived once.
+
+    WHY a linked list in the metadata instead of sorting names: a reader walks one file's history newest to oldest from
+    one pointer, and the order survives a clock that jumps back. WHY write the archive before the pointer: a crash in
+    between leaves an unreferenced archive, never a pointer to a missing one."""
+    if not src.is_file():
+        return None
+    data = src.read_bytes()
+    digest = hashlib.sha256(data).hexdigest()
+    folder.mkdir(parents=True, exist_ok=True)
+    pointer = read_json(folder / ARCHIVE_POINTER) or {}
+    prev = pointer.get(src.name) if isinstance(pointer.get(src.name), str) else None
+    if prev and (read_json(folder / f"{prev}.meta.json") or {}).get("sha256") == digest:
+        return None
+    t = time.time()
+    stamp = time.strftime("%Y%m%dT%H%M%S", time.gmtime(t)) + f"{int(t % 1 * 1000):03d}Z"
+    name, n = f"{src.name}.{stamp}.gz", 1
+    while (folder / name).exists():
+        n += 1
+        name = f"{src.name}.{stamp}-{n}.gz"
+    tmp = folder / f".{name}.tmp"
+    with gzip.open(tmp, "wb") as fh:
+        fh.write(data)
+    tmp.replace(folder / name)
+    write_json(folder / f"{name}.meta.json", {"file": src.name, "created": now_iso(), "reason": reason,
+                                              "sha256": digest, "bytes": len(data), "prev": prev})
+    pointer[src.name] = name
+    write_json(folder / ARCHIVE_POINTER, pointer)
+    return folder / name
+
+
+def history_problems(folder: Path) -> list[str]:
+    """Walk every chain from `LATEST.json`: each archive must exist, decompress to its recorded sha256, and end."""
+    problems: list[str] = []
+    for name, newest in sorted((read_json(folder / ARCHIVE_POINTER) or {}).items()):
+        cur, seen = newest, set()
+        while isinstance(cur, str):
+            if cur in seen:
+                problems.append(f"{name}: cycle at {cur}")
+                break
+            seen.add(cur)
+            meta, gz = read_json(folder / f"{cur}.meta.json"), folder / cur
+            if meta is None or not gz.is_file():
+                problems.append(f"{name}: {cur} is missing")
+                break
+            try:
+                digest = hashlib.sha256(gzip.decompress(gz.read_bytes())).hexdigest()
+            except (OSError, EOFError, zlib.error) as e:
+                problems.append(f"{name}: {cur} does not decompress ({type(e).__name__})")
+            else:
+                if digest != meta.get("sha256"):
+                    problems.append(f"{name}: {cur} does not match its sha256")
+            cur = meta.get("prev")
+    return problems
+
+
+def bundle_old(folder: Path, days: int = BUNDLE_AFTER_DAYS, now: float | None = None, force: bool = False) -> list[str]:
+    """Pack loose archives older than `days` into one `<YYYY-MM-DD>.tar.gz` per day of their creation; the loose copies
+    go only after the bundle is written, so nothing is lost. Scans at most once a day unless forced.
+
+    WHY bundle at all: every archived write leaves two files, so a busy week would leave thousands; one file per day
+    keeps the folder listable while every byte stays retrievable (`tar -xzf <day>.tar.gz <name>`)."""
+    if not folder.is_dir():
+        return []
+    now = time.time() if now is None else now
+    today = time.strftime("%Y-%m-%d", time.gmtime(now))
+    marker = folder / ".bundled"
+    if not force and marker.is_file() and marker.read_text("utf-8").strip() == today:
+        return []
+    cutoff = time.strftime("%Y%m%d", time.gmtime(now - days * 86400))
+    groups: dict[str, list[Path]] = {}
+    for p in folder.iterdir():
+        m = STAMP_RE.search(p.name)
+        if m and m.group(1) < cutoff:
+            groups.setdefault(m.group(1), []).append(p)
+    done = []
+    for day, files in sorted(groups.items()):
+        label = f"{day[:4]}-{day[4:6]}-{day[6:]}"
+        target, n = folder / f"{label}.tar.gz", 1
+        while target.exists():
+            n += 1
+            target = folder / f"{label}.{n}.tar.gz"
+        tmp = folder / f".{target.name}.tmp"
+        with tarfile.open(tmp, "w:gz") as tar:
+            for f in sorted(files):
+                tar.add(f, arcname=f.name)
+        tmp.replace(target)
+        for f in files:
+            f.unlink()
+        done.append(f"{target.name} ← {len(files)} files")
+    marker.write_text(today + "\n", "utf-8")
+    return done

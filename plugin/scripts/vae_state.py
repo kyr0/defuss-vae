@@ -1,4 +1,4 @@
-"""Session state and agent memory files. Both live in the repo (tmp/vae/, .agents/), so the CLI and hooks agree."""
+"""Session state and agent memory files. Both live in the repo (tmp/vae/, .vae/), so the CLI and hooks agree."""
 from __future__ import annotations
 
 import contextlib
@@ -9,6 +9,8 @@ from typing import Any
 
 from vae_repo import (
     PLUGIN_ROOT,
+    STATE_DIR,
+    archive_copy,
     git_head,
     now_iso,
     read_json,
@@ -27,6 +29,10 @@ MEMORY_LINE = 240  # one concise lesson: about 16 fit the MEMORY budget
 ENTRY_RE = re.compile(r"\d{4}-\d\d-\d\dT")
 SESSIONS = "sessions.tsv"  # one `<folder>\t<session id>` line per session; the first line for an id wins
 FOLDER_RE = re.compile(r"\d{4}-\d\d-\d\d_\d\d_\d\d_\d\d_\d+")
+# Every version of these files is kept, gzipped, in MEMORY_HISTORY (vae_repo.archive_copy): edits and trims rewrite
+# the live file, and the history is where an agent looks when evidence shows earlier work that memory no longer holds.
+MEMORY_FILES = ("MEMORY.md", "CLI_GIST.md", "EPISODES.md")
+MEMORY_HISTORY = "tmp/vae/memory"
 
 
 def session_dir(repo: Path, session_id: str) -> Path:
@@ -121,11 +127,11 @@ def ensure_from_template(repo: Path, rel: str, template_root: Path = PLUGIN_ROOT
 
 def bootstrap(repo: Path, template_root: Path = PLUGIN_ROOT) -> list[str]:
     """Gate-owned agent state only; the Makefile and .gitignore stay explicit `init` decisions."""
-    return [r for r in (".agents/VERIFY.py", ".agents/EPISODES.md") if ensure_from_template(repo, r, template_root)]
+    return [r for r in (".vae/VERIFY.py", ".vae/EPISODES.md") if ensure_from_template(repo, r, template_root)]
 
 
 def episode_entries(repo: Path) -> list[str]:
-    p = repo / ".agents" / "EPISODES.md"
+    p = repo / STATE_DIR / "EPISODES.md"
     lines = p.read_text("utf-8", errors="replace").splitlines() if p.exists() else []
     return [ln for ln in lines if ENTRY_RE.match(ln)]
 
@@ -141,9 +147,14 @@ def is_lead(entry: str) -> bool:
     return kind not in ("DONE", "FAIL")
 
 
+def archive_memory(repo: Path, name: str, reason: str) -> Path | None:
+    """Archive the current `.vae/<name>` before it changes (`alter`, `capacity`) or when found changed (`snapshot`)."""
+    return archive_copy(repo / STATE_DIR / name, runtime_dir(repo, MEMORY_HISTORY), reason)
+
+
 def append_episodes(repo: Path, session_id: str, entries: list[str], template_root: Path = PLUGIN_ROOT) -> None:
-    ensure_from_template(repo, ".agents/EPISODES.md", template_root)
-    p = repo / ".agents" / "EPISODES.md"
+    ensure_from_template(repo, ".vae/EPISODES.md", template_root)
+    p = repo / STATE_DIR / "EPISODES.md"
     lines = p.read_text("utf-8", errors="replace").splitlines()
     first = next((i for i, ln in enumerate(lines) if ENTRY_RE.match(ln)), len(lines))
     head = lines[:first] + ([""] if first == len(lines) and lines and lines[-1].strip() else [])
@@ -157,6 +168,7 @@ def append_episodes(repo: Path, session_id: str, entries: list[str], template_ro
         cut = {i for i, ln in enumerate(body) if ENTRY_RE.match(ln) and not is_lead(ln)}
         cut = set(sorted(cut)[:drop])
         body = [ln for i, ln in enumerate(body) if i not in cut]
+        archive_memory(repo, "EPISODES.md", "capacity")
     p.write_text("\n".join(head + body) + "\n", "utf-8")
 
 

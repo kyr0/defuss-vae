@@ -36,6 +36,17 @@
             "statusMessage": "defuss-vae commit gate"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/lifecycle.py\"",
+            "timeout": 10,
+            "statusMessage": "defuss-vae memory history"
+          }
+        ]
       }
     ]
   }

@@ -18,6 +18,6 @@ jobs:
         if: hashFiles('**/uv.lock') != ''
       - uses: oven-sh/setup-bun@v2
         if: hashFiles('**/bun.lock', '**/bun.lockb') != ''
-      # CONFIG["ci"] commands from .agents/VERIFY.py, one step each:
+      # CONFIG["ci"] commands from .vae/VERIFY.py, one step each:
       - run: make setup
       - run: make verify

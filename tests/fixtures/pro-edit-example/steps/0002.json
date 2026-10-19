@@ -1,0 +1,534 @@
+{
+  "part": 2,
+  "window": [
+    1,
+    2
+  ],
+  "previousRevision": 1,
+  "summary": {
+    "revision": 2,
+    "bis_seite": 2,
+    "naechste_id": 8,
+    "eintraege": [
+      {
+        "id": "M000001",
+        "typ": "struktur",
+        "inhalt": "Teil 1 trägt die Überschrift „Importprüfung“; damit ist der sichtbare Gegenstandsbezeichner dieses Teils gegeben. Weiterer Sachinhalt als die Einordnung in M000002 ist in Teil 1 nicht vorhanden.",
+        "woertlich": [
+          "Importprüfung"
+        ],
+        "belege": [
+          {
+            "seite": 1,
+            "zitat": "# Importprüfung",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000002"
+        ]
+      },
+      {
+        "id": "M000002",
+        "typ": "aussage",
+        "inhalt": "Das Dokument (Überschrift siehe M000001) beschreibt nach eigener Angabe einen konstruierten Testfall und ausdrücklich keine reale Studie. Diese Einschränkung gilt für den Dokumentcharakter und schließt die Einordnung als real untersuchte Studie aus.",
+        "woertlich": [
+          "konstruierten Testfall",
+          "keine reale Studie"
+        ],
+        "belege": [
+          {
+            "seite": 1,
+            "zitat": "Dieses Dokument beschreibt einen konstruierten Testfall, keine reale Studie.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000001"
+        ]
+      },
+      {
+        "id": "M000003",
+        "typ": "struktur",
+        "inhalt": "Teil 2 trägt die Überschrift „Pilotversuch“ und steht als Unterabschnitt hinter dem in M000001 genannten Gegenstandsbezeichner „Importprüfung“. Der sichtbare Sachinhalt unter dieser Überschrift besteht aus genau zwei Sätzen, gespeichert in M000004 und M000007; eine weitere Gliederung, Gliederungspunkt oder Textankündigung enthält Teil 2 nicht.",
+        "woertlich": [
+          "Pilotversuch"
+        ],
+        "belege": [
+          {
+            "seite": 2,
+            "zitat": "## Pilotversuch",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000004",
+          "M000007"
+        ]
+      },
+      {
+        "id": "M000004",
+        "typ": "aussage",
+        "inhalt": "Für die Pilotgruppe mit 40 Erwachsenen wird nur eine Möglichkeit behauptet: Die Vorlage könnte unter Aufsicht die Bearbeitungszeit um 12 % verringern. Zur Aussage gehören die Bedingung „unter Aufsicht“, der Umfang „Pilotgruppe mit 40 Erwachsenen“, die Bezugsgröße Bearbeitungszeit und der Wert 12 %. Es wird keine bestätigte Verringerung behauptet, und über Gruppen außerhalb der genannten Pilotgruppe wird nichts ausgesagt. Die Bezugsgröße ist die Bearbeitungszeit; die Fehlerquote wird davon getrennt in M000007 behandelt.",
+        "woertlich": [
+          "Pilotgruppe",
+          "40 Erwachsenen",
+          "könnte",
+          "unter Aufsicht",
+          "Bearbeitungszeit",
+          "12 %",
+          "Vorlage"
+        ],
+        "belege": [
+          {
+            "seite": 2,
+            "zitat": "In der Pilotgruppe mit 40 Erwachsenen könnte die Vorlage unter Aufsicht die Bearbeitungszeit um 12 % verringern.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000003",
+          "M000005",
+          "M000006",
+          "M000007"
+        ]
+      },
+      {
+        "id": "M000005",
+        "typ": "offen",
+        "inhalt": "Der in M000004 gebrauchte Ausdruck „die Vorlage“ wird im sichtbaren Material nicht definiert und nicht eingeführt. Ob er dasselbe bezeichnet wie den in M000001 als Überschrift genannten Gegenstandsbezeichner „Importprüfung“ oder einen davon zu unterscheidenden Gegenstand, bleibt innerhalb der sichtbaren Teile offen.",
+        "woertlich": [
+          "die Vorlage"
+        ],
+        "belege": [
+          {
+            "seite": 2,
+            "zitat": "In der Pilotgruppe mit 40 Erwachsenen könnte die Vorlage unter Aufsicht die Bearbeitungszeit um 12 % verringern.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000001",
+          "M000004"
+        ]
+      },
+      {
+        "id": "M000006",
+        "typ": "offen",
+        "inhalt": "Spannung zwischen der in M000002 mit wörtlichem Beleg gespeicherten Eigencharakteristik des Dokuments („einen konstruierten Testfall, keine reale Studie“) und den in M000004 genannten Pilotangaben „Pilotgruppe mit 40 Erwachsenen“ sowie „12 %“: Im sichtbaren Material wird nicht ausdrücklich eingeordnet, ob diese Angaben als reale Messung oder als Bestandteil des konstruierten Szenarios gemeint sind. Die Spannung bleibt als offen erhalten und wird nicht aufgelöst.",
+        "woertlich": [
+          "Pilotgruppe mit 40 Erwachsenen",
+          "12 %"
+        ],
+        "belege": [
+          {
+            "seite": 2,
+            "zitat": "In der Pilotgruppe mit 40 Erwachsenen könnte die Vorlage unter Aufsicht die Bearbeitungszeit um 12 % verringern.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000002",
+          "M000004"
+        ]
+      },
+      {
+        "id": "M000007",
+        "typ": "aussage",
+        "inhalt": "Zur Fehlerquote hält Teil 2 nur fest: Eine Wirkung auf die Fehlerquote wurde nicht nachgewiesen. Dokumentiert ist damit das Fehlen eines Nachweises, nicht ein Nachweis der Wirkungslosigkeit und auch keine verneinte oder ausgeschlossene Wirkung. Diese Aussage betrifft die Fehlerquote und nicht die in M000004 genannte Bearbeitungszeit.",
+        "woertlich": [
+          "Fehlerquote",
+          "nicht nachgewiesen"
+        ],
+        "belege": [
+          {
+            "seite": 2,
+            "zitat": "Eine Wirkung auf die Fehlerquote wurde nicht nachgewiesen.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000003",
+          "M000004"
+        ]
+      }
+    ]
+  },
+  "delta": {
+    "basis_revision": 1,
+    "neu": [
+      {
+        "id": "M000003",
+        "typ": "struktur",
+        "inhalt": "Teil 2 trägt die Überschrift „Pilotversuch“ und steht als Unterabschnitt hinter dem in M000001 genannten Gegenstandsbezeichner „Importprüfung“. Der sichtbare Sachinhalt unter dieser Überschrift besteht aus genau zwei Sätzen, gespeichert in M000004 und M000007; eine weitere Gliederung, Gliederungspunkt oder Textankündigung enthält Teil 2 nicht.",
+        "woertlich": [
+          "Pilotversuch"
+        ],
+        "belege": [
+          {
+            "seite": 2,
+            "zitat": "## Pilotversuch",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000004",
+          "M000007"
+        ]
+      },
+      {
+        "id": "M000004",
+        "typ": "aussage",
+        "inhalt": "Für die Pilotgruppe mit 40 Erwachsenen wird nur eine Möglichkeit behauptet: Die Vorlage könnte unter Aufsicht die Bearbeitungszeit um 12 % verringern. Zur Aussage gehören die Bedingung „unter Aufsicht“, der Umfang „Pilotgruppe mit 40 Erwachsenen“, die Bezugsgröße Bearbeitungszeit und der Wert 12 %. Es wird keine bestätigte Verringerung behauptet, und über Gruppen außerhalb der genannten Pilotgruppe wird nichts ausgesagt. Die Bezugsgröße ist die Bearbeitungszeit; die Fehlerquote wird davon getrennt in M000007 behandelt.",
+        "woertlich": [
+          "Pilotgruppe",
+          "40 Erwachsenen",
+          "könnte",
+          "unter Aufsicht",
+          "Bearbeitungszeit",
+          "12 %",
+          "Vorlage"
+        ],
+        "belege": [
+          {
+            "seite": 2,
+            "zitat": "In der Pilotgruppe mit 40 Erwachsenen könnte die Vorlage unter Aufsicht die Bearbeitungszeit um 12 % verringern.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000003",
+          "M000005",
+          "M000006",
+          "M000007"
+        ]
+      },
+      {
+        "id": "M000005",
+        "typ": "offen",
+        "inhalt": "Der in M000004 gebrauchte Ausdruck „die Vorlage“ wird im sichtbaren Material nicht definiert und nicht eingeführt. Ob er dasselbe bezeichnet wie den in M000001 als Überschrift genannten Gegenstandsbezeichner „Importprüfung“ oder einen davon zu unterscheidenden Gegenstand, bleibt innerhalb der sichtbaren Teile offen.",
+        "woertlich": [
+          "die Vorlage"
+        ],
+        "belege": [
+          {
+            "seite": 2,
+            "zitat": "In der Pilotgruppe mit 40 Erwachsenen könnte die Vorlage unter Aufsicht die Bearbeitungszeit um 12 % verringern.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000001",
+          "M000004"
+        ]
+      },
+      {
+        "id": "M000006",
+        "typ": "offen",
+        "inhalt": "Spannung zwischen der in M000002 mit wörtlichem Beleg gespeicherten Eigencharakteristik des Dokuments („einen konstruierten Testfall, keine reale Studie“) und den in M000004 genannten Pilotangaben „Pilotgruppe mit 40 Erwachsenen“ sowie „12 %“: Im sichtbaren Material wird nicht ausdrücklich eingeordnet, ob diese Angaben als reale Messung oder als Bestandteil des konstruierten Szenarios gemeint sind. Die Spannung bleibt als offen erhalten und wird nicht aufgelöst.",
+        "woertlich": [
+          "Pilotgruppe mit 40 Erwachsenen",
+          "12 %"
+        ],
+        "belege": [
+          {
+            "seite": 2,
+            "zitat": "In der Pilotgruppe mit 40 Erwachsenen könnte die Vorlage unter Aufsicht die Bearbeitungszeit um 12 % verringern.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000002",
+          "M000004"
+        ]
+      },
+      {
+        "id": "M000007",
+        "typ": "aussage",
+        "inhalt": "Zur Fehlerquote hält Teil 2 nur fest: Eine Wirkung auf die Fehlerquote wurde nicht nachgewiesen. Dokumentiert ist damit das Fehlen eines Nachweises, nicht ein Nachweis der Wirkungslosigkeit und auch keine verneinte oder ausgeschlossene Wirkung. Diese Aussage betrifft die Fehlerquote und nicht die in M000004 genannte Bearbeitungszeit.",
+        "woertlich": [
+          "Fehlerquote",
+          "nicht nachgewiesen"
+        ],
+        "belege": [
+          {
+            "seite": 2,
+            "zitat": "Eine Wirkung auf die Fehlerquote wurde nicht nachgewiesen.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000003",
+          "M000004"
+        ]
+      }
+    ],
+    "ergaenze_belege": [],
+    "berichtige": [],
+    "seitenstatus": [
+      {
+        "seite": 1,
+        "status": "bearbeitet"
+      },
+      {
+        "seite": 2,
+        "status": "bearbeitet"
+      }
+    ],
+    "blocker": []
+  },
+  "audit": [],
+  "customInput": {
+    "text": "# Importprüfung\n\nDieses Dokument beschreibt einen konstruierten Testfall, keine reale Studie.\n\n## Pilotversuch\n\nIn der Pilotgruppe mit 40 Erwachsenen könnte die Vorlage unter Aufsicht die Bearbeitungszeit um 12 % verringern. Eine Wirkung auf die Fehlerquote wurde nicht nachgewiesen.\n\n",
+    "zusammenfassung": "[M000001 | struktur] Teil 1 trägt die Überschrift „Importprüfung“; damit ist der sichtbare Gegenstandsbezeichner dieses Teils gegeben. Weiterer Sachinhalt als die Einordnung in M000002 ist in Teil 1 nicht vorhanden.\n  Teil 1, Vorkommen 1: \"# Importprüfung\"\n  Bezüge: M000002\n\n[M000002 | aussage] Das Dokument (Überschrift siehe M000001) beschreibt nach eigener Angabe einen konstruierten Testfall und ausdrücklich keine reale Studie. Diese Einschränkung gilt für den Dokumentcharakter und schließt die Einordnung als real untersuchte Studie aus.\n  Teil 1, Vorkommen 1: \"Dieses Dokument beschreibt einen konstruierten Testfall, keine reale Studie.\"\n  Bezüge: M000001",
+    "pruefbereich": {
+      "von": 95,
+      "bis": 285
+    },
+    "abschnitt_id": "2",
+    "vorgaben": {}
+  },
+  "custom": [
+    {
+      "zitat": "In der Pilotgruppe mit 40 Erwachsenen könnte die Vorlage unter Aufsicht die Bearbeitungszeit um 12 % verringern.",
+      "vorkommen": 1,
+      "typ": "satz",
+      "befunde": [
+        {
+          "regel": "B03",
+          "schwere": "wesentlich",
+          "sicherheit": "hoch",
+          "aktion": "praezisieren",
+          "kommentar": "„um 12 %“ bleibt ohne Bezugsgrundlage: Gegenüber welchem Ausgangswert (Vorher-Nachher-Messung oder Vergleichsgruppe ohne Vorlage), über welchen Zeitraum und mit welcher Stichprobenverteilung der 40 Erwachsenen (gesamt oder je Bedingung) wurde die Bearbeitungszeit erhoben? Im verfügbaren Material ist keine Vergleichsbasis genannt; die Angabe ist erst mit Bezugsgröße, Messzeitpunkt und Streuung prüfbar.",
+          "belege": [
+            {
+              "quelle": "dokument",
+              "teil": 1,
+              "zitat": "Dieses Dokument beschreibt einen konstruierten Testfall, keine reale Studie.",
+              "vorkommen": 1
+            }
+          ]
+        },
+        {
+          "regel": "B04",
+          "schwere": "wesentlich",
+          "sicherheit": "hoch",
+          "aktion": "praezisieren",
+          "kommentar": "Die exakte Zahl „12 %“ steht in einem Konjunktivsatz („könnte … verringern“) und wird zusätzlich durch die Bedingung „unter Aufsicht“ eingeschränkt; damit ist nicht unterscheidbar, ob 12 % ein gemessenes Ergebnis des Pilotversuchs oder eine angenommene Größenordnung ist. Status (Messung, Schätzung, Szenario) ausdrücklich kennzeichnen; die Prämisse „keine reale Studie“ entbindet nicht davon, den Status der Zahl im Textinneren zu klären.",
+          "belege": []
+        },
+        {
+          "regel": "P02",
+          "schwere": "wesentlich",
+          "sicherheit": "mittel",
+          "aktion": "praezisieren",
+          "kommentar": "„die Vorlage“ ist der handelnde Gegenstand des Satzes, wird aber im gesamten verfügbaren Material nicht eingeführt oder abgegrenzt (Teil 1 enthält nachweislich nur Überschrift und Testfall-Einordnung). Gattung und Abgrenzung der Vorlage bestimmen, worauf sich die 12 % beziehen; beim ersten Auftreten kurz bestimmen.",
+          "belege": [
+            {
+              "quelle": "zusammenfassung",
+              "zitat": "Weiterer Sachinhalt als die Einordnung in M000002 ist in Teil 1 nicht vorhanden.",
+              "vorkommen": 1
+            }
+          ]
+        }
+      ],
+      "umformulierung": null
+    },
+    {
+      "zitat": "Eine Wirkung auf die Fehlerquote wurde nicht nachgewiesen.",
+      "vorkommen": 1,
+      "typ": "satz",
+      "befunde": [
+        {
+          "regel": "P07",
+          "schwere": "wesentlich",
+          "sicherheit": "hoch",
+          "aktion": "praezisieren",
+          "kommentar": "„nicht nachgewiesen“ lässt zwei sachlich verschiedene Lesarten offen: Die Fehlerquote wurde erhoben und zeigte keinen Unterschied (Nullresultat), oder sie wurde im Pilotversuch gar nicht erhoben. Aus der Negation folgt im ersten Fall kein Beleg für Wirkungslosigkeit, im zweiten Fall fehlt jede Aussage zum Fehlerverhalten; die gewünschte Lesart ausdrücklich formulieren und die Erfassung der Fehlerquote benennen.",
+          "belege": [
+            {
+              "quelle": "text",
+              "zitat": "In der Pilotgruppe mit 40 Erwachsenen könnte die Vorlage unter Aufsicht die Bearbeitungszeit um 12 % verringern.",
+              "vorkommen": 1
+            }
+          ]
+        }
+      ],
+      "umformulierung": null
+    }
+  ],
+  "calls": [
+    {
+      "role": "custom",
+      "attempt": 1,
+      "tools": [
+        {
+          "name": "document_read",
+          "args": {
+            "teil": 1
+          }
+        },
+        {
+          "name": "document_read",
+          "args": {
+            "teil": 2
+          }
+        }
+      ],
+      "usage": [
+        {
+          "input": 11343,
+          "output": 2312,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 2258,
+          "totalTokens": 13655,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        {
+          "input": 13771,
+          "output": 3789,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 2848,
+          "totalTokens": 17560,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "summary",
+      "attempt": 1,
+      "tools": [
+        {
+          "name": "document_read",
+          "args": {
+            "teil": 2
+          }
+        },
+        {
+          "name": "document_read",
+          "args": {
+            "teil": 1
+          }
+        }
+      ],
+      "usage": [
+        {
+          "input": 8124,
+          "output": 293,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 239,
+          "totalTokens": 8417,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        {
+          "input": 8533,
+          "output": 2620,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 1663,
+          "totalTokens": 11153,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "summary",
+      "attempt": 2,
+      "tools": [],
+      "usage": [
+        {
+          "input": 9177,
+          "output": 6603,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 5590,
+          "totalTokens": 15780,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "audit",
+      "attempt": 1,
+      "tools": [
+        {
+          "name": "document_read",
+          "args": {
+            "teil": 1
+          }
+        },
+        {
+          "name": "document_read",
+          "args": {
+            "teil": 2
+          }
+        }
+      ],
+      "usage": [
+        {
+          "input": 4545,
+          "output": 1134,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 1080,
+          "totalTokens": 5679,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        {
+          "input": 5794,
+          "output": 116,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 112,
+          "totalTokens": 5910,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        }
+      ]
+    }
+  ]
+}

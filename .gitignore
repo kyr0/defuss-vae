@@ -7,6 +7,7 @@ output/*
 .DS_Store
 .ruff_cache/
 .agents/
+.vae/
 dist/
 .venv/
 .pytest_cache/
@@ -14,3 +15,8 @@ dist/
 node_modules/
 coverage/
 .cache/
+feat-autoresearch-handoff/
+feat-pro-edit/
+# defuss-vae LLM, typed-decision and MCP config pairs: API keys and personal endpoints stay local
+.vae/.env.*
+plans/

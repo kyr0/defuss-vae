@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -11,8 +13,15 @@ from vae_testkit import PY, ROOT, RepoCase, sh  # first: puts plugin/scripts on 
 
 # isort: split
 from vae_hooks import STATE_BUDGET
-from vae_project import MANAGED_START, doctor_repo, init_project, runs_verify
-from vae_state import EPISODE_LEADS, MEMORY_LINE, append_episodes
+from vae_project import MANAGED_START, doctor_repo, init_project, runs_verify, tidy
+from vae_repo import archive_copy
+from vae_state import (
+    EPISODE_LEADS,
+    MEMORY_HISTORY,
+    MEMORY_LINE,
+    append_episodes,
+    archive_memory,
+)
 from vae_verify import PROBE_TAG, render_checks
 
 
@@ -22,9 +31,9 @@ class InitDoctorTests(RepoCase):
         self.write(".gitignore", "/tmp/\n")
         self.commit_all()
         first = init_project(self.repo, ROOT)
-        self.assertEqual(set(first), {".agents/VERIFY.py", ".agents/EPISODES.md", ".agents/MEMORY.md", ".agents/CLI_GIST.md", "Makefile", ".gitignore", "AGENTS.md"})
+        self.assertEqual(set(first), {".vae/VERIFY.py", ".vae/EPISODES.md", ".vae/MEMORY.md", ".vae/CLI_GIST.md", "Makefile", ".gitignore", "AGENTS.md"})
         # `/tmp/` already covers tmp/*, so only the missing defaults are appended, in order.
-        self.assertEqual((self.repo / ".gitignore").read_text(), "/tmp/\n.env\nvar/*\noutput/*\ninput/*\n.DS_Store\ndist/\n.agents/SWARM_STATUS.yaml\n",
+        self.assertEqual((self.repo / ".gitignore").read_text(), "/tmp/\n.env\nvar/*\noutput/*\ninput/*\n.DS_Store\ndist/\n.vae/SWARM_STATUS.yaml\n",
                          "no toolchain yet: base lines only; init adds each stack's lines once its files exist")
         text = (self.repo / "AGENTS.md").read_text()
         self.assertIn("Keep me.", text)
@@ -42,7 +51,7 @@ class InitDoctorTests(RepoCase):
         # Stack lines arrive with the stack; an exempt line (a committed build) is never appended.
         (self.repo / ".gitignore").write_text("/tmp/\n.env\nvar/*\noutput/*\ninput/*\n.DS_Store\n")
         self.write("app.py", "")
-        with (self.repo / ".agents/VERIFY.py").open("a") as f:
+        with (self.repo / ".vae/VERIFY.py").open("a") as f:
             f.write("CONFIG['gitignore_exempt'] = ['dist/']\n")
         init_project(self.repo, ROOT)
         text = (self.repo / ".gitignore").read_text()
@@ -74,7 +83,7 @@ class InitDoctorTests(RepoCase):
         sh("git remote add origin git@github.com:example/app.git", self.repo)
         init_project(self.repo, ROOT)
         wf = self.repo / ".github/workflows/verify.yml"
-        verify_py = self.repo / ".agents/VERIFY.py"
+        verify_py = self.repo / ".vae/VERIFY.py"
         wf.unlink()
         with verify_py.open("a") as f:
             f.write("CONFIG['ci'] = False\n")
@@ -113,7 +122,7 @@ class InitDoctorTests(RepoCase):
         init_project(self.repo, ROOT)
         passes = lambda: {c.id: c.passes() for c in doctor_repo(self.repo)}
         self.assertTrue(all(passes().values()), render_checks(doctor_repo(self.repo)))
-        memory = self.repo / ".agents/MEMORY.md"
+        memory = self.repo / ".vae/MEMORY.md"
         with memory.open("a") as f:
             f.write("- remember to be careful\n")
         self.assertFalse(passes()["state.MEMORY.md"])
@@ -132,7 +141,7 @@ class InitDoctorTests(RepoCase):
         memory.write_text("- VERIFIED[src/db] pool size 4 BC " + "y" * MEMORY_LINE + "\n")
         self.assertFalse(passes()["state.MEMORY.md"])
         # The CLI gist holds commands; their evidence is the observed run, not a BC clause.
-        (self.repo / ".agents/CLI_GIST.md").write_text("- VERIFIED[setup] `make setup`\n")
+        (self.repo / ".vae/CLI_GIST.md").write_text("- VERIFIED[setup] `make setup`\n")
         self.assertTrue(passes()["state.CLI_GIST.md"])
 
     def test_doctor_caps_unsettled_episode_leads(self):
@@ -149,13 +158,13 @@ class InitDoctorTests(RepoCase):
     def test_doctor_lists_memory_that_cites_missing_paths_without_blocking(self):
         init_project(self.repo, ROOT)
         self.write("src/kept.py", "")
-        self.write(".agents/MEMORY.md", "# Agent memory\n- VERIFIED[a] `src/old.py:load` validates input\n"
+        self.write(".vae/MEMORY.md", "# Agent memory\n- VERIFIED[a] `src/old.py:load` validates input\n"
                    "- VERIFIED[b] src/kept.py stays pure; agent/human split; see ../../references/X.md and src/*.py\n")
         with (self.repo / "AGENTS.md").open("a") as f:
             f.write("\n- Run src/gone.sh before release.\n")
         stale = next(c for c in doctor_repo(self.repo) if c.id == "state.stale")
         self.assertTrue(stale.passes() and stale.value is False, "a candidate list, never a blocker")
-        self.assertIn(".agents/MEMORY.md: src/old.py", stale.evidence)
+        self.assertIn(".vae/MEMORY.md: src/old.py", stale.evidence)
         self.assertIn("AGENTS.md: src/gone.sh", stale.evidence)
         for fine in ("src/kept.py", "agent/human", "references/X.md", "src/*.py"):
             self.assertNotIn(f": {fine} ", stale.evidence, fine)
@@ -217,6 +226,69 @@ class MakefileTemplateTests(unittest.TestCase):
             self.assertNotEqual(p.returncode, 0)
             self.assertIn(f"UNKNOWN[{verb}]", p.stdout)
         self.assertIn("web: Playwright", sh("make -s e2e", self.dir, check=False).stdout)
+
+
+class TidyTests(RepoCase):
+    def age(self, path: Path, days: float) -> None:
+        stamp = time.time() - days * 86400
+        for f in [path, *path.rglob("*")] if path.is_dir() else [path]:
+            os.utime(f, (stamp, stamp))
+
+    def test_removes_only_defuss_vae_leftovers_and_bundles_old_log_archives(self):
+        vae = self.repo / "tmp/vae"
+        for name, days in (("2026-01-01_10_00_00_1", 40), ("2026-01-02_10_00_00_1", 20), ("2026-09-01_10_00_00_1", 30)):
+            self.write(f"tmp/vae/{name}/state.json", "{}")
+            self.age(vae / name, days)
+        self.write("tmp/vae/sessions.tsv", "2026-01-01_10_00_00_1\ta\n2026-01-02_10_00_00_1\tb\n2026-09-01_10_00_00_1\tc\n")
+        self.write("tmp/vae/SWARM_STATUS.123.456.tmp", "x")
+        self.age(vae / "SWARM_STATUS.123.456.tmp", 1)
+        dead = subprocess.Popen([PY, "-c", "pass"])
+        dead.wait()
+        self.write("tmp/old.pid", str(dead.pid))
+        self.write("tmp/live.pid", str(os.getpid()))
+        self.write("tmp/verify.log", "the project's own scratch file")
+        for name, days in (("guide-2026-01-01T10-00-00-000Z-a1b2c3", 20), ("guide-2026-09-30T10-00-00-000Z-d4e5f6", 2)):
+            self.write(f"tmp/vae/edit/{name}/steps/0001.trace.jsonl", "{}")
+            self.age(vae / "edit" / name, days)
+        self.write(".vae/MEMORY.md", "- one\n")
+        archive_memory(self.repo, "MEMORY.md", "alter")
+        log = self.write("var/log/vae/tests.unit.log", "run 1\n")
+        archive_copy(log, self.repo / "var/log/vae/archive", "overwrite")
+        later = time.time() + 8 * 86400
+
+        report = "\n".join(render_checks(tidy(self.repo, apply=False, now=later)))
+        self.assertIn("tmp/vae/2026-01-01_10_00_00_1/", report)
+        self.assertIn("tmp/vae/edit/guide-2026-01-01T10-00-00-000Z-a1b2c3/", report)
+        self.assertIn("tmp/old.pid", report)
+        self.assertNotIn("tmp/live.pid", report)
+        self.assertIn("due=2 files", report)
+        self.assertTrue((vae / "2026-01-01_10_00_00_1").is_dir(), "a report deletes nothing")
+
+        tidy(self.repo, apply=True, now=later)
+        self.assertFalse((vae / "2026-01-01_10_00_00_1").exists())
+        self.assertFalse((vae / "2026-01-02_10_00_00_1").exists())
+        self.assertTrue((vae / "2026-09-01_10_00_00_1").is_dir(), "the newest session stays, however old")
+        self.assertEqual((vae / "sessions.tsv").read_text(), "2026-09-01_10_00_00_1\tc\n")
+        self.assertFalse((vae / "SWARM_STATUS.123.456.tmp").exists())
+        self.assertFalse((self.repo / "tmp/old.pid").exists())
+        self.assertTrue((self.repo / "tmp/live.pid").exists())
+        self.assertTrue((self.repo / "tmp/verify.log").exists(), "the project's files stay")
+        self.assertEqual([d.name for d in (vae / "edit").iterdir()], ["guide-2026-09-30T10-00-00-000Z-d4e5f6"],
+                         "an edit run, traces included, goes after 14 days untouched")
+        self.assertTrue(any((self.repo / MEMORY_HISTORY).glob("MEMORY.md.*.gz")), "memory history is never touched")
+        self.assertEqual(len(list((self.repo / "var/log/vae/archive").glob("*.tar.gz"))), 1)
+        self.assertTrue(log.exists(), "the live log stays")
+
+    def test_doctor_checks_the_memory_history_chain(self):
+        self.make_python_project()
+        init_project(self.repo, ROOT)
+        archive_memory(self.repo, "MEMORY.md", "snapshot")
+        checks = {c.id: c for c in doctor_repo(self.repo)}
+        self.assertTrue(checks["state.history"].passes(), checks["state.history"])
+        newest = next((self.repo / MEMORY_HISTORY).glob("MEMORY.md.*.gz"))
+        newest.write_bytes(b"broken")
+        checks = {c.id: c for c in doctor_repo(self.repo)}
+        self.assertFalse(checks["state.history"].passes())
 
 
 if __name__ == "__main__":

@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:redaktionspruefung:output:v1",
+  "title": "Ausgabe der redaktionellen Abschnittsprüfung",
+  "description": "Zusätzlich mit src/validation.ts Zitate, Vorkommen, Bereich und Reihenfolge prüfen.",
+  "type": "array",
+  "uniqueItems": true,
+  "items": {
+    "$ref": "#/$defs/eintrag"
+  },
+  "$defs": {
+    "eintrag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "zitat",
+        "vorkommen",
+        "typ",
+        "befunde",
+        "umformulierung"
+      ],
+      "properties": {
+        "zitat": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "vorkommen": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "typ": {
+          "enum": [
+            "fragment",
+            "listeneintrag",
+            "satz",
+            "ueberschrift"
+          ]
+        },
+        "befunde": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/befund"
+          }
+        },
+        "umformulierung": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "befunde": {
+                "contains": {
+                  "type": "object",
+                  "required": [
+                    "aktion"
+                  ],
+                  "properties": {
+                    "aktion": {
+                      "enum": [
+                        "belegen",
+                        "pruefen",
+                        "streichen"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "umformulierung": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "befund": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "regel",
+        "schwere",
+        "sicherheit",
+        "aktion",
+        "kommentar",
+        "belege"
+      ],
+      "properties": {
+        "regel": {
+          "enum": [
+            "A01",
+            "A02",
+            "A03",
+            "A04",
+            "A05",
+            "A06",
+            "A07",
+            "A08",
+            "B01",
+            "B02",
+            "B03",
+            "B04",
+            "B05",
+            "B06",
+            "B07",
+            "B08",
+            "B09",
+            "L01",
+            "L02",
+            "L03",
+            "L04",
+            "L05",
+            "L06",
+            "L07",
+            "L08",
+            "L09",
+            "P01",
+            "P02",
+            "P03",
+            "P04",
+            "P05",
+            "P06",
+            "P07",
+            "P08",
+            "R01",
+            "R02",
+            "R03",
+            "R04",
+            "R05",
+            "R06",
+            "R07",
+            "R08",
+            "S01",
+            "S02",
+            "S03",
+            "S04",
+            "S05",
+            "S06",
+            "S07",
+            "S08",
+            "T01",
+            "T02",
+            "T03",
+            "T04",
+            "T05",
+            "T06"
+          ]
+        },
+        "schwere": {
+          "enum": [
+            "kritisch",
+            "wesentlich",
+            "gering"
+          ]
+        },
+        "sicherheit": {
+          "enum": [
+            "hoch",
+            "mittel"
+          ]
+        },
+        "aktion": {
+          "enum": [
+            "belegen",
+            "kuerzen",
+            "praezisieren",
+            "pruefen",
+            "revidieren",
+            "streichen",
+            "umformulieren",
+            "umstrukturieren"
+          ]
+        },
+        "kommentar": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "belege": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/beleg"
+          }
+        }
+      }
+    },
+    "beleg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "quelle",
+        "zitat",
+        "vorkommen"
+      ],
+      "properties": {
+        "quelle": {
+          "enum": [
+            "text",
+            "zusammenfassung"
+          ]
+        },
+        "zitat": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "vorkommen": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

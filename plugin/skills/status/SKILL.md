@@ -4,14 +4,14 @@ description: "What runs and whether the record matches: sub-agents, services, re
 allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py *)
 ---
 
-# defuss-vae / status
+# defuss-vae 0.9.0 / status
 
 Quick: observe, reconcile the registry; act only on this task's agents OR as the human asked. A process outranks its registry entry.
 CLI = `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vae.py` (other hosts: plugin root = skill dir/../..).
 
 ## Workflow
 
-1. **Observe.** CLI `swarm status --repo .` → resources + one line per agent; `make status` → service; `git worktree list`.
+1. **Observe.** CLI `swarm status --repo .` → resources + one line per agent; `make status` → service; `git worktree list`; CLI `doctor --repo . --tidy [--apply]` → leftovers.
 2. **Reconcile.** IF `LOST` or duplicate entries THEN CLI `swarm status --fix`, rerun → ∅ drift. A worktree with neither entry nor process: report it, NOT delete it.
 3. **Act** per state:
    - `EXITED` code=0 → merge its worktree through the gate, THEN CLI `swarm rm --name <n>`.

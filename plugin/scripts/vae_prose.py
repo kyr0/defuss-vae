@@ -1,21 +1,27 @@
 """Static prose checks for doc pages (machine-writing tells, invisible or look-alike characters, Markdown that renders
-wrong) and the page walk, which splits a page into windows for the catalog review.
+wrong) and the page parts the anchored review (vae_edit) walks.
 
 Pure functions over one page's text; the verifier and `vae.py prose` do the I/O. Every finding names the rule of
-references/PROSE.md it instantiates, so the static check and the catalog review speak one vocabulary.
+references/PROSE.md it instantiates, so the static check and the catalog review speak one vocabulary. A Markdown page is
+checked outside code spans and fences; an HTML page (a project site, CONFIG["prose"]["html"]) in its text and
+reader-facing attributes, outside code, scripts, styles and SVG.
 
-WHY a short list of characters, not ASCII normalization: non-ASCII is not a defect (arrows, math, emoji and other
-languages' quotation marks are content, PROSE.md T06). Flagged are only characters that are typical machine-writing
-tells or that break rendering, search or exact matching. A page or project allows more via CONFIG["prose"].
-HYPOTHESIS: this short list plus per-page allows gives fewer false positives than an ASCII allowlist; falsifier:
+WHY a character table, adapted from aslopcleaner (github.com/kyr0/defuss, packages/aslopcleaner), not its ASCII
+normalization: aslopcleaner swaps every listed character for ASCII (`→` to `=>`), which keeps a symbol standing in for a
+word. In prose the fix for an arrow, a relation sign, a check mark or an emoji is words or a layout, so those are
+flagged for a rewrite by meaning; only swaps that cannot change meaning (curly quotes, the ellipsis character,
+typographic spaces, invisible characters) are applied by `--fix`. Code, diagrams, quoted output, other languages'
+quotation marks and a notation a page defines (VAE-DIALECT's operators) are content: a page or project allows them via
+CONFIG["prose"]["allow"].
+HYPOTHESIS: flagging symbols only outside code keeps false positives to pages that define a notation; falsifier:
 ordinary pages that each need their own CONFIG["prose"]["allow"] entry."""
 from __future__ import annotations
 
 import dataclasses
 import re
-import shlex
 import unicodedata
 from collections.abc import Iterable
+from html import unescape
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -28,7 +34,24 @@ CHARS = {
     "\u2018": ("T06", "'", "curly single quote"),
     "\u2019": ("T06", "'", "curly apostrophe"),
     "\u2026": ("T06", "...", "ellipsis character"),
+    **dict.fromkeys("\u00a0\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u202f\u205f", ("T06", " ", (
+        "non-breaking or typographic space, invisible in the source: a plain space, or `&nbsp;` in HTML where the line "
+        "must not break"))),
 }
+SPACES = {c for c, (_, repl, _) in CHARS.items() if repl == " "}
+# Symbols standing in for words (PROSE.md T06): flagged for words or a layout, never swapped. One finding per kind and line.
+ARROWS = ("\u2192\u27f6\u279c\u2794\u279d\u27a1\u21e2\u21e8\u21d2\u27f9\u2190\u27f5\u21d0\u27f8\u2b05\u2194\u21c4\u21c6\u21d4\u27f7\u27fa\u2191\u21d1"
+          "\u2193\u21d3\u2195\u21d5")
+SYMBOLS = [
+    (ARROWS, ("arrow standing in for a verb: write 'from X to Y', 'X, then Y' or 'X becomes Y', or lay it out as a list, "
+              "table or diagram")),
+    ("\u2264\u2265\u2260\u2248", "relation sign standing in for words: 'at most', 'at least', 'not', 'about'"),
+    ("\u2714\u2705\u2611\u2713\u2717\u2718\u274c\u274e\u2716", ("check or cross mark standing in for a word: 'done', 'passes', "
+                                                      "'fails', 'accept', 'reject'")),
+]
+# Emoji and dingbats (U+2600-27BF, U+2B00-2BFF, U+1F000-1FAFF) not listed above: decoration in technical prose.
+PICTOGRAPH = re.compile("[\u2600-\u27bf\u2b00-\u2bff\U0001f000-\U0001faff]")
+LISTED = "".join(c for c, _ in SYMBOLS)
 # Never content in a doc page, inside code or not: they hide text, break search, or reorder what renders (Trojan Source).
 INVISIBLE = {
     "\u200b": "zero-width space", "\u2060": "word joiner", "\u00ad": "soft hyphen", "\ufeff": "byte-order mark",
@@ -59,6 +82,15 @@ LINK = re.compile(r"\]\(\s*<?([^)\s>]+)>?(?:\s+\"[^\"]*\")?\s*\)")
 SCHEME = re.compile(r"^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|//|#)")
 WORD = re.compile(r"[^\W\d_]{2,}")
 SCRIPTS = ("LATIN", "CYRILLIC", "GREEK")
+HTML_EXT = {".html", ".htm"}
+# Not prose in an HTML page: comments, code-like elements, and the markup of every other tag (its reader-facing
+# attributes excepted; a quoted value may hold `>`). WHY a scanner, not html.parser: findings need source line numbers
+# and --fix must leave every byte outside the text as it is.
+HTML_SKIP = re.compile(r"<!--.*?-->|<(script|style|pre|code|kbd|samp|svg|math|template|textarea)\b.*?</\1\s*>"
+                       r"""|<(?:[^>"']|"[^"]*"|'[^']*')*>""", re.DOTALL | re.IGNORECASE)
+HTML_ATTR = re.compile(r"""\s(?:alt|title|aria-label|placeholder|content)\s*=\s*(["'])(.*?)\1""", re.DOTALL | re.IGNORECASE)
+ENTITY = re.compile(r"&(?:#\d+|#[xX][0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]*);")
+LINE_BREAKS = "\n\r\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029"  # what str.splitlines splits on: masking keeps line numbers
 MERMAID_TYPES = {
     "flowchart", "graph", "sequenceDiagram", "classDiagram", "stateDiagram", "stateDiagram-v2", "erDiagram", "journey",
     "gantt", "pie", "gitGraph", "mindmap", "timeline", "quadrantChart", "requirementDiagram", "C4Context", "C4Container",
@@ -89,6 +121,27 @@ def mixed_script(word: str) -> bool:
     return len(scripts & set(SCRIPTS)) > 1
 
 
+def html_prose(text: str) -> list[tuple[int, int, str]]:
+    """The (start, end, quote) spans of an HTML page that a reader reads: text between tags (quote "") and
+    reader-facing attribute values (quote: their delimiter, which a fix must not write unescaped)."""
+    spans, pos = [], 0
+    for m in HTML_SKIP.finditer(text):
+        spans.append((pos, m.start(), ""))
+        if not m.group(1) and not m.group().startswith("<!--"):
+            spans += [(m.start() + a.start(2), m.start() + a.end(2), a.group(1)) for a in HTML_ATTR.finditer(m.group())]
+        pos = m.end()
+    spans.append((pos, len(text), ""))
+    return [s for s in spans if s[0] < s[1]]
+
+
+def decoded(s: str) -> str:
+    """Entities as the characters they render (`&rarr;` is an arrow), except spaces: `&nbsp;` is a deliberate choice."""
+    def one(m: re.Match[str]) -> str:
+        ch = unescape(m.group())
+        return m.group() if ch in SPACES else ch
+    return ENTITY.sub(one, s)
+
+
 def scan(text: str, path: str = "", root: Path | None = None, allow: str = "", phrases: Iterable[str] = ()) -> list[Finding]:
     """All findings for one page. `root` enables relative-link checks; `allow` lists characters this page may use."""
     found: list[Finding] = []
@@ -100,11 +153,44 @@ def scan(text: str, path: str = "", root: Path | None = None, allow: str = "", p
     def add(n: int, rule: str, message: str, fixable: bool = False) -> None:
         found.append(Finding(path, n, rule, message, fixable))
 
+    def prose_rules(n: int, prose: str, raw: str) -> None:
+        """Character, phrase and placeholder rules on one line's prose; `raw` is it before entities were decoded."""
+        for ch, (rule, repl, why) in CHARS.items():
+            if ch in (raw if ch in SPACES else prose) and ch not in allow:
+                add(n, rule, why + (f" -> {repl!r}" if repl is not None else ""), fixable=repl is not None)
+        for chars, why in SYMBOLS:
+            hit = "".join(dict.fromkeys(c for c in prose if c in chars and c not in allow))
+            if hit:
+                add(n, "T06", f"{hit} {why}")
+        hit = "".join(dict.fromkeys(c for c in PICTOGRAPH.findall(prose) if c not in allow and c not in LISTED))
+        if hit:
+            add(n, "T06", f"{hit} emoji or pictograph in prose: say it in words, or drop the decoration")
+        if "\u2013" not in allow and SPACED_EN_DASH.search(prose):
+            add(n, "T02", "spaced en dash used as a dash: rewrite as comma, colon or parentheses")
+        for rx, rule, why in rules:
+            hit = rx.search(prose)
+            if hit:
+                add(n, rule, f"{why}: {hit.group()!r}")
+        hit = PLACEHOLDER.search(prose)
+        if hit:
+            add(n, "T04", f"placeholder left in page: {hit.group()!r}")
+        for word in WORD.findall(prose):
+            if mixed_script(word):
+                add(n, "T06", f"mixed Latin/Cyrillic/Greek letters in {word!r} (look-alike characters)")
+
     lines = text.splitlines()
     for n, line in enumerate(lines, 1):
         for ch, why in INVISIBLE.items():
             if ch in line and ch not in allow and not (ch == "\ufeff" and n == 1 and line.index(ch) == 0):
                 add(n, "T06", f"invisible character U+{ord(ch):04X} ({why})", fixable=True)
+    if Path(path).suffix.lower() in HTML_EXT:
+        shown = [c if c in LINE_BREAKS else " " for c in text]
+        for a, b, _ in html_prose(text):
+            shown[a:b] = text[a:b]
+        for n, line in enumerate("".join(shown).splitlines(), 1):
+            prose_rules(n, decoded(line), line)
+        return sorted(found, key=lambda f: f.line)
+    for n, line in enumerate(lines, 1):
         m = FENCE.match(line)
         if fence:
             char, length, start, mermaid = fence
@@ -130,26 +216,12 @@ def scan(text: str, path: str = "", root: Path | None = None, allow: str = "", p
             fence, header = (m.group(1)[0], len(m.group(1)), n, bool(info) and info[0] == "mermaid"), "none"
             continue
         prose = masked(line)
-        for ch, (rule, repl, why) in CHARS.items():
-            if ch in prose and ch not in allow:
-                add(n, rule, why + (f" -> {repl!r}" if repl is not None else ""), fixable=repl is not None)
-        if "\u2013" not in allow and SPACED_EN_DASH.search(prose):
-            add(n, "T02", "spaced en dash used as a dash: rewrite as comma, colon or parentheses")
+        prose_rules(n, prose, prose)
         if GLYPH_BULLET.match(prose):
             add(n, "T01", "glyph bullet does not render as a Markdown list -> '- '", fixable=True)
-        for rx, rule, why in rules:
-            hit = rx.search(prose)
-            if hit:
-                add(n, rule, f"{why}: {hit.group()!r}")
         hit = (UNVERIFIED_LABEL.search(line) or UNVERIFIED_TAG.search(prose)) if Path(path).name in VERIFIED_ONLY else None
         if hit:
             add(n, "B01", f"{hit.group()} claim in a verified-only page: verify it or move it to docs/")
-        hit = PLACEHOLDER.search(prose)
-        if hit:
-            add(n, "T04", f"placeholder left in page: {hit.group()!r}")
-        for word in WORD.findall(prose):
-            if mixed_script(word):
-                add(n, "T06", f"mixed Latin/Cyrillic/Greek letters in {word!r} (look-alike characters)")
         if root is not None:
             for target in LINK.findall(prose):
                 if SCHEME.match(target):
@@ -160,11 +232,20 @@ def scan(text: str, path: str = "", root: Path | None = None, allow: str = "", p
                     add(n, "T04", f"broken relative link {target!r}")
     if fence:
         add(fence[2], "T04", "unclosed code fence")
-    return found
+    return sorted(found, key=lambda f: f.line)
 
 
-def fix(text: str, allow: str = "") -> str:
-    """Apply only the replacements that cannot change meaning; dashes and phrases stay for a rewrite by meaning."""
+def fix(text: str, allow: str = "", html: bool = False) -> str:
+    """Apply only the replacements that cannot change meaning; dashes, symbols and phrases stay for a rewrite by
+    meaning. `html`: the page is HTML, fixed in its text and reader-facing attributes only."""
+    if html:
+        text = "".join(c for i, c in enumerate(text) if c not in INVISIBLE or c in allow or (i == 0 and c == "\ufeff"))
+        out, pos = [], 0
+        for a, b, quote in html_prose(text):
+            fixed = prose_fix(ENTITY.sub(lambda m: entity_fix(m.group(), allow), text[a:b]), allow)
+            out += [text[pos:a], fixed.replace(quote, "&quot;" if quote == '"' else "&#39;") if quote else fixed]
+            pos = b
+        return "".join(out) + text[pos:]
     out: list[str] = []
     fence: tuple[str, int] | None = None
     for line in text.splitlines(keepends=True):
@@ -195,18 +276,22 @@ def prose_fix(s: str, allow: str) -> str:
     return s
 
 
-# The page walk: the catalog review as a loop a program drives, one window at a time, instead of one pass the agent
-# may skim. WHY a fresh split per step: the agent edits between steps, so part boundaries move; a plain index walk is
-# enough because each window also shows the previous part, so a boundary that moves by one part is still seen.
+def entity_fix(entity: str, allow: str) -> str:
+    """An HTML entity of a fixable character (`&hellip;`, `&ldquo;`) as its replacement; spaces stay deliberate."""
+    ch = unescape(entity)
+    repl = CHARS.get(ch, (None, None, None))[1]
+    return repl if repl is not None and ch not in SPACES and ch not in allow else entity
+
+
+# Page parts: the unit of the anchored review (vae_edit). WHY these defaults: pro-edit's (`maxPartChars: 8000,
+# headingDepth: 2`); VERIFIED: (2026-10-11) `parts(source, 8000, 2)` reproduced the parts.json texts, headings and start
+# lines of all 15 runs in feat-pro-edit/output.
 HEADING = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]|$)")
 SETEXT = re.compile(r"^ {0,3}(=+|-+)[ \t]*$")
 CONTAINER = re.compile(r"^ {0,3}(?:[-*+][ \t]|\d{1,9}[.)][ \t]|>|\|)")  # list item, quote or table row: no setext heading
 ITEM = re.compile(r"^( *)(?:[-*+]|\d{1,9}[.)])[ \t]")
 RULE_ID = re.compile(r"^- \*\*([BLPRAST]\d\d [^*]+?)\.\*\*", re.MULTILINE)
-# WHY 3,500: two parts, the rule list and line numbers stay inside one tool output even on the first step, which also
-# prints the whole catalog. VERIFIED: (Claude Code env-var docs) BASH_MAX_OUTPUT_LENGTH reads back 30,000 characters by
-# default; the first step on this repository's README prints 19,067.
-WALK_CHARS = 3500
+PART_CHARS, HEADING_DEPTH = 8000, 2
 
 
 @dataclasses.dataclass(frozen=True)
@@ -263,7 +348,7 @@ def blocks(lines: list[str]) -> list[tuple[int, int]]:
     return out
 
 
-def parts(text: str, max_chars: int = WALK_CHARS, heading_depth: int = 1) -> list[Part]:
+def parts(text: str, max_chars: int = PART_CHARS, heading_depth: int = HEADING_DEPTH) -> list[Part]:
     """The page as parts that join back to it exactly. A part starts at every heading of depth ≤ heading_depth and
     otherwise grows block by block up to max_chars; a heading stays with its first content block, never alone."""
     lines = text.splitlines(keepends=True)
@@ -298,35 +383,3 @@ def parts(text: str, max_chars: int = WALK_CHARS, heading_depth: int = 1) -> lis
         raise ValueError("page parts do not join back to the page")
     return out
 
-
-def walk(page: str, text: str, n: int, catalog: str, static: list[Finding], cli: str) -> tuple[bool, str]:
-    """Step n of the page walk: part n to review with part n-1 as context, every catalog rule, and the command for
-    step n+1. Past the last part: the static findings to fix, or VERIFIED. `cli` is the `vae.py prose --repo` prefix."""
-    ps = parts(text)
-    nxt = lambda m: f"{cli} --walk {shlex.quote(page)} --part {m}"
-    if not 1 <= n <= len(ps) + 1:
-        return False, f"UNKNOWN[walk] BC part {n} is outside 1..{len(ps) + 1} of {page}; start with: {nxt(1)}"
-    if n > len(ps):
-        if not static:
-            return True, f"VERIFIED[walk]=true BC {page}: {len(ps)} part{'s' * (len(ps) != 1)} walked, prose findings=0"
-        return False, "\n".join([f"defuss-vae WALK {page}: all {len(ps)} parts walked; the static check still finds:",
-                                 *map(str, static),
-                                 (f"DO: `{cli} --fix {shlex.quote(page)}` repairs the (--fix) ones; rewrite the rest by "
-                                  "meaning, never as a character swap."), f"NEXT: {nxt(n)}"])
-    cur = ps[n - 1]
-    number = lambda p: [f"{p.first + j:>5}| {line}" for j, line in enumerate(p.text.splitlines())]
-    out = [f"defuss-vae WALK {page} part {n}/{len(ps)} (lines {cur.first}-{cur.last})"]
-    if n == 1:
-        out += ["CATALOG (printed once; every rule applies to every part):", catalog.rstrip()]
-    out.append("SECTION: " + (" > ".join(cur.headings) or "(page start)"))
-    if n > 1:
-        prev = ps[n - 2]
-        out += [f"CONTEXT part {n - 1} (lines {prev.first}-{prev.last}): fix only what crosses into part {n}", *number(prev)]
-    out += [f"REVIEW part {n} (lines {cur.first}-{cur.last})", *number(cur)]
-    hits = [str(f) for f in static if cur.first <= f.line <= cur.last]
-    out += ["STATIC: " + ("; ".join(hits) or "∅"),
-            f"CHECK EVERY rule against part {n}: " + ", ".join(RULE_ID.findall(catalog)),
-            (f"DO: edit {page} in place where a rule fails and the page or repo supports the fix; a fix that needs an "
-             "absent fact, source or decision is a question for the human, never an invention. Keep structure and voice."),
-            f"NEXT: {nxt(n + 1)}"]
-    return False, "\n".join(out)

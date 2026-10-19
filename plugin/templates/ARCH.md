@@ -1,6 +1,6 @@
 # Architecture: templates
 
-Files `vae.py init` copies into a project when they are missing (`VERIFY.py`, `MEMORY.md`, `CLI_GIST.md`, `EPISODES.md`, `Makefile`, `verify.yml`), and page templates the doc skill and the verifier hints point to (`README.md.tmpl`, `ARCH.md.tmpl`, `package.json.tmpl`).
+Files `vae.py init` copies into a project when they are missing (`VERIFY.py`, `MEMORY.md`, `CLI_GIST.md`, `EPISODES.md`, `Makefile`, `verify.yml`), page templates the doc skill and the verifier hints point to (`README.md.tmpl`, `ARCH.md.tmpl`, `package.json.tmpl`), the review page `annotate.html` that edit and research runs fill with a page and its comments (defuss-shadcn 0.9.9's Document Editor, read-only, its builds pinned on jsDelivr), and the six research config files `vae.py research init` copies into `.vae/` (`research/`: three secret files with empty keys, written with mode 600, and their JSON twins, whose MCP servers ship disabled).
 
 ## Why this design
 

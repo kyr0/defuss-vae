@@ -1,0 +1,699 @@
+{
+  "part": 4,
+  "window": [
+    3,
+    4
+  ],
+  "previousRevision": 3,
+  "summary": {
+    "revision": 4,
+    "bis_seite": 4,
+    "naechste_id": 15,
+    "eintraege": [
+      {
+        "id": "M000001",
+        "typ": "struktur",
+        "inhalt": "Teil 1 trägt die Überschrift „Importprüfung“; damit ist der sichtbare Gegenstandsbezeichner dieses Teils gegeben. Weiterer Sachinhalt als die Einordnung in M000002 ist in Teil 1 nicht vorhanden.",
+        "woertlich": [
+          "Importprüfung"
+        ],
+        "belege": [
+          {
+            "seite": 1,
+            "zitat": "# Importprüfung",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000002"
+        ]
+      },
+      {
+        "id": "M000002",
+        "typ": "aussage",
+        "inhalt": "Das Dokument (Überschrift siehe M000001) beschreibt nach eigener Angabe einen konstruierten Testfall und ausdrücklich keine reale Studie. Diese Einschränkung gilt für den Dokumentcharakter und schließt die Einordnung als real untersuchte Studie aus.",
+        "woertlich": [
+          "konstruierten Testfall",
+          "keine reale Studie"
+        ],
+        "belege": [
+          {
+            "seite": 1,
+            "zitat": "Dieses Dokument beschreibt einen konstruierten Testfall, keine reale Studie.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000001"
+        ]
+      },
+      {
+        "id": "M000003",
+        "typ": "struktur",
+        "inhalt": "Teil 2 trägt die Überschrift „Pilotversuch“ und steht als Unterabschnitt hinter dem in M000001 genannten Gegenstandsbezeichner „Importprüfung“. Der sichtbare Sachinhalt unter dieser Überschrift besteht aus genau zwei Sätzen, gespeichert in M000004 und M000007; eine weitere Gliederung, Gliederungspunkt oder Textankündigung enthält Teil 2 nicht.",
+        "woertlich": [
+          "Pilotversuch"
+        ],
+        "belege": [
+          {
+            "seite": 2,
+            "zitat": "## Pilotversuch",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000004",
+          "M000007"
+        ]
+      },
+      {
+        "id": "M000004",
+        "typ": "aussage",
+        "inhalt": "Für die Pilotgruppe mit 40 Erwachsenen wird nur eine Möglichkeit behauptet: Die Vorlage könnte unter Aufsicht die Bearbeitungszeit um 12 % verringern. Zur Aussage gehören die Bedingung „unter Aufsicht“, der Umfang „Pilotgruppe mit 40 Erwachsenen“, die Bezugsgröße Bearbeitungszeit und der Wert 12 %. Es wird keine bestätigte Verringerung behauptet, und über Gruppen außerhalb der genannten Pilotgruppe wird nichts ausgesagt. Die Bezugsgröße ist die Bearbeitungszeit; die Fehlerquote wird davon getrennt in M000007 behandelt.",
+        "woertlich": [
+          "Pilotgruppe",
+          "40 Erwachsenen",
+          "könnte",
+          "unter Aufsicht",
+          "Bearbeitungszeit",
+          "12 %",
+          "Vorlage"
+        ],
+        "belege": [
+          {
+            "seite": 2,
+            "zitat": "In der Pilotgruppe mit 40 Erwachsenen könnte die Vorlage unter Aufsicht die Bearbeitungszeit um 12 % verringern.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000003",
+          "M000005",
+          "M000006",
+          "M000007"
+        ]
+      },
+      {
+        "id": "M000005",
+        "typ": "offen",
+        "inhalt": "Der in M000004 gebrauchte Ausdruck „die Vorlage“ wird im sichtbaren Material nicht definiert und nicht eingeführt. Ob er dasselbe bezeichnet wie den in M000001 als Überschrift genannten Gegenstandsbezeichner „Importprüfung“ oder einen davon zu unterscheidenden Gegenstand, bleibt innerhalb der sichtbaren Teile offen.",
+        "woertlich": [
+          "die Vorlage"
+        ],
+        "belege": [
+          {
+            "seite": 2,
+            "zitat": "In der Pilotgruppe mit 40 Erwachsenen könnte die Vorlage unter Aufsicht die Bearbeitungszeit um 12 % verringern.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000001",
+          "M000004"
+        ]
+      },
+      {
+        "id": "M000006",
+        "typ": "offen",
+        "inhalt": "Spannung zwischen der in M000002 mit wörtlichem Beleg gespeicherten Eigencharakteristik des Dokuments („einen konstruierten Testfall, keine reale Studie“) und den in M000004 genannten Pilotangaben „Pilotgruppe mit 40 Erwachsenen“ sowie „12 %“: Im sichtbaren Material wird nicht ausdrücklich eingeordnet, ob diese Angaben als reale Messung oder als Bestandteil des konstruierten Szenarios gemeint sind. Die Spannung bleibt als offen erhalten und wird nicht aufgelöst.",
+        "woertlich": [
+          "Pilotgruppe mit 40 Erwachsenen",
+          "12 %"
+        ],
+        "belege": [
+          {
+            "seite": 2,
+            "zitat": "In der Pilotgruppe mit 40 Erwachsenen könnte die Vorlage unter Aufsicht die Bearbeitungszeit um 12 % verringern.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000002",
+          "M000004"
+        ]
+      },
+      {
+        "id": "M000007",
+        "typ": "aussage",
+        "inhalt": "Zur Fehlerquote hält Teil 2 nur fest: Eine Wirkung auf die Fehlerquote wurde nicht nachgewiesen. Dokumentiert ist damit das Fehlen eines Nachweises, nicht ein Nachweis der Wirkungslosigkeit und auch keine verneinte oder ausgeschlossene Wirkung. Diese Aussage betrifft die Fehlerquote und nicht die in M000004 genannte Bearbeitungszeit.",
+        "woertlich": [
+          "Fehlerquote",
+          "nicht nachgewiesen"
+        ],
+        "belege": [
+          {
+            "seite": 2,
+            "zitat": "Eine Wirkung auf die Fehlerquote wurde nicht nachgewiesen.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000003",
+          "M000004"
+        ]
+      },
+      {
+        "id": "M000008",
+        "typ": "struktur",
+        "inhalt": "Teil 3 trägt die Überschrift „Betrieb“ und steht als weiterer Unterabschnitt hinter dem in M000001 genannten Gegenstandsbezeichner „Importprüfung“ und dem in M000003 genannten Unterabschnitt „Pilotversuch“. Der sichtbare Sachinhalt unter dieser Überschrift besteht aus genau zwei Sätzen, gespeichert in M000009 und M000011; die zugehörige offene Begriffsfrage ist M000010. Weitere Gliederungspunkte, Textankündigungen oder Einschränkungen enthält Teil 3 nicht.",
+        "woertlich": [
+          "Betrieb"
+        ],
+        "belege": [
+          {
+            "seite": 3,
+            "zitat": "## Betrieb",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000001",
+          "M000003",
+          "M000009",
+          "M000010",
+          "M000011"
+        ]
+      },
+      {
+        "id": "M000009",
+        "typ": "aussage",
+        "inhalt": "Für den in M000008 genannten Abschnitt „Betrieb“ hält Teil 3 fest: „Die Durchführung der Prüfung erfolgt täglich.“ Behauptet wird die tägliche Häufigkeit der Durchführung der Prüfung im Indikativ, nicht als Möglichkeit, Empfehlung oder Bedingung. Welche Prüfung genau gemeint ist, bleibt im sichtbaren Material unbestimmt (siehe M000010).",
+        "woertlich": [
+          "Durchführung der Prüfung",
+          "täglich"
+        ],
+        "belege": [
+          {
+            "seite": 3,
+            "zitat": "Die Durchführung der Prüfung erfolgt täglich.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000008",
+          "M000010"
+        ]
+      },
+      {
+        "id": "M000010",
+        "typ": "offen",
+        "inhalt": "Der in Teil 3 gebrauchte Ausdruck „Prüfung“ (in „Die Durchführung der Prüfung erfolgt täglich“ und „Alle Importvorgänge werden automatisch geprüft“) wird im sichtbaren Material nicht definiert. Offen bleibt, ob er denselben Gegenstand bezeichnet wie den in M000001 als Überschrift genannten Gegenstandsbezeichner „Importprüfung“ und/oder wie den in M000005 offenen Ausdruck „die Vorlage“, oder ob unterscheidbare Bezeichnungen vorliegen. Diese Begriffsfrage wird nicht aufgelöst, sondern für eine spätere Konsistenzprüfung gehalten; der Beleg für die Überschrift „Importprüfung“ ist bei M000001 gespeichert.",
+        "woertlich": [
+          "Prüfung"
+        ],
+        "belege": [
+          {
+            "seite": 3,
+            "zitat": "Die Durchführung der Prüfung erfolgt täglich.",
+            "vorkommen": 1
+          },
+          {
+            "seite": 3,
+            "zitat": "Alle Importvorgänge werden automatisch geprüft.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000001",
+          "M000005",
+          "M000009",
+          "M000011"
+        ]
+      },
+      {
+        "id": "M000011",
+        "typ": "aussage",
+        "inhalt": "Ebenfalls in Teil 3 („Betrieb“, M000008) steht der unbeschränkte Geltungsanspruch: „Alle Importvorgänge werden automatisch geprüft.“ Zum Aussagekern gehören der Totalquantor „Alle“ über Importvorgänge und die Automatik der Prüfung. Innerhalb der sichtbaren Teile 1 bis 3 ist zu diesem Satz keine Ausnahme genannt; ob das Dokument an anderer Stelle eine Ausnahme ergänzt, ist damit nicht entschieden. Die Aussage steht im Indikativ und ist von der in M000004 nur als Möglichkeit geäußerten Wirkung der Vorlage auf die Bearbeitungszeit zu unterscheiden; das sichtbare Material ordnet nicht ausdrücklich ein, ob zwischen beiden ein Zusammenhang oder eine Spannung besteht.",
+        "woertlich": [
+          "Alle Importvorgänge",
+          "automatisch geprüft"
+        ],
+        "belege": [
+          {
+            "seite": 3,
+            "zitat": "Alle Importvorgänge werden automatisch geprüft.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000004",
+          "M000008",
+          "M000010"
+        ]
+      },
+      {
+        "id": "M000012",
+        "typ": "struktur",
+        "inhalt": "Teil 4 trägt die Überschrift „Einschränkung“ und steht als weiterer Unterabschnitt hinter den in M000001 (Überschrift „Importprüfung“), M000003 („Pilotversuch“) und M000008 („Betrieb“) genannten Abschnitten. Der sichtbare Sachinhalt unter dieser Überschrift besteht aus genau zwei Sätzen, gespeichert in M000013 und M000014. Nach dem vom Aufrufer gelieferten Fensterstatus (dokumentende=true) ist Teil 4 der letzte Teil des vorliegenden Dokumentstands; das beschreibt nur diesen Dokumentstand, nicht eine Vollständigkeit der Sachinformationen.",
+        "woertlich": [
+          "Einschränkung"
+        ],
+        "belege": [
+          {
+            "seite": 4,
+            "zitat": "## Einschränkung",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000001",
+          "M000003",
+          "M000008",
+          "M000013",
+          "M000014"
+        ]
+      },
+      {
+        "id": "M000013",
+        "typ": "aussage",
+        "inhalt": "Teil 4 („Einschränkung“, M000012) nennt eine ausdrückliche Ausnahme: „Die automatische Prüfung gilt nicht für manuell hochgeladene CSV-Dateien.“ Erhalten bleiben die Negation „gilt nicht“, der Geltungsbereich „automatische Prüfung“ und die Bedingung „manuell hochgeladene CSV-Dateien“. Diese im späteren Teil 4 nachgetragene Einschränkung steht neben dem in M000011 gespeicherten unbeschränkten Anspruch „Alle Importvorgänge werden automatisch geprüft.“; das Dokument ordnet diese Spannung nicht selbst ein, und M000011 wird deshalb nicht rückwirkend umgeschrieben. Ob die Ausnahme auch die in M000009 genannte tägliche Durchführung der Prüfung berührt, bleibt im sichtbaren Material offen; zur Begriffsfrage „Prüfung“ siehe M000010.",
+        "woertlich": [
+          "automatische Prüfung",
+          "gilt nicht",
+          "manuell hochgeladene CSV-Dateien"
+        ],
+        "belege": [
+          {
+            "seite": 4,
+            "zitat": "Die automatische Prüfung gilt nicht für manuell hochgeladene CSV-Dateien.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000011",
+          "M000009",
+          "M000010",
+          "M000012"
+        ]
+      },
+      {
+        "id": "M000014",
+        "typ": "argument",
+        "inhalt": "Ebenfalls in Teil 4 („Einschränkung“, M000012) steht die behauptete Schlussbeziehung im Wortlaut: „Die tägliche Prüfung beweist die einzigartige Zuverlässigkeit des Verfahren.“ Bewahrt wird die grammatische Abweichung „des Verfahren“ ohne Korrektur. Behauptet wird, dass die tägliche Prüfung (siehe M000009) die Zuverlässigkeit des Verfahrens beweise, und zwar ausdrücklich als „einzigartige Zuverlässigkeit“; Gründe oder Belege für diese Folgerung werden im sichtbaren Material nicht genannt. Die Aussage bleibt als Textbehauptung des Dokuments gespeichert, nicht als geprüfte Tatsache. Der Begriff „Verfahren“ wird im sichtbaren Material nicht definiert; ob er denselben Gegenstand bezeichnet wie der in M000010 offene Begriff „Prüfung“, bleibt offen. Eine mögliche Spannung zu M000013 (Ausnahme von der automatischen Prüfung) ist nur als Prüfbedarf notiert und nicht aufgelöst.",
+        "woertlich": [
+          "beweist",
+          "einzigartige Zuverlässigkeit",
+          "des Verfahren"
+        ],
+        "belege": [
+          {
+            "seite": 4,
+            "zitat": "Die tägliche Prüfung beweist die einzigartige Zuverlässigkeit des Verfahren.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000012",
+          "M000013",
+          "M000009",
+          "M000010"
+        ]
+      }
+    ]
+  },
+  "delta": {
+    "basis_revision": 3,
+    "neu": [
+      {
+        "id": "M000012",
+        "typ": "struktur",
+        "inhalt": "Teil 4 trägt die Überschrift „Einschränkung“ und steht als weiterer Unterabschnitt hinter den in M000001 (Überschrift „Importprüfung“), M000003 („Pilotversuch“) und M000008 („Betrieb“) genannten Abschnitten. Der sichtbare Sachinhalt unter dieser Überschrift besteht aus genau zwei Sätzen, gespeichert in M000013 und M000014. Nach dem vom Aufrufer gelieferten Fensterstatus (dokumentende=true) ist Teil 4 der letzte Teil des vorliegenden Dokumentstands; das beschreibt nur diesen Dokumentstand, nicht eine Vollständigkeit der Sachinformationen.",
+        "woertlich": [
+          "Einschränkung"
+        ],
+        "belege": [
+          {
+            "seite": 4,
+            "zitat": "## Einschränkung",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000001",
+          "M000003",
+          "M000008",
+          "M000013",
+          "M000014"
+        ]
+      },
+      {
+        "id": "M000013",
+        "typ": "aussage",
+        "inhalt": "Teil 4 („Einschränkung“, M000012) nennt eine ausdrückliche Ausnahme: „Die automatische Prüfung gilt nicht für manuell hochgeladene CSV-Dateien.“ Erhalten bleiben die Negation „gilt nicht“, der Geltungsbereich „automatische Prüfung“ und die Bedingung „manuell hochgeladene CSV-Dateien“. Diese im späteren Teil 4 nachgetragene Einschränkung steht neben dem in M000011 gespeicherten unbeschränkten Anspruch „Alle Importvorgänge werden automatisch geprüft.“; das Dokument ordnet diese Spannung nicht selbst ein, und M000011 wird deshalb nicht rückwirkend umgeschrieben. Ob die Ausnahme auch die in M000009 genannte tägliche Durchführung der Prüfung berührt, bleibt im sichtbaren Material offen; zur Begriffsfrage „Prüfung“ siehe M000010.",
+        "woertlich": [
+          "automatische Prüfung",
+          "gilt nicht",
+          "manuell hochgeladene CSV-Dateien"
+        ],
+        "belege": [
+          {
+            "seite": 4,
+            "zitat": "Die automatische Prüfung gilt nicht für manuell hochgeladene CSV-Dateien.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000011",
+          "M000009",
+          "M000010",
+          "M000012"
+        ]
+      },
+      {
+        "id": "M000014",
+        "typ": "argument",
+        "inhalt": "Ebenfalls in Teil 4 („Einschränkung“, M000012) steht die behauptete Schlussbeziehung im Wortlaut: „Die tägliche Prüfung beweist die einzigartige Zuverlässigkeit des Verfahren.“ Bewahrt wird die grammatische Abweichung „des Verfahren“ ohne Korrektur. Behauptet wird, dass die tägliche Prüfung (siehe M000009) die Zuverlässigkeit des Verfahrens beweise, und zwar ausdrücklich als „einzigartige Zuverlässigkeit“; Gründe oder Belege für diese Folgerung werden im sichtbaren Material nicht genannt. Die Aussage bleibt als Textbehauptung des Dokuments gespeichert, nicht als geprüfte Tatsache. Der Begriff „Verfahren“ wird im sichtbaren Material nicht definiert; ob er denselben Gegenstand bezeichnet wie der in M000010 offene Begriff „Prüfung“, bleibt offen. Eine mögliche Spannung zu M000013 (Ausnahme von der automatischen Prüfung) ist nur als Prüfbedarf notiert und nicht aufgelöst.",
+        "woertlich": [
+          "beweist",
+          "einzigartige Zuverlässigkeit",
+          "des Verfahren"
+        ],
+        "belege": [
+          {
+            "seite": 4,
+            "zitat": "Die tägliche Prüfung beweist die einzigartige Zuverlässigkeit des Verfahren.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000012",
+          "M000013",
+          "M000009",
+          "M000010"
+        ]
+      }
+    ],
+    "ergaenze_belege": [],
+    "berichtige": [],
+    "seitenstatus": [
+      {
+        "seite": 3,
+        "status": "bearbeitet"
+      },
+      {
+        "seite": 4,
+        "status": "bearbeitet"
+      }
+    ],
+    "blocker": []
+  },
+  "audit": [],
+  "customInput": {
+    "text": "## Betrieb\n\nDie Durchführung der Prüfung erfolgt täglich. Alle Importvorgänge werden automatisch geprüft.\n\n## Einschränkung\n\nDie automatische Prüfung gilt nicht für manuell hochgeladene CSV-Dateien. Die tägliche Prüfung beweist die einzigartige Zuverlässigkeit des Verfahren.\n",
+    "zusammenfassung": "[M000001 | struktur] Teil 1 trägt die Überschrift „Importprüfung“; damit ist der sichtbare Gegenstandsbezeichner dieses Teils gegeben. Weiterer Sachinhalt als die Einordnung in M000002 ist in Teil 1 nicht vorhanden.\n  Teil 1, Vorkommen 1: \"# Importprüfung\"\n  Bezüge: M000002\n\n[M000002 | aussage] Das Dokument (Überschrift siehe M000001) beschreibt nach eigener Angabe einen konstruierten Testfall und ausdrücklich keine reale Studie. Diese Einschränkung gilt für den Dokumentcharakter und schließt die Einordnung als real untersuchte Studie aus.\n  Teil 1, Vorkommen 1: \"Dieses Dokument beschreibt einen konstruierten Testfall, keine reale Studie.\"\n  Bezüge: M000001\n\n[M000003 | struktur] Teil 2 trägt die Überschrift „Pilotversuch“ und steht als Unterabschnitt hinter dem in M000001 genannten Gegenstandsbezeichner „Importprüfung“. Der sichtbare Sachinhalt unter dieser Überschrift besteht aus genau zwei Sätzen, gespeichert in M000004 und M000007; eine weitere Gliederung, Gliederungspunkt oder Textankündigung enthält Teil 2 nicht.\n  Teil 2, Vorkommen 1: \"## Pilotversuch\"\n  Bezüge: M000004, M000007\n\n[M000004 | aussage] Für die Pilotgruppe mit 40 Erwachsenen wird nur eine Möglichkeit behauptet: Die Vorlage könnte unter Aufsicht die Bearbeitungszeit um 12 % verringern. Zur Aussage gehören die Bedingung „unter Aufsicht“, der Umfang „Pilotgruppe mit 40 Erwachsenen“, die Bezugsgröße Bearbeitungszeit und der Wert 12 %. Es wird keine bestätigte Verringerung behauptet, und über Gruppen außerhalb der genannten Pilotgruppe wird nichts ausgesagt. Die Bezugsgröße ist die Bearbeitungszeit; die Fehlerquote wird davon getrennt in M000007 behandelt.\n  Teil 2, Vorkommen 1: \"In der Pilotgruppe mit 40 Erwachsenen könnte die Vorlage unter Aufsicht die Bearbeitungszeit um 12 % verringern.\"\n  Bezüge: M000003, M000005, M000006, M000007\n\n[M000005 | offen] Der in M000004 gebrauchte Ausdruck „die Vorlage“ wird im sichtbaren Material nicht definiert und nicht eingeführt. Ob er dasselbe bezeichnet wie den in M000001 als Überschrift genannten Gegenstandsbezeichner „Importprüfung“ oder einen davon zu unterscheidenden Gegenstand, bleibt innerhalb der sichtbaren Teile offen.\n  Teil 2, Vorkommen 1: \"In der Pilotgruppe mit 40 Erwachsenen könnte die Vorlage unter Aufsicht die Bearbeitungszeit um 12 % verringern.\"\n  Bezüge: M000001, M000004\n\n[M000006 | offen] Spannung zwischen der in M000002 mit wörtlichem Beleg gespeicherten Eigencharakteristik des Dokuments („einen konstruierten Testfall, keine reale Studie“) und den in M000004 genannten Pilotangaben „Pilotgruppe mit 40 Erwachsenen“ sowie „12 %“: Im sichtbaren Material wird nicht ausdrücklich eingeordnet, ob diese Angaben als reale Messung oder als Bestandteil des konstruierten Szenarios gemeint sind. Die Spannung bleibt als offen erhalten und wird nicht aufgelöst.\n  Teil 2, Vorkommen 1: \"In der Pilotgruppe mit 40 Erwachsenen könnte die Vorlage unter Aufsicht die Bearbeitungszeit um 12 % verringern.\"\n  Bezüge: M000002, M000004\n\n[M000007 | aussage] Zur Fehlerquote hält Teil 2 nur fest: Eine Wirkung auf die Fehlerquote wurde nicht nachgewiesen. Dokumentiert ist damit das Fehlen eines Nachweises, nicht ein Nachweis der Wirkungslosigkeit und auch keine verneinte oder ausgeschlossene Wirkung. Diese Aussage betrifft die Fehlerquote und nicht die in M000004 genannte Bearbeitungszeit.\n  Teil 2, Vorkommen 1: \"Eine Wirkung auf die Fehlerquote wurde nicht nachgewiesen.\"\n  Bezüge: M000003, M000004\n\n[M000008 | struktur] Teil 3 trägt die Überschrift „Betrieb“ und steht als weiterer Unterabschnitt hinter dem in M000001 genannten Gegenstandsbezeichner „Importprüfung“ und dem in M000003 genannten Unterabschnitt „Pilotversuch“. Der sichtbare Sachinhalt unter dieser Überschrift besteht aus genau zwei Sätzen, gespeichert in M000009 und M000011; die zugehörige offene Begriffsfrage ist M000010. Weitere Gliederungspunkte, Textankündigungen oder Einschränkungen enthält Teil 3 nicht.\n  Teil 3, Vorkommen 1: \"## Betrieb\"\n  Bezüge: M000001, M000003, M000009, M000010, M000011\n\n[M000009 | aussage] Für den in M000008 genannten Abschnitt „Betrieb“ hält Teil 3 fest: „Die Durchführung der Prüfung erfolgt täglich.“ Behauptet wird die tägliche Häufigkeit der Durchführung der Prüfung im Indikativ, nicht als Möglichkeit, Empfehlung oder Bedingung. Welche Prüfung genau gemeint ist, bleibt im sichtbaren Material unbestimmt (siehe M000010).\n  Teil 3, Vorkommen 1: \"Die Durchführung der Prüfung erfolgt täglich.\"\n  Bezüge: M000008, M000010\n\n[M000010 | offen] Der in Teil 3 gebrauchte Ausdruck „Prüfung“ (in „Die Durchführung der Prüfung erfolgt täglich“ und „Alle Importvorgänge werden automatisch geprüft“) wird im sichtbaren Material nicht definiert. Offen bleibt, ob er denselben Gegenstand bezeichnet wie den in M000001 als Überschrift genannten Gegenstandsbezeichner „Importprüfung“ und/oder wie den in M000005 offenen Ausdruck „die Vorlage“, oder ob unterscheidbare Bezeichnungen vorliegen. Diese Begriffsfrage wird nicht aufgelöst, sondern für eine spätere Konsistenzprüfung gehalten; der Beleg für die Überschrift „Importprüfung“ ist bei M000001 gespeichert.\n  Teil 3, Vorkommen 1: \"Die Durchführung der Prüfung erfolgt täglich.\"\n  Teil 3, Vorkommen 1: \"Alle Importvorgänge werden automatisch geprüft.\"\n  Bezüge: M000001, M000005, M000009, M000011\n\n[M000011 | aussage] Ebenfalls in Teil 3 („Betrieb“, M000008) steht der unbeschränkte Geltungsanspruch: „Alle Importvorgänge werden automatisch geprüft.“ Zum Aussagekern gehören der Totalquantor „Alle“ über Importvorgänge und die Automatik der Prüfung. Innerhalb der sichtbaren Teile 1 bis 3 ist zu diesem Satz keine Ausnahme genannt; ob das Dokument an anderer Stelle eine Ausnahme ergänzt, ist damit nicht entschieden. Die Aussage steht im Indikativ und ist von der in M000004 nur als Möglichkeit geäußerten Wirkung der Vorlage auf die Bearbeitungszeit zu unterscheiden; das sichtbare Material ordnet nicht ausdrücklich ein, ob zwischen beiden ein Zusammenhang oder eine Spannung besteht.\n  Teil 3, Vorkommen 1: \"Alle Importvorgänge werden automatisch geprüft.\"\n  Bezüge: M000004, M000008, M000010",
+    "pruefbereich": {
+      "von": 107,
+      "bis": 276
+    },
+    "abschnitt_id": "4",
+    "vorgaben": {}
+  },
+  "custom": [
+    {
+      "zitat": "## Einschränkung",
+      "vorkommen": 1,
+      "typ": "ueberschrift",
+      "befunde": [
+        {
+          "regel": "A04",
+          "schwere": "wesentlich",
+          "sicherheit": "hoch",
+          "aktion": "umstrukturieren",
+          "kommentar": "Die Überschrift kündigt eine Einschränkung an; gedeckt wird das nur vom CSV-Satz. Der zweite Satz behauptet im Gegenteil eine positive Eigenschaft des Verfahrens und gehört nicht unter diese Überschrift. Entweder den Zuverlässigkeitssatz in den Abschnitt Betrieb verschieben oder die Überschrift so fassen, dass sie beide Inhalte benennt.",
+          "belege": [
+            {
+              "quelle": "text",
+              "zitat": "Die tägliche Prüfung beweist die einzigartige Zuverlässigkeit des Verfahren.",
+              "vorkommen": 1
+            }
+          ]
+        }
+      ],
+      "umformulierung": null
+    },
+    {
+      "zitat": "Die automatische Prüfung gilt nicht für manuell hochgeladene CSV-Dateien.",
+      "vorkommen": 1,
+      "typ": "satz",
+      "befunde": [
+        {
+          "regel": "L03",
+          "schwere": "wesentlich",
+          "sicherheit": "mittel",
+          "aktion": "pruefen",
+          "kommentar": "Der Satz im Abschnitt Betrieb behauptet ohne Ausnahme, alle Importvorgänge würden automatisch geprüft; hier steht eine Ausnahme. Prüfen, ob manuell hochgeladene CSV-Dateien zu den Importvorgängen im Sinne jenes Satzes zählen. Wenn ja, Totalquantor im Abschnitt Betrieb einschränken; wenn nein, die Abgrenzung ausdrücklich sagen.",
+          "belege": [
+            {
+              "quelle": "text",
+              "zitat": "Alle Importvorgänge werden automatisch geprüft.",
+              "vorkommen": 1
+            }
+          ]
+        },
+        {
+          "regel": "P07",
+          "schwere": "wesentlich",
+          "sicherheit": "mittel",
+          "aktion": "praezisieren",
+          "kommentar": "Grammatisch nahe liegt die Schnittmenge: nur manuell hochgeladene Dateien im Format CSV sind ausgenommen. Offen bleibt, welches Kriterium tatsächlich trägt und ob manuell hochgeladene Dateien anderen Formats weiter automatisch geprüft werden. Ausnahme nach dem geltenden Kriterium eindeutig formulieren.",
+          "belege": []
+        }
+      ],
+      "umformulierung": null
+    },
+    {
+      "zitat": "Die tägliche Prüfung beweist die einzigartige Zuverlässigkeit des Verfahren.",
+      "vorkommen": 1,
+      "typ": "satz",
+      "befunde": [
+        {
+          "regel": "L01",
+          "schwere": "wesentlich",
+          "sicherheit": "hoch",
+          "aktion": "pruefen",
+          "kommentar": "Aus der täglichen Durchführung der Prüfung folgt keine Zuverlässigkeit: Die Häufigkeit sagt nichts über Trefferquote, Fehlerquote oder Ausfallverhalten. Beweist ist damit zu stark. Benennen, durch welche Messung die Zuverlässigkeit belegt wird, oder den Satz auf die tatsächlich belegbare Aussage zurückführen.",
+          "belege": [
+            {
+              "quelle": "text",
+              "zitat": "Die Durchführung der Prüfung erfolgt täglich.",
+              "vorkommen": 1
+            }
+          ]
+        },
+        {
+          "regel": "B06",
+          "schwere": "wesentlich",
+          "sicherheit": "hoch",
+          "aktion": "belegen",
+          "kommentar": "Einzigartige Zuverlässigkeit ist eine Vergleichsbehauptung ohne definiertes Vergleichsfeld und ohne Nachweis im sichtbaren Material. Angeben, gegenüber welchen Alternativen die Einzigartigkeit bestehen soll, oder die Wertung durch die konkret belegte Eigenschaft ersetzen.",
+          "belege": []
+        },
+        {
+          "regel": "T03",
+          "schwere": "gering",
+          "sicherheit": "hoch",
+          "aktion": "umformulieren",
+          "kommentar": "Genitivfehler: des Verfahren muss des Verfahrens heißen. Die Korrektur lässt sich einsetzen, sobald der Geltungsanspruch des Satzes geklärt ist.",
+          "belege": []
+        }
+      ],
+      "umformulierung": null
+    }
+  ],
+  "calls": [
+    {
+      "role": "custom",
+      "attempt": 1,
+      "tools": [],
+      "usage": [
+        {
+          "input": 12969,
+          "output": 6369,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 5306,
+          "totalTokens": 19338,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "custom",
+      "attempt": 2,
+      "tools": [],
+      "usage": [
+        {
+          "input": 14103,
+          "output": 6221,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 5183,
+          "totalTokens": 20324,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "summary",
+      "attempt": 1,
+      "tools": [
+        {
+          "name": "document_read",
+          "args": {
+            "teil": 4
+          }
+        },
+        {
+          "name": "document_read",
+          "args": {
+            "teil": 3
+          }
+        }
+      ],
+      "usage": [
+        {
+          "input": 9951,
+          "output": 1948,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 1894,
+          "totalTokens": 11899,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        {
+          "input": 12003,
+          "output": 1282,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 173,
+          "totalTokens": 13285,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "summary",
+      "attempt": 2,
+      "tools": [
+        {
+          "name": "document_read",
+          "args": {
+            "teil": 3
+          }
+        },
+        {
+          "name": "document_read",
+          "args": {
+            "teil": 4
+          }
+        }
+      ],
+      "usage": [
+        {
+          "input": 11139,
+          "output": 214,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 160,
+          "totalTokens": 11353,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        {
+          "input": 11458,
+          "output": 2377,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 1374,
+          "totalTokens": 13835,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "audit",
+      "attempt": 1,
+      "tools": [
+        {
+          "name": "document_read",
+          "args": {
+            "teil": 3
+          }
+        },
+        {
+          "name": "document_read",
+          "args": {
+            "teil": 4
+          }
+        }
+      ],
+      "usage": [
+        {
+          "input": 6285,
+          "output": 125,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 71,
+          "totalTokens": 6410,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        {
+          "input": 6515,
+          "output": 3089,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 3085,
+          "totalTokens": 9604,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        }
+      ]
+    }
+  ]
+}

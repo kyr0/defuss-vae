@@ -1,0 +1,271 @@
+{
+  "part": 1,
+  "window": [
+    1
+  ],
+  "previousRevision": 0,
+  "summary": {
+    "revision": 1,
+    "bis_seite": 1,
+    "naechste_id": 3,
+    "eintraege": [
+      {
+        "id": "M000001",
+        "typ": "struktur",
+        "inhalt": "Teil 1 trägt die Überschrift „Importprüfung“; damit ist der sichtbare Gegenstandsbezeichner dieses Teils gegeben. Weiterer Sachinhalt als die Einordnung in M000002 ist in Teil 1 nicht vorhanden.",
+        "woertlich": [
+          "Importprüfung"
+        ],
+        "belege": [
+          {
+            "seite": 1,
+            "zitat": "# Importprüfung",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000002"
+        ]
+      },
+      {
+        "id": "M000002",
+        "typ": "aussage",
+        "inhalt": "Das Dokument (Überschrift siehe M000001) beschreibt nach eigener Angabe einen konstruierten Testfall und ausdrücklich keine reale Studie. Diese Einschränkung gilt für den Dokumentcharakter und schließt die Einordnung als real untersuchte Studie aus.",
+        "woertlich": [
+          "konstruierten Testfall",
+          "keine reale Studie"
+        ],
+        "belege": [
+          {
+            "seite": 1,
+            "zitat": "Dieses Dokument beschreibt einen konstruierten Testfall, keine reale Studie.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000001"
+        ]
+      }
+    ]
+  },
+  "delta": {
+    "basis_revision": 0,
+    "neu": [
+      {
+        "id": "M000001",
+        "typ": "struktur",
+        "inhalt": "Teil 1 trägt die Überschrift „Importprüfung“; damit ist der sichtbare Gegenstandsbezeichner dieses Teils gegeben. Weiterer Sachinhalt als die Einordnung in M000002 ist in Teil 1 nicht vorhanden.",
+        "woertlich": [
+          "Importprüfung"
+        ],
+        "belege": [
+          {
+            "seite": 1,
+            "zitat": "# Importprüfung",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000002"
+        ]
+      },
+      {
+        "id": "M000002",
+        "typ": "aussage",
+        "inhalt": "Das Dokument (Überschrift siehe M000001) beschreibt nach eigener Angabe einen konstruierten Testfall und ausdrücklich keine reale Studie. Diese Einschränkung gilt für den Dokumentcharakter und schließt die Einordnung als real untersuchte Studie aus.",
+        "woertlich": [
+          "konstruierten Testfall",
+          "keine reale Studie"
+        ],
+        "belege": [
+          {
+            "seite": 1,
+            "zitat": "Dieses Dokument beschreibt einen konstruierten Testfall, keine reale Studie.",
+            "vorkommen": 1
+          }
+        ],
+        "bezug_ids": [
+          "M000001"
+        ]
+      }
+    ],
+    "ergaenze_belege": [],
+    "berichtige": [],
+    "seitenstatus": [
+      {
+        "seite": 1,
+        "status": "bearbeitet"
+      }
+    ],
+    "blocker": []
+  },
+  "audit": [],
+  "customInput": {
+    "text": "# Importprüfung\n\nDieses Dokument beschreibt einen konstruierten Testfall, keine reale Studie.\n\n",
+    "zusammenfassung": "",
+    "pruefbereich": {
+      "von": 0,
+      "bis": 95
+    },
+    "abschnitt_id": "1",
+    "vorgaben": {}
+  },
+  "custom": [
+    {
+      "zitat": "# Importprüfung",
+      "vorkommen": 1,
+      "typ": "ueberschrift",
+      "befunde": [
+        {
+          "regel": "A04",
+          "schwere": "wesentlich",
+          "sicherheit": "mittel",
+          "aktion": "pruefen",
+          "kommentar": "Die Überschrift kündigt die Behandlung des Themas Importprüfung an; der gesamte sichtbare Abschnitt besteht lediglich aus dem Vorbehalt, dass ein konstruierter Testfall beschrieben werde, und enthält keine Aussage zu einem Importvorgang, einer Prüfroutine oder deren Ergebnis. Prüfen, ob hier noch inhaltlicher Text folgen soll; falls der Abschnitt so abgeschlossen ist, entweder um den eigentlichen Prüfablauf ergänzen oder die Überschrift auf den tatsächlichen Inhalt (z. B. Hinweis- bzw. Vorbehaltstext) anpassen.",
+          "belege": [
+            {
+              "quelle": "text",
+              "zitat": "Dieses Dokument beschreibt einen konstruierten Testfall, keine reale Studie.",
+              "vorkommen": 1
+            }
+          ]
+        }
+      ],
+      "umformulierung": null
+    }
+  ],
+  "calls": [
+    {
+      "role": "custom",
+      "attempt": 1,
+      "tools": [
+        {
+          "name": "document_read",
+          "args": {
+            "teil": 1
+          }
+        }
+      ],
+      "usage": [
+        {
+          "input": 11091,
+          "output": 636,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 608,
+          "totalTokens": 11727,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        {
+          "input": 11777,
+          "output": 1481,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 1202,
+          "totalTokens": 13258,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "summary",
+      "attempt": 1,
+      "tools": [
+        {
+          "name": "document_read",
+          "args": {
+            "teil": 1
+          }
+        }
+      ],
+      "usage": [
+        {
+          "input": 7828,
+          "output": 179,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 151,
+          "totalTokens": 8007,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        {
+          "input": 8057,
+          "output": 605,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 324,
+          "totalTokens": 8662,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "audit",
+      "attempt": 1,
+      "tools": [
+        {
+          "name": "document_read",
+          "args": {
+            "teil": 1
+          }
+        }
+      ],
+      "usage": [
+        {
+          "input": 3517,
+          "output": 244,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 216,
+          "totalTokens": 3761,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        {
+          "input": 3811,
+          "output": 69,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 65,
+          "totalTokens": 3880,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        }
+      ]
+    }
+  ]
+}

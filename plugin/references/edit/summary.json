@@ -1,0 +1,294 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "basis_revision",
+    "neu",
+    "ergaenze_belege",
+    "berichtige",
+    "seitenstatus",
+    "blocker"
+  ],
+  "properties": {
+    "basis_revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "neu": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "typ",
+          "inhalt",
+          "woertlich",
+          "belege",
+          "bezug_ids"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^M[0-9]{6,}$"
+          },
+          "typ": {
+            "enum": [
+              "argument",
+              "aussage",
+              "begriff",
+              "offen",
+              "struktur",
+              "textspur",
+              "verknuepfung"
+            ]
+          },
+          "inhalt": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "woertlich": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          },
+          "belege": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "seite",
+                "zitat",
+                "vorkommen"
+              ],
+              "properties": {
+                "seite": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "zitat": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                },
+                "vorkommen": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "bezug_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^M[0-9]{6,}$"
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          }
+        }
+      },
+      "minItems": 0
+    },
+    "ergaenze_belege": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "belege"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^M[0-9]{6,}$"
+          },
+          "belege": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "seite",
+                "zitat",
+                "vorkommen"
+              ],
+              "properties": {
+                "seite": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "zitat": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                },
+                "vorkommen": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        }
+      },
+      "minItems": 0
+    },
+    "berichtige": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "grund",
+          "ersatz"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^M[0-9]{6,}$"
+          },
+          "grund": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "ersatz": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "typ",
+              "inhalt",
+              "woertlich",
+              "belege",
+              "bezug_ids"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^M[0-9]{6,}$"
+              },
+              "typ": {
+                "enum": [
+                  "argument",
+                  "aussage",
+                  "begriff",
+                  "offen",
+                  "struktur",
+                  "textspur",
+                  "verknuepfung"
+                ]
+              },
+              "inhalt": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              "woertlich": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                },
+                "minItems": 0,
+                "uniqueItems": true
+              },
+              "belege": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "seite",
+                    "zitat",
+                    "vorkommen"
+                  ],
+                  "properties": {
+                    "seite": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "zitat": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    },
+                    "vorkommen": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "bezug_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^M[0-9]{6,}$"
+                },
+                "minItems": 0,
+                "uniqueItems": true
+              }
+            }
+          }
+        }
+      },
+      "minItems": 0
+    },
+    "seitenstatus": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "seite",
+          "status"
+        ],
+        "properties": {
+          "seite": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "enum": [
+              "bearbeitet",
+              "leer",
+              "klaerung_noetig"
+            ]
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "blocker": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "\\S"
+      },
+      "minItems": 0
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:semantikspeicher:delta:v1",
+  "title": "Semantikspeicher v1: delta"
+}

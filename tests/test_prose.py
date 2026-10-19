@@ -5,16 +5,14 @@ import subprocess
 import unittest
 
 from vae_testkit import (  # first: puts plugin/scripts on sys.path
-    PY,
     REPO,
-    ROOT,
     RepoCase,
 )
 
 # isort: split
-from vae_prose import Finding, fix, parts, scan, walk
+from vae_prose import fix, parts, scan
 
-EM, ELL, ZWSP, RLO, CYR_O = "\u2014", "\u2026", "\u200b", "\u202e", "\u043e"
+EM, ELL, ZWSP, RLO, CYR_O, ARROW = "\u2014", "\u2026", "\u200b", "\u202e", "\u043e", "\u2192"
 FENCE = "`" * 3
 
 
@@ -28,9 +26,22 @@ class ScanTests(unittest.TestCase):
         self.assertEqual(rules(text), [(1, "T02"), (2, "T06"), (3, "T06"), (3, "T06"), (4, "S02"), (5, "T02")])
 
     def test_ranges_code_and_allowed_characters_are_content(self):
-        text = f"Pages 1\u20134, `a {EM} b`, arrows \u2192 \u2264 and emoji \U0001F512.\n{FENCE}\nx = '{EM}'\n{FENCE}\n"
+        text = f"Pages 1\u20134, `a {EM} b`, `x {ARROW} y \u2264 z \U0001F512`.\n{FENCE}\nx = '{EM}' {ARROW} \u2705\n{FENCE}\n"
         self.assertEqual(rules(text), [])
-        self.assertEqual(rules(f"IF {ELL} THEN\n", allow=ELL), [])
+        self.assertEqual(rules(f"IF {ELL} THEN a {ARROW} b\n", allow=ELL + ARROW), [])
+
+    def test_symbols_standing_in_for_words_need_a_rewrite_by_meaning(self):
+        text = f"Coverage 31.6% {ARROW} 75.6%.\nCoverage \u2265 60%.\nAccept (\u2705) or reject (\u274c).\n\U0001F680 Fast.\n"
+        found = scan(text, "page.md")
+        self.assertEqual([(f.line, f.rule, f.fixable) for f in found], [(n, "T06", False) for n in (1, 2, 3, 4)])
+        self.assertIn("from X to Y", found[0].message)
+        self.assertIn("\u2705\u274c", found[2].message, "one finding per kind of symbol on a line")
+        self.assertEqual(fix(text), text, "never a symbol swap: an ASCII arrow is the same tell")
+
+    def test_typographic_spaces_become_plain_spaces(self):
+        text = "10\u00a0ms and 5\u202f% `a\u00a0b`\n"
+        self.assertEqual([(f.line, f.rule, f.fixable) for f in scan(text, "page.md")], [(1, "T06", True), (1, "T06", True)])
+        self.assertEqual(fix(text), "10 ms and 5 % `a\u00a0b`\n")
 
     def test_invisible_and_bidi_characters_count_even_inside_code(self):
         self.assertEqual(rules(f"a{ZWSP}b\n{FENCE}\nx{RLO}y\n{FENCE}\n"), [(1, "T06"), (3, "T06")])
@@ -70,6 +81,32 @@ class FixTests(unittest.TestCase):
         self.assertEqual(fix(f"IF {ELL} THEN\n", allow=ELL), f"IF {ELL} THEN\n")
 
 
+class HtmlTests(unittest.TestCase):
+    # a project site: text and reader-facing attributes are prose; code, scripts, comments and entity spaces are not
+    PAGE = ("<p>From 55 &rarr; 231\n and \u201cquoted\u201d.</p>\n"
+            "<pre><code>a \u2192 b \u201cq\u201d</code></pre>\n"
+            '<img src="x.png"\n  alt="Go \u2192 there">\n'
+            "<p>1&nbsp;ms, TODO</p>\n"
+            '<script>const s = "\u2192 \u201cx\u201d";</script><!-- \u2192 -->\n'
+            "<p>Wait&hellip; done</p>\n")
+
+    def test_html_pages_check_their_text_and_reader_facing_attributes(self):
+        found = [(f.line, f.rule, f.fixable) for f in scan(self.PAGE, "docs/index.html")]
+        self.assertEqual(found, [(1, "T06", False), (2, "T06", True), (2, "T06", True), (5, "T06", False), (6, "T04", False),
+                                 (8, "T06", True)])
+
+    def test_html_attributes_stay_well_formed(self):
+        page = '<img alt="the \u201cbest\u201d tool" title=\'it\u2019s\' data-x="a > b \u2192 c">\n'
+        out = fix(page, html=True)
+        self.assertEqual(out, '<img alt="the &quot;best&quot; tool" title=\'it&#39;s\' data-x="a > b \u2192 c">\n')
+        self.assertEqual(scan(out, "docs/index.html"), [], "a quoted '>' does not end the tag")
+
+    def test_html_fix_touches_only_text(self):
+        out = fix(self.PAGE, html=True)
+        self.assertEqual(out, self.PAGE.replace("\u201cquoted\u201d", '"quoted"').replace("&hellip;", "..."))
+        self.assertEqual([(f.line, f.rule) for f in scan(out, "docs/index.html")], [(1, "T06"), (5, "T06"), (6, "T04")])
+
+
 class LinkTests(RepoCase):
     def test_relative_links_resolve_against_the_page(self):
         self.write("docs/a.md", "x")
@@ -80,7 +117,7 @@ class LinkTests(RepoCase):
         self.assertEqual([f.message for f in found], ["broken relative link 'missing.md'", "broken relative link '/nope.png'"])
 
 
-class WalkTests(RepoCase):
+class PartsTests(unittest.TestCase):
     def test_parts_join_back_and_never_cut_a_fence_or_strand_a_heading(self):
         pages = subprocess.run(["git", "ls-files", "*.md"], cwd=REPO, capture_output=True, text=True, check=True).stdout.split()
         for page in pages:
@@ -101,36 +138,6 @@ class WalkTests(RepoCase):
         self.assertGreater(len(ps), 3, "a long list spans parts, one item per block")
         self.assertTrue(all(p.text.startswith(("- item", "---", "# One", "Title")) for p in ps))
         self.assertEqual(parts(""), [])
-
-    def test_walk_steps_through_every_part_then_requires_a_clean_static_check(self):
-        text = "# Page\nOne.\n\n# Next\nTwo.\n"
-        catalog = "- **B01 Facts.** Q?\n- **T02 Dashes.** Q?\n"
-        cli = "python3 vae.py prose --repo /r"
-        done, first = walk("p.md", text, 1, catalog, [], cli)
-        self.assertFalse(done)
-        for token in ("WALK p.md part 1/2", "CATALOG", "CHECK EVERY rule against part 1: B01 Facts, T02 Dashes", "NEXT: python3 vae.py prose --repo /r --walk p.md --part 2"):
-            self.assertIn(token, first)
-        self.assertNotIn("CONTEXT", first)
-        done, second = walk("p.md", text, 2, catalog, [Finding("p.md", 5, "T02", "em dash")], cli)
-        self.assertIn("CONTEXT part 1 (lines 1-3)", second)
-        self.assertIn("STATIC: p.md:5 T02 em dash", second)
-        self.assertNotIn("CATALOG", second, "the catalog is printed once")
-        self.assertEqual(walk("p.md", text, 3, catalog, [], cli), (True, "VERIFIED[walk]=true BC p.md: 2 parts walked, prose findings=0"))
-        done, last = walk("p.md", text, 3, catalog, [Finding("p.md", 5, "T02", "em dash")], cli)
-        self.assertFalse(done)
-        self.assertIn("python3 vae.py prose --repo /r --fix p.md", last)
-        self.assertIn("NEXT: python3 vae.py prose --repo /r --walk p.md --part 3", last)
-        self.assertTrue(walk("p.md", text, 4, catalog, [], cli)[1].startswith("UNKNOWN[walk] BC part 4 is outside 1..3"))
-
-    def test_cli_walk_exits_2_until_verified(self):
-        self.write("README.md", "# Calc\nAdds numbers.\n")
-        run = lambda *args: subprocess.run([PY, str(ROOT / "scripts/vae.py"), "prose", "--repo", str(self.repo), *args],
-                                           capture_output=True, text=True, check=False)
-        step = run("--walk", "README.md")
-        self.assertEqual(step.returncode, 2)
-        self.assertIn("P09 Current state", step.stdout, "the first step prints the shipped catalog")
-        self.assertEqual((run("--walk", "README.md", "--part", "2").returncode), 0)
-        self.assertIn("UNKNOWN[walk] BC missing.md is not a file", run("--walk", "missing.md").stdout)
 
 
 if __name__ == "__main__":

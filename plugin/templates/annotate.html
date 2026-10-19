@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="icon" href="data:," /><!-- no favicon request: the review server has none, and a 404 is noise -->
+<title>__VAE_TITLE__</title>
+<!-- defuss-vae review page: defuss-shadcn 0.9.9's Document Editor scaffold (application/scaffold-document-editor)
+     with the agent's comments; `vae.py` fills the title and the vae-data script. In an edit review the human edits the
+     text, replies, accepts (✅) or rejects (❌) a card and comments, then sends the response to the review server (or
+     downloads it); `vae.py comments` reads it back for the agent. A dashed card is applied already and counts as
+     accepted unless answered. A research report stays read-only. -->
+<script>
+  // the theme before the first paint: the header switch's last choice in this browser, else the OS preference
+  (() => {
+    let theme = null;
+    try { theme = localStorage.getItem('vae-annotate:theme'); } catch { /* private mode */ }
+    if (theme ? theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.classList.add('dark');
+  })();
+</script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/kyr0/defuss-shadcn@v0.9.9/dist/apps/document-editor/document-editor.min.css" />
+<style>
+  /* one hue per severity (the theme's chart colors are shades of one hue): red, amber, blue; green for the human */
+  :root, .dark { --scaffold-height: 100dvh; --chart-1: oklch(0.64 0.21 25); --chart-4: oklch(0.78 0.16 75);
+                 --chart-2: oklch(0.62 0.17 255); --chart-3: oklch(0.65 0.17 150); }
+  html, body { height: 100%; margin: 0; }
+  body { overflow: hidden; background: var(--background); color: var(--foreground); font-family: var(--font-sans, system-ui, sans-serif); }
+  .de { container: de / inline-size; position: relative; display: flex; width: 100%; height: var(--scaffold-height);
+        overflow: hidden; background: var(--background); color: var(--foreground); font-size: 0.875rem; }
+  .de-main { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
+  .de-top { display: flex; flex: none; align-items: center; gap: 0.5rem; min-height: 3.25rem; padding-inline: 0.75rem;
+            border-block-end: 1px solid var(--border); flex-wrap: wrap; }
+  .de-title { flex: 1; min-width: 0; margin: 0; padding: 0.25rem 0.5rem; font-size: 1.0625rem; font-weight: 600;
+              overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .de-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; color: var(--muted-foreground); font-size: 0.75rem; }
+  .de-legend span { display: inline-flex; align-items: center; gap: 0.25rem; }
+  .de-legend span::before { content: ''; width: 0.625rem; height: 0.625rem; border-radius: 50%; background: var(--de-c); }
+  .de .toolbar { flex: none; flex-wrap: wrap; margin: 0.5rem 0.75rem 0; }
+  .de-body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+  .de-page { flex: 1; min-width: 0; overflow: auto; overscroll-behavior: contain; padding: 2rem clamp(1rem, 6cqi, 4rem) 6rem;
+             background: color-mix(in oklch, var(--muted) 40%, var(--background)); }
+  .de-sheet { max-width: 46rem; min-height: 100%; margin-inline: auto; padding: 3rem clamp(1.5rem, 5cqi, 4rem) 4rem;
+              border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); box-shadow: var(--shadow-sm); }
+  .de .editorjs { --editorjs-measure: 100%; --editorjs-min-height: 24rem; }
+  .de .doc-comments { flex: none; border-inline-start: 1px solid var(--border); background: var(--background); }
+  .de-status { position: relative; z-index: 1; display: flex; flex: none; align-items: center; gap: 0.75rem; min-height: 2rem;
+               padding-inline: 0.75rem; border-block-start: 1px solid var(--border); background: var(--background);
+               color: var(--muted-foreground); font-size: 0.75rem; flex-wrap: wrap; }
+  .de-status-spacer { flex: 1; }
+  .de-quote { margin: 0 0 0.75rem; padding: 0.5rem 0.75rem; border-inline-start: 3px solid var(--primary);
+              border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--muted); color: var(--muted-foreground); font-style: italic; }
+  .de [hidden] { display: none !important; }
+  /* applied already: dashed, and accepted unless the human answers it */
+  .de .doc-comments-card[data-applied] { border-style: dashed; border-block-width: 2px; border-inline-end-width: 2px; }
+  .de-legend .de-legend-applied::before { border: 2px dashed var(--muted-foreground); border-radius: 2px; background: none; }
+  .de-verdict { display: inline-flex; gap: 0.25rem; }
+  .de-verdict .btn[aria-pressed="true"] { background: var(--secondary); color: var(--secondary-foreground); font-weight: 600; }
+  .dark .de-theme-dark, :root:not(.dark) .de-theme-light { display: none; }
+  .de-comments-toggle { display: none; }
+  @container de (width < 56rem) {
+    .de-comments-toggle { display: inline-flex; }
+    .de .doc-comments { display: none; }
+    .de[data-comments] .doc-comments { display: flex; position: absolute; inset-block: 3.25rem 2rem; inset-inline-end: 0;
+                                       z-index: 2; box-shadow: var(--shadow-lg); }
+    .de-page { padding-inline: 1rem; }
+    .de-sheet { padding: 2rem 1.25rem 3rem; }
+  }
+</style>
+</head>
+<body>
+<script type="application/json" id="vae-data">__VAE_DATA__</script>
+<div class="de" id="de">
+  <div class="de-main">
+    <header class="de-top">
+      <h1 class="de-title" id="de-title"></h1>
+      <div class="de-legend" aria-label="Comment colours">
+        <span style="--de-c: var(--chart-1)">critical</span>
+        <span style="--de-c: var(--chart-4)">essential</span>
+        <span style="--de-c: var(--chart-2)">minor</span>
+        <span style="--de-c: var(--chart-3)">yours</span>
+        <span class="de-legend-applied" title="Applied already: accepted unless you reply or reject">applied</span>
+      </div>
+      <button class="btn" data-variant="ghost" data-size="icon-sm" type="button" id="de-theme" aria-label="Dark mode"
+        aria-pressed="false"><span class="de-theme-dark"><i data-lucide="moon"></i></span><span class="de-theme-light"><i data-lucide="sun"></i></span></button>
+      <button class="btn" data-size="sm" type="button" id="de-send" hidden><i data-lucide="send"></i> Send to agent</button>
+      <button class="btn" data-variant="outline" data-size="sm" type="button" id="de-download"><i data-lucide="download"></i> Download</button>
+      <button class="btn de-comments-toggle" data-variant="ghost" data-size="icon-sm" type="button" id="de-comments-toggle"
+        aria-label="Toggle comments" aria-pressed="false"><i data-lucide="message-square-text"></i></button>
+    </header>
+    <div class="toolbar" role="toolbar" aria-label="Review" data-size="sm">
+      <button class="btn" data-variant="outline" data-size="sm" type="button" id="de-comment"><i data-lucide="message-square-plus"></i> Comment</button>
+      <span class="badge" data-variant="outline" id="de-kind"></span>
+    </div>
+    <div class="de-body">
+      <div class="de-page" id="de-page">
+        <div class="de-sheet" id="de-sheet"></div>
+        <script>
+          // The page as an Editor.js document (read-only for a research report), built before the runtime starts so
+          // it mounts it like authored markup; the Markdown travels in JSON, so no character of it can end this script.
+          (() => {
+            const data = JSON.parse(document.getElementById('vae-data').textContent);
+            const editor = document.createElement('div');
+            editor.className = 'editorjs';
+            editor.id = 'de-editor';
+            if ((data.meta || {}).kind === 'research') editor.setAttribute('data-readonly', '');
+            const source = document.createElement('script');
+            source.type = 'text/markdown';
+            source.className = 'editorjs-source';
+            source.textContent = data.markdown;
+            editor.append(source);
+            document.getElementById('de-sheet').append(editor);
+            document.getElementById('de-title').textContent = data.title;
+          })();
+        </script>
+      </div>
+      <aside class="doc-comments" id="de-comments" data-for="de-editor" data-author="You" aria-label="Comments">
+        <script type="application/json" class="doc-comments-source">{"version": 1, "comments": []}</script>
+      </aside>
+    </div>
+    <footer class="de-status">
+      <span id="de-count">0 comments</span>
+      <span class="de-status-spacer"></span>
+      <span>Edit the text · select text, <kbd class="kbd">⌘</kbd> <kbd class="kbd">K</kbd> to comment · reply, ✅ accept or ❌ reject under a card · send to the agent</span>
+    </footer>
+  </div>
+  <dialog class="dialog" id="de-new-comment" role="dialog" aria-modal="true" aria-labelledby="de-new-comment-title">
+    <form class="dialog-content" id="de-new-comment-form">
+      <div class="dialog-header">
+        <h2 class="dialog-title" id="de-new-comment-title">New comment</h2>
+        <p class="dialog-description">On the selected text. Markdown works in the comment.</p>
+      </div>
+      <div class="dialog-body">
+        <blockquote class="de-quote" id="de-new-comment-quote"></blockquote>
+        <textarea class="textarea" id="de-new-comment-body" data-rows="3" data-max-rows="8" required aria-label="Comment"
+          placeholder="What should change?"></textarea>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn" data-variant="outline" type="button" data-dialog-close>Cancel</button>
+        <button class="btn" type="submit">Comment</button>
+      </div>
+    </form>
+  </dialog>
+</div>
+<script>
+  // Glue: place the agent's comments on the rendered page; keep the human's comments and edits in this browser until
+  // they are sent or downloaded. WHY a baseline: the editor writes Markdown in its own style, so the response carries
+  // the editor's Markdown of the page as loaded beside the edited one, and only their difference counts as an edit.
+  document.addEventListener('DOMContentLoaded', () => {
+    const $ = df$;
+    const data = JSON.parse(document.getElementById('vae-data').textContent);
+    const meta = data.meta || {};
+    const column = '#de-comments';
+    const editor = document.getElementById('de-editor');
+    const agentIds = new Set(data.comments.map((c) => c.id));
+    // per review folder: every page the server serves shares one origin, and a revision whose text is unchanged has
+    // the same documentId, so a key without the folder would restore the previous revision's comments
+    const storeKey = `vae-annotate:${meta.review || meta.run || data.title}:${meta.documentId || ''}`;
+    const docKey = `${storeKey}:document`;
+    const editable = !editor.hasAttribute('data-readonly');
+    let baseline = null;
+    document.getElementById('de-kind').textContent = meta.kind === 'research' ? 'research report' : 'edit review';
+
+    // A finding quotes Markdown source; the editor shows rendered text. Match on the rendered text: first with
+    // whitespace collapsed, then on letters and digits only (tables, escapes), then on the quote's first words.
+    const plain = (md) => md
+      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+      .replace(/^\s*>\s?/gm, '')
+      .replace(/^\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?/gm, '')
+      .replace(/\*\*|__|~~|`|(?<!\w)[*_]|[*_](?!\w)/g, '')
+      .replace(/<[^>]+>/g, '')
+      .replace(/\\([\\`*_{}[\]()#+\-.!|])/g, '$1');
+    const keyed = (s, keep) => {
+      const map = [];
+      let k = '';
+      let space = false;
+      for (let i = 0; i < s.length; i++) {
+        const c = s[i];
+        if (keep === 'space' && /\s/.test(c)) {
+          if (!space && k) { k += ' '; map.push(i); }
+          space = true;
+        } else if (keep === 'space' || /[\p{L}\p{N}]/u.test(c)) {
+          k += c.toLowerCase(); map.push(i); space = false;
+        }
+      }
+      return { k: k.trim(), map };
+    };
+    const anchorOf = (quote) => {
+      const blocks = [...editor.querySelectorAll('.ce-block[data-id]')];
+      const text = plain(quote);
+      for (const [mode, cut] of [['space', 0], ['loose', 0], ['loose', 32]]) {
+        let target = keyed(text, mode).k;
+        if (cut) target = target.slice(0, cut);
+        if (target.length < 3) continue;
+        for (const b of blocks) {
+          const raw = b.textContent;
+          const { k, map } = keyed(raw, mode);
+          const at = k.indexOf(target);
+          if (at >= 0) return { block: b.dataset.id, text: raw.slice(map[at], map[at + target.length - 1] + 1) };
+        }
+      }
+      return null;
+    };
+    const kept = (key) => {
+      try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; }
+    };
+    const keep = (key, value) => {
+      try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private mode */ }
+    };
+    const save = () => keep(storeKey, $.shadcn.docComments.data(column));
+    // Quick verdicts: ✅ / ❌ beside an agent card's Reply add a reply carrying `verdict`, which `vae.py comments`
+    // reads as ACCEPT / REJECT. One per card: the other button replaces it, the same one takes it back. The column
+    // re-renders its cards on every change, so the buttons and the applied mark are added again whenever it does.
+    const VERDICTS = { accept: '✅ Accepted', reject: '❌ Rejected' };
+    const verdictOf = (all, id) => all.filter((c) => c.parent === id && VERDICTS[c.verdict]).map((c) => c.verdict).pop();
+    const decorate = () => {
+      const all = $.shadcn.docComments.data(column).comments;
+      for (const card of document.querySelectorAll('#de-comments .doc-comments-card[data-depth="0"]')) {
+        const id = card.dataset.id;
+        if (!agentIds.has(id)) continue;
+        if ((((meta.findings || {})[id]) || {}).status === 'applied') card.setAttribute('data-applied', '');
+        const actions = editable && card.querySelector(':scope > .doc-comments-actions');
+        if (!actions) continue;
+        let box = actions.querySelector('.de-verdict');
+        if (!box) {
+          box = document.createElement('span');
+          box.className = 'de-verdict';
+          box.setAttribute('role', 'group');
+          box.setAttribute('aria-label', 'Quick answer');
+          box.innerHTML = '<button class="btn" data-variant="ghost" data-size="sm" type="button" data-vae-verdict="accept"'
+            + ' title="Accept: keep this change, or make it">✅ Accept</button>'
+            + '<button class="btn" data-variant="ghost" data-size="sm" type="button" data-vae-verdict="reject"'
+            + ' title="Reject: leave the text, or restore it">❌ Reject</button>';
+          actions.append(box);
+        }
+        const verdict = verdictOf(all, id);
+        for (const b of box.querySelectorAll('[data-vae-verdict]')) b.setAttribute('aria-pressed', String(b.dataset.vaeVerdict === verdict));
+      }
+    };
+    new MutationObserver(decorate).observe(document.getElementById('de-comments'), { childList: true, subtree: true });
+    $(column).on('click', (e) => {
+      const button = e.target.closest('[data-vae-verdict]');
+      if (!button) return;
+      const id = button.closest('.doc-comments-card').dataset.id;
+      const verdict = button.dataset.vaeVerdict;
+      const { comments } = $.shadcn.docComments.data(column);
+      const rest = comments.filter((c) => !(c.parent === id && VERDICTS[c.verdict]));
+      if (rest.length !== comments.length) $.shadcn.docComments.load(column, { version: 1, comments: rest });
+      if (verdictOf(comments, id) !== verdict) {
+        $.shadcn.docComments.add(column, { parent: id, author: 'You', color: 'chart-3', body: VERDICTS[verdict], verdict });
+      }
+      $.shadcn.docComments.go(column, id);
+    });
+    const counts = () => {
+      const all = $.shadcn.docComments.data(column).comments;
+      const yours = all.filter((c) => !agentIds.has(c.id)).length;
+      document.getElementById('de-count').textContent = `${all.length} comments · ${yours} yours`;
+    };
+    const place = () => {
+      const first = editor.querySelector('.ce-block[data-id]');
+      // a revision note may quote several blocks (a whole new section): it then anchors on its first line
+      const agent = data.comments.map(({ quote, ...c }) => {
+        const line = quote.split('\n').find((l) => l.trim()) || quote;
+        const anchor = anchorOf(quote) || anchorOf(line) || { block: first ? first.dataset.id : 'b1', text: quote };
+        return { ...c, anchor };
+      });
+      // the agent's comments come fresh from this file; the human's (and replies) from the last session, re-anchored
+      // by their text when restored edits gave their block a new id
+      const known = (id) => [...editor.querySelectorAll('.ce-block[data-id]')].some((b) => b.dataset.id === id);
+      const mine = ((kept(storeKey) || {}).comments || []).filter((c) => !agentIds.has(c.id))
+        .map((c) => (c.parent || !c.anchor || known(c.anchor.block) ? c : { ...c, anchor: anchorOf(c.anchor.text) || c.anchor }));
+      $.shadcn.docComments.load(column, { version: 1, comments: [...agent, ...mine] });
+      counts();
+      globalThis.lucide && lucide.createIcons();
+    };
+    let timer = 0;
+    const keepEdits = () => {
+      clearTimeout(timer);
+      timer = setTimeout(async () => keep(docKey, { baseline, edited: await $.shadcn.editorjs.markdown(editor) }), 150);
+    };
+    const start = async () => {
+      if (editable) {
+        baseline = await $.shadcn.editorjs.markdown(editor);
+        const last = kept(docKey);
+        if (last && last.baseline === baseline && typeof last.edited === 'string' && last.edited !== baseline) {
+          await $.shadcn.editorjs.setMarkdown(editor, last.edited);
+        }
+      }
+      place();
+      // WHY `input` too: Editor.js reports typing more than a second late, and a reload before that lost the edit
+      if (editable) for (const name of ['editorjs-change', 'input']) editor.addEventListener(name, keepEdits);
+    };
+    if (editor.hasAttribute('data-ready')) start();
+    else editor.addEventListener('editorjs-ready', start, { once: true });
+    $(column).on('doc-comments-change', () => { save(); counts(); });
+
+    let pending = null;
+    const commentOnSelection = () => {
+      const sel = globalThis.getSelection();
+      const text = sel ? sel.toString().trim() : '';
+      const node = sel && sel.anchorNode ? (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement) : null;
+      const block = node && node.closest('#de-editor .ce-block');
+      if (!text || !block) {
+        df$.shadcn.toast.show({ title: 'Select some text first', description: 'Then comment on it.' });
+        return;
+      }
+      pending = { block: block.dataset.id, text };
+      document.getElementById('de-new-comment-quote').textContent = text;
+      document.getElementById('de-new-comment-body').value = '';
+      document.getElementById('de-new-comment').showModal();
+      document.getElementById('de-new-comment-body').focus();
+    };
+    $('#de-comment').on('mousedown', (e) => e.preventDefault());
+    $('#de-comment').on('click', commentOnSelection);
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        commentOnSelection();
+      }
+    });
+    $('#de-new-comment-form').on('submit', (e) => {
+      e.preventDefault();
+      const body = document.getElementById('de-new-comment-body').value.trim();
+      if (!pending || !body) return;
+      const id = $.shadcn.docComments.add(column, { author: 'You', time: new Date().toISOString(), color: 'chart-3', anchor: pending, body });
+      document.getElementById('de-new-comment').close();
+      if (id) $.shadcn.docComments.go(column, id);
+      pending = null;
+    });
+
+    const response = async () => JSON.stringify({
+      vae: meta, version: 1, exported: new Date().toISOString(), comments: $.shadcn.docComments.data(column).comments,
+      ...(editable ? { document: { baseline, edited: await $.shadcn.editorjs.markdown(editor) } } : {}),
+    }, null, 2) + '\n';
+    // "Send to agent" needs the review server: a page opened from disk downloads instead
+    document.getElementById('de-send').hidden = !(editable && location.protocol.startsWith('http'));
+    $('#de-send').on('click', async () => {
+      try {
+        const r = await fetch('response.json', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: await response() });
+        const answer = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(answer.message || `HTTP ${r.status}`);
+        df$.shadcn.toast.show({ title: 'Sent to the agent', description: "Tell the agent you're done: it reads response.json in this review's folder." });
+      } catch (e) {
+        df$.shadcn.toast.show({ title: 'Not sent', description: `${e.message}. Download the response and hand the file to the agent instead.` });
+      }
+    });
+    $('#de-download').on('click', async () => {
+      const url = URL.createObjectURL(new Blob([await response()], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${(meta.review || meta.run || 'review').split('/').pop()}.response.json`;
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      df$.shadcn.toast.show({ title: 'Response downloaded', description: `Hand ${a.download} to the agent.` });
+    });
+    const root = document.documentElement;
+    const theme = document.getElementById('de-theme');
+    theme.setAttribute('aria-pressed', String(root.classList.contains('dark')));
+    $('#de-theme').on('click', () => {
+      const dark = root.classList.toggle('dark');
+      theme.setAttribute('aria-pressed', String(dark));
+      try { localStorage.setItem('vae-annotate:theme', dark ? 'dark' : 'light'); } catch { /* private mode */ }
+    });
+    $('#de-comments-toggle').on('click', () => {
+      const on = !document.getElementById('de').hasAttribute('data-comments');
+      document.getElementById('de').toggleAttribute('data-comments', on);
+      document.getElementById('de-comments-toggle').setAttribute('aria-pressed', String(on));
+    });
+  });
+</script>
+<script type="module" src="https://cdn.jsdelivr.net/gh/kyr0/defuss-shadcn@v0.9.9/dist/apps/document-editor/document-editor.min.js"></script>
+<script src="https://unpkg.com/lucide@1.8.0"></script>
+<script>globalThis.lucide && lucide.createIcons();</script>
+</body>
+</html>

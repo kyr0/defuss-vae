@@ -114,7 +114,7 @@ class SwarmTests(RepoCase):
         reused = subprocess.Popen(["sleep", "30"])  # alive, but started long after the entry claims
         try:
             # Hand-written block YAML, unquoted, with a block list: the reader must take what agents write.
-            (self.repo / ".agents").mkdir(exist_ok=True)
+            (self.repo / ".vae").mkdir(exist_ok=True)
             (self.repo / SWARM_FILE).write_text(
                 "agents:\n"
                 f"  - name: crashed\n    pid: {gone.stdout.strip()}\n    goal: Crashed before reporting.\n    workdir: ../c\n"
@@ -180,7 +180,7 @@ class SwarmTests(RepoCase):
                 dict(base, name="stalled", workdir="../s", target_focus_paths=["s"], estimated_ram_usage="999T"),
                 dict(base, name="running", workdir="../r", target_focus_paths=["r"], start_timestamp="not a time", eta_in_mins=30),
             ]
-            (self.repo / ".agents").mkdir(exist_ok=True)
+            (self.repo / ".vae").mkdir(exist_ok=True)
             (self.repo / SWARM_FILE).write_text(dump(entries))
             log = self.repo / "var/log/swarm/stalled.log"
             log.parent.mkdir(parents=True)

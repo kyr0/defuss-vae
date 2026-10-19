@@ -2,7 +2,9 @@
 
 Universal rules for any documentation page in any language. Examples illustrate; the rule decides. **Context** is only what the page, its sources and the repo establish; never invent facts, sources, numbers or names to make a rule pass.
 
-Use: check every changed unit (sentence, paragraph, heading, list, table, diagram) against the rules it touches. A finding is `ID page:line: problem; instruction`. `vae.py prose` already catches the mechanical part (marked *static*); this catalog is the part only reading catches.
+Use: check every changed unit (sentence, paragraph, heading, list, table, diagram) against the rules it touches. A finding is `ID page:line: problem; instruction` (in an edit run, JSON per `references/edit/CONTRACT.md`). `vae.py prose` already catches the mechanical part (marked *static*); this catalog is the part only reading catches.
+
+Threshold: report what matters for understanding, checkability, reasoning or reading, never a mere style alternative or a weak hunch. Priority: correctness and valid conclusions, then terms, then relevance and structure, then language and typography. One cause is one finding, under its best-fitting rule. Anchor a wrong conclusion at the conclusion, not at a correct premise, and a repetition at its later, dispensable place. Judge the text, not whether a machine wrote it.
 
 ## B: evidence and scope of claims
 
@@ -50,6 +52,7 @@ Use: check every changed unit (sentence, paragraph, heading, list, table, diagra
 - **R06 Conclusion/outlook.** Does the conclusion follow, is the forecast grounded? One good quarter does not support a ten-year forecast. Cut needless wrap-ups.
 - **R07 Production leftovers.** Assistant address, prompt references, self-praise (*"Here is the carefully crafted article you asked for"*) → delete from publishable text. *static: common phrases*
 - **R08 Examples.** Do examples carry the point, and is real vs hypothetical marked? An invented case presented as real → label it "fictional example". Missing evidence does not prove invention; never invent replacement anecdotes.
+- **R09 Detail level.** Does each detail serve this reader at this point? Exact versions, IP addresses, ports, file paths, flags and internal identifiers in an overview → name the thing and what it does. Keep exact values where the reader acts on them (install steps, configuration, reference) and where a claim needs its pin (B09). *"A local server on 127.0.0.1 serves the page behind a random token"* on a product page → "the page opens in your browser, private to you".
 
 ## A: structure and flow
 
@@ -61,6 +64,8 @@ Use: check every changed unit (sentence, paragraph, heading, list, table, diagra
 - **A06 List parallelism.** Equal rank and parallel grammar? *"Filling in the form; check the data; sign"* → "Fill in the form; check the data; sign". Mixed content dimensions → L05.
 - **A07 Rhythm.** Do repeated openings or uniform paragraphs flatten emphasis? Three times *"Note that"* gives color, a hard requirement and logo position equal weight → state them directly and stress the requirement. Similar sentence length alone is no defect; never add artificial variety.
 - **A08 Loops.** Announcement, content and immediate recap of the same point in a short passage → keep the content. Orientation in long or teaching texts stays.
+- **A09 Topic first.** Does a section or paragraph open by naming its subject and what it does for the reader, before mechanism, names and details? The heading does not replace that subject. *"doc and doc-edit end with a link"* as a section's first words → "The documentation skills doc and doc-edit finish by opening the page for your review". A paragraph that continues an introduced subject needs no new opening.
+- **A10 Paragraph size.** Does each paragraph carry one point? A paragraph that walks through a mechanism, its steps and its exceptions → split it where the next point starts, or set the steps as a list. On overview and web pages three or four sentences usually carry a point; reference pages may run longer when one point needs it. Length alone is no defect.
 
 ## S: language
 
@@ -80,7 +85,7 @@ Use: check every changed unit (sentence, paragraph, heading, list, table, diagra
 - **T03 Spelling/grammar.** Clear errors only, not permitted variants; check commas that change meaning.
 - **T04 References and leftovers.** Do section numbers, footnotes, links, brackets and placeholders resolve? "See section 5" in a document with four sections → fix the reference. *static: broken relative links, unclosed fences, `TODO`/`TBD`/`FIXME`, `lorem ipsum`*
 - **T05 Number format.** Decimal mark, unit spacing, dates and abbreviations consistent with the house style? Fix presentation only; keep values, magnitudes and units.
-- **T06 Special characters.** Do decorative, look-alike or mis-encoded characters harm reading or processing? Cyrillic `о` in an identifier `Kоnto-1` breaks exact matching. Non-ASCII alone is no defect. *static: invisible and bidi characters, mixed-script words, curly quotes and ellipsis (allow them per page where they are the house style, e.g. German `„…“` quotes)*
+- **T06 Special characters.** Does a symbol stand in for words, or does a decorative, look-alike or mis-encoded character harm reading or processing? In prose an arrow, a relation sign, a check mark or an emoji replaces a verb or a judgment: *"coverage 31.6 % → 75.6 %"* → "coverage rose from 31.6 % to 75.6 %", *"≥ 60 %"* → "at least 60 %", *"accept (✅)"* → "accept". Steps → a list or a diagram; before and after → a table or a from/to layout. Cyrillic `о` in an identifier `Kоnto-1` breaks exact matching. Non-ASCII alone is no defect: in code, formulas, diagrams, quoted output, UI labels and a notation the page defines, symbols are content, and so are other languages' quotation marks. *static: invisible and bidi characters, typographic spaces, curly quotes and ellipsis (fixed); arrows, relation signs, check marks and emoji in prose, mixed-script words (flagged); allow characters per page where they are content, e.g. German `„…“` quotes or a page's own notation*
 - **T07 Schematic content.** Is ordered, branching or connected structure (≥ 3 steps with order, branches, loops or feedback; components and connections; states and transitions; actors exchanging messages; a timeline) explained only in prose that a diagram would show at a glance? Use a Mermaid block (`flowchart`, `sequenceDiagram`, `stateDiagram-v2`, `erDiagram`, `timeline`). One diagram, one idea, about 12 nodes at most, quoted labels, and the claim still stated in a sentence. A diagram that repeats a two-item list adds nothing. Render before shipping (`bunx @mermaid-js/mermaid-cli -i page.mmd -o tmp/page.png`) and look at the image. *static: unknown diagram type, unbalanced label quotes*
 
 ## Comments and rewrites

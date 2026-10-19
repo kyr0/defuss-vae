@@ -1,4 +1,4 @@
-"""Swarm registry `.agents/SWARM_STATUS.yaml` (one entry per live sub-agent, no history) and detached job lifecycle.
+"""Swarm registry `.vae/SWARM_STATUS.yaml` (one entry per live sub-agent, no history) and detached job lifecycle.
 
 WHY code over prose: agents of any harness or model can run a CLI, while agents hand-editing one shared YAML race and
 drift. Every write here takes a lock, replaces the file atomically and re-reads it after a settle delay; liveness comes
@@ -22,9 +22,9 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from vae_repo import git_root, now_iso, run, runtime_dir, safe_name
+from vae_repo import STATE_DIR, git_root, now_iso, run, runtime_dir, safe_name
 
-SWARM_FILE = ".agents/SWARM_STATUS.yaml"
+SWARM_FILE = f"{STATE_DIR}/SWARM_STATUS.yaml"
 LOG_DIR = "var/log/swarm"
 FIELDS = ("name", "pid", "host", "goal", "exit_code", "workdir", "target_focus_paths", "start_timestamp", "eta_in_mins",
           "estimated_ram_usage", "estimated_vram_usage", "estimated_disk_space_usage", "gpu_id", "container_id", "pwd")

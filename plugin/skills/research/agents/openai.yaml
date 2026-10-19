@@ -1,0 +1,3 @@
+# The agent may start this skill when its description's condition holds (Codex reads this switch, Claude Code the frontmatter).
+policy:
+  allow_implicit_invocation: true

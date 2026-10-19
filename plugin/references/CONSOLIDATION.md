@@ -4,11 +4,11 @@
 
 ## Reflect first
 
-Before the audit, capture what this work taught that nothing records yet: a falsified hypothesis, a dead end, a root cause, a command that worked. Each one takes the strongest form that fits, at the narrowest scope its evidence supports: a test, a `.agents/VERIFY.py` rule, one MEMORY line with its reason after `BC`, or a CLI_GIST line for a command. A lesson a test or rule already enforces needs no line. A lesson whose cause was the environment, configuration or an external system becomes a MEMORY or CLI_GIST line at its scope, never a test that pins the values that happened to work once.
+Before the audit, capture what this work taught that nothing records yet: a falsified hypothesis, a dead end, a root cause, a command that worked. Each one takes the strongest form that fits, at the narrowest scope its evidence supports: a test, a `.vae/VERIFY.py` rule, one MEMORY line with its reason after `BC`, or a CLI_GIST line for a command. A lesson a test or rule already enforces needs no line. A lesson whose cause was the environment, configuration or an external system becomes a MEMORY or CLI_GIST line at its scope, never a test that pins the values that happened to work once.
 
 ## Audit every entry
 
-Scope: every line in `.agents/MEMORY.md`, `.agents/CLI_GIST.md` and `.agents/EPISODES.md`, and every rule an agent added to `AGENTS.md` outside the managed block.
+Scope: every line in `.vae/MEMORY.md`, `.vae/CLI_GIST.md` and `.vae/EPISODES.md`, and every rule an agent added to `AGENTS.md` outside the managed block.
 
 1. **Check it against the current repo:** does the file, symbol, command or behavior it names still exist and act as stated? Read the code, run the command or test. `vae.py doctor --repo .` lists entries that cite paths which no longer exist; those are candidates to look at, not verdicts.
 2. **Decide only on evidence:**
@@ -16,7 +16,7 @@ Scope: every line in `.agents/MEMORY.md`, `.agents/CLI_GIST.md` and `.agents/EPI
    | Evidence | Action |
    |---|---|
    | Contradicted by current code, a test or command output | Rewrite to the current fact, or delete |
-   | Superseded: a test or `.agents/VERIFY.py` rule now enforces it | Delete, naming the test or rule |
+   | Superseded: a test or `.vae/VERIFY.py` rule now enforces it | Delete, naming the test or rule |
    | Derivable from code, git or docs | Delete |
    | Cites a moved path or symbol | Rewrite to the new location |
    | Cites something removed, and the fact went with it | Delete |
@@ -28,6 +28,8 @@ Scope: every line in `.agents/MEMORY.md`, `.agents/CLI_GIST.md` and `.agents/EPI
 4. **Human-written content is never deleted.** `AGENTS.md` outside the managed block belongs to the human unless an agent demonstrably added the line; propose the change instead.
 5. **When unsure, keep.** A wrong deletion is silent; an `UNKNOWN` entry invites the next check.
 
+Deleting from the live file does not erase the entry: every earlier version of `MEMORY.md`, `CLI_GIST.md` and `EPISODES.md` is gzipped in `tmp/vae/memory/` before each edit, each gate trim and at each session start (`LATEST.json` names the newest; each `.meta.json` `prev` names the next older). The live files stay small because the session start injects them; the history is read only when evidence shows earlier work that memory no longer holds (`zgrep -i <term> tmp/vae/memory/*.gz`).
+
 ## Scope
 
 The `[scope]` in `VERIFIED[scope]` is the narrowest boundary the evidence supports (a path, module, command or condition), not a topic label. An entry decides nothing outside it, however relevant it looks. Promote a lesson at that smallest scope: `FAIL` lines recurring in `src/db/` become a test there or a `VERIFIED[src/db]` line, not a repo-wide rule. Widen a scope only with evidence from the wider area; repetition, recency, detail and confident wording widen nothing.
@@ -35,7 +37,7 @@ The `[scope]` in `VERIFIED[scope]` is the narrowest boundary the evidence suppor
 ## Per file
 
 - **MEMORY.md:** one tagged line per durable decision, invariant, constraint or promoted lesson that code, git and docs do not already state, with its reason after `BC`, at most 240 characters; at most 4 KiB in all. `doctor --repo .` fails on a line without `BC` or over the limit.
-- **EPISODES.md:** the gate writes `FAIL`, `DONE` and `FINDING` (each distinct finding once). Agents add at most one `LESSON` line per falsified hypothesis, dead end or root cause. Past 100 entries the gate trims only its own noise, oldest first: `DONE`, `FAIL`, and a `FINDING` already learned as a test, rule or memory line. Leads (`LESSON` lines, `FINDING learn=none`, any other kind) stay until wrap settles each one: promote it to the strongest form that fits (a test, a `.agents/VERIFY.py` rule, or one MEMORY line with `BC`), then delete it; or delete it with evidence from the table above. A lead with no evidence either way stays. `doctor --repo .` fails at more than 30 leads. Repeated `FAIL` lines for one failure signal a lesson worth a test or rule.
+- **EPISODES.md:** the gate writes `FAIL`, `DONE` and `FINDING` (each distinct finding once). Agents add at most one `LESSON` line per falsified hypothesis, dead end or root cause. Past 100 entries the gate trims only its own noise, oldest first: `DONE`, `FAIL`, and a `FINDING` already learned as a test, rule or memory line. Leads (`LESSON` lines, `FINDING learn=none`, any other kind) stay until wrap settles each one: promote it to the strongest form that fits (a test, a `.vae/VERIFY.py` rule, or one MEMORY line with `BC`), then delete it; or delete it with evidence from the table above. A lead with no evidence either way stays. `doctor --repo .` fails at more than 30 leads. Repeated `FAIL` lines for one failure signal a lesson worth a test or rule.
 - **CLI_GIST.md:** the shortest non-Makefile commands for setup, development, data and release; `VERIFIED` only after an observed success, otherwise `UNKNOWN`; at most 2 KiB.
 - **AGENTS.md:** `vae.py init` regenerates the managed block. Agents add only rules that prevent a repeated mistake, and remove an agent-added rule once a test or rule enforces it.
 

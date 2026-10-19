@@ -1,0 +1,71 @@
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "regel",
+      "eintrag_ids",
+      "seite",
+      "zitat",
+      "kommentar"
+    ],
+    "properties": {
+      "regel": {
+        "enum": [
+          "auslassung",
+          "begriff",
+          "berichtigung",
+          "format",
+          "geltungsbereich",
+          "quellengrenze",
+          "relation",
+          "ueberlappung",
+          "ungestuetzt",
+          "zahl",
+          "zuschreibung"
+        ]
+      },
+      "eintrag_ids": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "pattern": "^M[0-9]{6,}$"
+        },
+        "minItems": 0
+      },
+      "seite": {
+        "oneOf": [
+          {
+            "type": "integer",
+            "minimum": 1
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "zitat": {
+        "oneOf": [
+          {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "kommentar": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "\\S"
+      }
+    }
+  },
+  "minItems": 0,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:semantikspeicher:audit:v1",
+  "title": "Semantikspeicher v1: audit"
+}

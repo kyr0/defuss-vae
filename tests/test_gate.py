@@ -21,9 +21,11 @@ from vae_testkit import (  # first: puts plugin/scripts on sys.path
 from vae_gate import REVIEW_CHECKLIST, bounded, gate, validate_docs, validate_review
 from vae_hooks import commit_gate, is_commit_command, session_start, stop_gate
 from vae_project import init_project
-from vae_repo import changed_since, code_fingerprint, read_json, write_json
+from vae_repo import STATE_DIR, changed_since, code_fingerprint, read_json, write_json
 from vae_state import (
     EPISODE_KEEP,
+    MEMORY_FILES,
+    MEMORY_HISTORY,
     append_episodes,
     attestation_path,
     episode_entries,
@@ -32,6 +34,7 @@ from vae_state import (
     session_dir,
     state_path,
 )
+from vae_update import installed_version
 
 
 class GateTests(RepoCase):
@@ -149,10 +152,14 @@ class GateTests(RepoCase):
         self.write("calc.py", "def add(a, b):\n    return a + b + 0\n")
         gate(self.repo, "s3", ROOT)
         self.assertEqual(runs(), 2)
-        with (self.repo / ".agents/VERIFY.py").open("a") as f:
+        with (self.repo / ".vae/VERIFY.py").open("a") as f:
             f.write("# policy edit\n")
         gate(self.repo, "s3", ROOT)
         self.assertEqual(runs(), 3)
+        # A project check script (.vae/checks/, run by a `command` rule) is policy too: editing it reruns verify.
+        self.write(".vae/checks/no_todo.py", "raise SystemExit(0)\n")
+        gate(self.repo, "s3", ROOT)
+        self.assertEqual(runs(), 4)
 
     def test_page_edit_after_green_suite_reruns_only_page_checks(self):
         self.make_python_project(test_command=f"echo run >> runs.txt && {TEST_CMD}")
@@ -194,7 +201,7 @@ class GateTests(RepoCase):
         self.write("pyproject.toml", "[project]\nname = 'calc'\n")
         gate(self.repo, "s3c", ROOT)
         self.assertEqual(runs(), 3, "a build file always reruns e2e")
-        with (self.repo / ".agents/VERIFY.py").open("a") as f:
+        with (self.repo / ".vae/VERIFY.py").open("a") as f:
             f.write("# policy edit\n")
         gate(self.repo, "s3c", ROOT)
         self.assertEqual(runs(), 4, "a policy edit reruns e2e")
@@ -262,9 +269,9 @@ class GateTests(RepoCase):
     def test_session_start_keeps_baseline_and_injects_memory(self):
         self.make_python_project()
         init_project(self.repo, ROOT)
-        with (self.repo / ".agents/MEMORY.md").open("a") as f:
+        with (self.repo / ".vae/MEMORY.md").open("a") as f:
             f.write("- VERIFIED[db] migrations run via `make migrate` BC 2026-09-30 run\n")
-        with (self.repo / ".agents/CLI_GIST.md").open("a") as f:
+        with (self.repo / ".vae/CLI_GIST.md").open("a") as f:
             f.write("- VERIFIED[deploy] `fly deploy --app demo`\n")
         event = {"hook_event_name": "SessionStart", "cwd": str(self.repo), "session_id": "same"}
         ctx = session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"]
@@ -272,7 +279,7 @@ class GateTests(RepoCase):
         self.assertIn("- VERIFIED[db] migrations run via `make migrate`", ctx)
         self.assertIn("- VERIFIED[deploy] `fly deploy --app demo`", ctx)
         self.assertNotIn("VERIFIED[scope] fact", ctx)
-        self.assertNotIn(".agents/EPISODES.md (", ctx)  # no open episode, no section
+        self.assertNotIn(".vae/EPISODES.md (", ctx)  # no open episode, no section
         for rule in ("IF a runtime fact is unknown or contested THEN observe", "Never promote or widen by rhetoric|repetition|recency|detail",
                      "an entry binds only in its evidenced `[scope]`, below the current request"):
             self.assertIn(rule, ctx)
@@ -323,7 +330,7 @@ class GateTests(RepoCase):
         append_episodes(self.repo, "b", ["FINDING b.py:g learn=none: UNKNOWN whether g needs a lock", "FAIL lint",
                                          "LESSON HYPOTHESIS[cache] falsified BC probe", "LESSON HYPOTHESIS[cache] falsified BC probe"], ROOT)
         event = {"hook_event_name": "SessionStart", "cwd": str(self.repo), "session_id": "c"}
-        tail = session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"].split("Open .agents/EPISODES.md")[1]
+        tail = session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"].split("Open .vae/EPISODES.md")[1]
         # Open = unencoded lesson|finding or a FAIL its session never turned green; newest 3, each once, as leads.
         self.assertIn("leads to re-check, not rules", tail)
         for line in ("learn=none: UNKNOWN whether g needs a lock", "s=b FAIL lint", "LESSON HYPOTHESIS[cache]"):
@@ -336,7 +343,7 @@ class GateTests(RepoCase):
         init_project(self.repo, ROOT)
         append_episodes(self.repo, "a", ["FAIL lint", "DONE fp=1 cov=90.0% paths=a.py", "FINDING a.py:f learn=test: pinned"], ROOT)
         event = {"hook_event_name": "SessionStart", "cwd": str(self.repo), "session_id": "c"}
-        self.assertNotIn("Open .agents/EPISODES.md", session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"])
+        self.assertNotIn("Open .vae/EPISODES.md", session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"])
 
     def test_full_memory_is_cut_between_entries_and_the_rest_is_named(self):
         # The probe that found the silent cut: rules + a MEMORY.md within its 4 KiB budget overflowed 9000 chars, so the
@@ -344,8 +351,8 @@ class GateTests(RepoCase):
         self.make_python_project()
         init_project(self.repo, ROOT)
         memory = [f"- VERIFIED[m{i:02d}] fact {i} " + "x" * 150 + " BC probe" for i in range(22)]
-        self.write(".agents/MEMORY.md", "# Agent memory\n" + "\n".join(memory) + "\n")
-        self.write(".agents/CLI_GIST.md", "# CLI gist\n- VERIFIED[deploy] `fly deploy --app demo`\n")
+        self.write(".vae/MEMORY.md", "# Agent memory\n" + "\n".join(memory) + "\n")
+        self.write(".vae/CLI_GIST.md", "# CLI gist\n- VERIFIED[deploy] `fly deploy --app demo`\n")
         append_episodes(self.repo, "s", ["LESSON HYPOTHESIS[cache] falsified BC probe"], ROOT)
         event = {"hook_event_name": "SessionStart", "cwd": str(self.repo), "session_id": "c"}
         ctx = session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"]
@@ -353,10 +360,10 @@ class GateTests(RepoCase):
         shown = [m for m in memory if m in ctx]
         self.assertTrue(shown and all(m in ctx.splitlines() for m in shown), "entries arrive whole or not at all")
         self.assertIn("… context full; read the rest: ", ctx.splitlines()[-1])
-        for source in (".agents/EPISODES.md",) + (() if "fly deploy" in ctx else (".agents/CLI_GIST.md",)):
+        for source in (".vae/EPISODES.md",) + (() if "fly deploy" in ctx else (".vae/CLI_GIST.md",)):
             self.assertIn(source, ctx.splitlines()[-1])
         # A small repo state fits whole: no cut line, and the detected stack's defaults arrive.
-        self.write(".agents/MEMORY.md", "# Agent memory\n" + memory[0] + "\n")
+        self.write(".vae/MEMORY.md", "# Agent memory\n" + memory[0] + "\n")
         ctx = session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"]
         self.assertNotIn("context full", ctx)
         self.assertIn("python lint: `uv run ruff check .`", ctx)
@@ -364,15 +371,15 @@ class GateTests(RepoCase):
 
     def test_session_start_shows_the_live_swarm_first(self):
         init_project(self.repo, ROOT)
-        (self.repo / ".agents/SWARM_STATUS.yaml").write_text(
+        (self.repo / ".vae/SWARM_STATUS.yaml").write_text(
             "agents:\n- name: crashed\n  pid: 999999\n  goal: Port the parser.\n  workdir: ../c\n  target_focus_paths: [src/p]\n"
             "  start_timestamp: 2026-01-01T00:00:00Z\n")
-        with (self.repo / ".agents/MEMORY.md").open("a") as f:
+        with (self.repo / ".vae/MEMORY.md").open("a") as f:
             f.write("- VERIFIED[db] pool size 4 BC load test\n")
         event = {"hook_event_name": "SessionStart", "cwd": str(self.repo), "session_id": "c"}
         ctx = session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"]
         self.assertIn("LOST crashed: Port the parser. (workdir ../c)", ctx)
-        self.assertLess(ctx.index("Swarm .agents/SWARM_STATUS.yaml"), ctx.index(".agents/MEMORY.md:"), "agents before memory")
+        self.assertLess(ctx.index("Swarm .vae/SWARM_STATUS.yaml"), ctx.index(".vae/MEMORY.md:"), "agents before memory")
 
     def test_attestations_fail_closed_on_every_incomplete_field(self):
         # One mutation per field of an otherwise valid attestation; each is rejected with its own reason.
@@ -465,10 +472,10 @@ class GateTests(RepoCase):
         event = {"hook_event_name": "SessionStart", "cwd": str(self.repo), "session_id": "c"}
 
         def section(entries: list[str]) -> list[str]:
-            (self.repo / ".agents/EPISODES.md").unlink()
+            (self.repo / ".vae/EPISODES.md").unlink()
             append_episodes(self.repo, "s", entries, ROOT)
             ctx = session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"]
-            body = ctx.split("Open .agents/EPISODES.md (leads to re-check, not rules):\n")[1]
+            body = ctx.split("Open .vae/EPISODES.md (leads to re-check, not rules):\n")[1]
             self.assertLessEqual(len(body), 1024)
             return body.split("\n")
 
@@ -485,7 +492,7 @@ class GateTests(RepoCase):
 
     def test_episodes_stay_bounded(self):
         append_episodes(self.repo, "s", [f"FAIL x{i}" for i in range(EPISODE_KEEP + 5)], ROOT)
-        text = (self.repo / ".agents/EPISODES.md").read_text()
+        text = (self.repo / ".vae/EPISODES.md").read_text()
         entries = episode_entries(self.repo)
         self.assertEqual(len(entries), EPISODE_KEEP)
         self.assertTrue(entries[0].endswith("FAIL x5") and text.startswith("# Episodes"))
@@ -537,6 +544,64 @@ class GateTests(RepoCase):
         self.assertEqual(denied["hookSpecificOutput"]["permissionDecision"], "deny")
         self.assertIn("could not run", denied["hookSpecificOutput"]["permissionDecisionReason"])
         self.assertEqual(hook("ls -la"), "", "a command that cannot be a commit never loads the gate")
+
+
+class MemoryHistoryTests(RepoCase):
+    """Every version of the memory files survives: before an edit (PreToolUse), at session start and before a trim."""
+
+    def archives(self) -> list[dict]:
+        folder = self.repo / MEMORY_HISTORY
+        return [json.loads(p.read_text()) for p in sorted(folder.glob("*.meta.json"))] if folder.is_dir() else []
+
+    def hook(self, tool: str, path: str) -> subprocess.CompletedProcess[str]:
+        event = {"hook_event_name": "PreToolUse", "tool_name": tool, "cwd": str(self.repo),
+                 "tool_input": {"file_path": path, "old_string": "a", "new_string": "b"}}
+        return subprocess.run([PY, str(ROOT / "hooks/lifecycle.py")], input=json.dumps(event), text=True, capture_output=True, check=False)
+
+    def test_adapter_paths_match_the_memory_files(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("lifecycle_paths", ROOT / "hooks/lifecycle.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        self.assertEqual(mod.MEMORY_PATHS, tuple(f"{STATE_DIR}/{n}" for n in MEMORY_FILES))
+
+    def test_an_edit_of_a_memory_file_archives_the_version_before_it(self):
+        self.write(".vae/MEMORY.md", "- VERIFIED[x] before BC test\n")
+        out = self.hook("Edit", str(self.repo / ".vae/MEMORY.md"))
+        self.assertEqual((out.returncode, out.stdout), (0, ""), "the edit is never blocked")
+        self.assertEqual([(a["file"], a["reason"]) for a in self.archives()], [("MEMORY.md", "alter")])
+        self.assertEqual(self.hook("Write", str(self.repo / "src/app.py")).stdout, "")
+        self.assertEqual(self.hook("Edit", str(self.repo / "notes/MEMORY.md")).stdout, "")
+        self.assertEqual(len(self.archives()), 1, "only .vae/ memory files are archived")
+
+    def test_session_start_snapshots_changes_and_points_to_the_history(self):
+        self.make_python_project()
+        init_project(self.repo, ROOT)
+        event = {"hook_event_name": "SessionStart", "cwd": str(self.repo), "session_id": "s1"}
+        session_start(event, ROOT)
+        first = len(self.archives())
+        self.assertGreaterEqual(first, 2, "MEMORY.md and CLI_GIST.md exist after init")
+        ctx = session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"]
+        self.assertEqual(len(self.archives()), first, "unchanged files are not archived again")
+        self.assertIn(f"Memory history: every earlier version of {STATE_DIR}/MEMORY.md", ctx)
+        self.assertIn(f"defuss-vae {installed_version(ROOT)} (verified agentic engineering)", ctx)
+        with (self.repo / ".vae/MEMORY.md").open("a") as f:
+            f.write("- VERIFIED[y] edited in an editor BC test\n")
+        session_start(event, ROOT)
+        self.assertEqual(self.archives()[-1]["reason"], "snapshot")
+
+    def test_session_start_asks_for_the_state_move(self):
+        self.write(".agents/VERIFY.py", "CONFIG = {}\nRULES = []\n")
+        event = {"hook_event_name": "SessionStart", "cwd": str(self.repo), "session_id": "s2"}
+        ctx = session_start(event, ROOT)["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("update migrate --repo", ctx)
+
+    def test_a_trim_archives_the_full_file_first(self):
+        append_episodes(self.repo, "a", [f"FAIL check{i}" for i in range(EPISODE_KEEP)], ROOT)
+        self.assertEqual(self.archives(), [])
+        append_episodes(self.repo, "a", ["FAIL one more"], ROOT)
+        self.assertEqual([(a["file"], a["reason"]) for a in self.archives()], [("EPISODES.md", "capacity")])
+
 
 if __name__ == "__main__":
     unittest.main()

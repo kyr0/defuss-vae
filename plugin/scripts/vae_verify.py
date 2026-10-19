@@ -11,12 +11,16 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from vae_prose import Finding, fix, scan
+from vae_prose import HTML_EXT, Finding, fix, scan
 from vae_repo import (
     CODE_CONFIG,
+    LEGACY_STATE_DIR,
     MANIFESTS,
     PLUGIN_ROOT,
     SOURCE_EXT,
+    STATE_DIR,
+    archive_copy,
+    bundle_old,
     code_fingerprint,
     dirty_paths,
     find_test_files,
@@ -65,12 +69,12 @@ GITIGNORE = {".env": ".env", ".venv/x": ".venv/", "__pycache__/x": "__pycache__/
              "var/x": "var/*", "tmp/x": "tmp/*", "output/x": "output/*", "input/x": "input/*", ".DS_Store": ".DS_Store",
              "dist/x": "dist/", "coverage/x": "coverage/", ".coverage": ".coverage", ".cache/x": ".cache/",
              "target/x": "target/", "build/x": "build/", ".gradle/x": ".gradle/", "bin/x": "bin/", "obj/x": "obj/",
-             ".agents/SWARM_STATUS.yaml": ".agents/SWARM_STATUS.yaml"}
+             ".vae/SWARM_STATUS.yaml": ".vae/SWARM_STATUS.yaml"}
 # Required: secrets, runtime state, consumer output and build artifacts always; caches and package folders per toolchain.
 LAYOUT_IGNORES = ("var/x", "tmp/x", ".env")
 BUILD_IGNORES = ("output/x", "dist/x")
 # The swarm registry is live process state (pids, absolute paths): never committed.
-BASE_IGNORES = (".env", "var/x", "tmp/x", "output/x", "input/x", ".DS_Store", "dist/x", ".agents/SWARM_STATUS.yaml")
+BASE_IGNORES = (".env", "var/x", "tmp/x", "output/x", "input/x", ".DS_Store", "dist/x", ".vae/SWARM_STATUS.yaml")
 STACK_IGNORES = {
     "js": ("node_modules/x", "coverage/x", ".cache/x"),
     "python": (".venv/x", "__pycache__/x", "x.pyc", ".pytest_cache/x", ".ruff_cache/x", ".coverage"),
@@ -91,7 +95,7 @@ OS_ENV = {"HOME", "PATH", "PWD", "USER", "SHELL", "TERM", "LANG", "TMPDIR", "TZ"
 
 
 def load_project_verifier(repo: Path) -> tuple[dict[str, Any], list[dict[str, Any]], str | None]:
-    path = repo / ".agents" / "VERIFY.py"
+    path = repo / STATE_DIR / "VERIFY.py"
     if not path.exists():
         return {}, [], None
     try:
@@ -111,12 +115,15 @@ def load_project_verifier(repo: Path) -> tuple[dict[str, Any], list[dict[str, An
 
 def check_verifier(repo: Path, check_id: str) -> tuple[Check, dict[str, Any], list[dict[str, Any]]]:
     """WHY missing fails: without VERIFY.py the template rules (e.g. no-mocks) silently never run."""
-    exists = (repo / ".agents" / "VERIFY.py").exists()
+    exists = (repo / STATE_DIR / "VERIFY.py").exists()
     config, rules, err = load_project_verifier(repo)
     ok = exists and err is None
     init_cmd = f"RUN: python3 {PLUGIN_ROOT}/scripts/vae.py init --repo {repo}"
-    return Check(check_id, ".agents/VERIFY.py exists and loads", "VERIFIED", ok, err or ("CONFIG/RULES valid" if exists else "missing"),
-                 next=None if ok else (f"FIX .agents/VERIFY.py: {err}" if err else init_cmd)), config, rules
+    if not exists and (repo / LEGACY_STATE_DIR / "VERIFY.py").exists():
+        # The state still sits where defuss-vae up to 0.8 kept it: move it rather than scaffold a second copy.
+        init_cmd = f"RUN: python3 {PLUGIN_ROOT}/scripts/vae.py update migrate --repo {repo}"
+    return Check(check_id, ".vae/VERIFY.py exists and loads", "VERIFIED", ok, err or ("CONFIG/RULES valid" if exists else "missing"),
+                 next=None if ok else (f"FIX .vae/VERIFY.py: {err}" if err else init_cmd)), config, rules
 
 
 @dataclasses.dataclass
@@ -192,6 +199,10 @@ def parse_coverage(output: str) -> tuple[float | None, str]:
 def run_logged(check_id: str, command: str, repo: Path, timeout: int) -> tuple[subprocess.CompletedProcess[str], str]:
     p = run(command, repo, timeout=timeout)
     log = runtime_dir(repo, "var/log/vae") / f"{safe_name(check_id)}.log"
+    # WHY archive before every write: the log is overwritten per run, and an earlier run's output is provenance an
+    # agent may need; archives older than a week are bundled per day, never deleted.
+    archive_copy(log, log.parent / "archive", "overwrite")
+    bundle_old(log.parent / "archive")
     log.write_text(f"$ {command}\n{p.stdout}", "utf-8")
     return p, str(log.relative_to(repo))
 
@@ -249,7 +260,7 @@ def run_custom_rule(rule: dict[str, Any], repo: Path, timeout: int, changed: Ite
     if kind == "command":
         cmd = str(rule.get("command") or "")
         if not cmd:
-            return Check(rid, claim, "UNKNOWN", None, "missing command", required, next=f"EDIT .agents/VERIFY.py rule {rid}")
+            return Check(rid, claim, "UNKNOWN", None, "missing command", required, next=f"EDIT .vae/VERIFY.py rule {rid}")
         c = check_command(rid, claim, cmd, repo, int(rule.get("timeout_s", timeout)))
         c.required = required
         return c
@@ -258,13 +269,13 @@ def run_custom_rule(rule: dict[str, Any], repo: Path, timeout: int, changed: Ite
         value = path.exists()
         return Check(rid, claim, "VERIFIED", value, f"path={path}", required, next=None if value else f"CREATE: {path}")
     if kind not in {"contains", "regex", "not_regex"}:
-        return Check(rid, claim, "UNKNOWN", None, f"unsupported rule kind={kind!r}", required, next=f"FIX .agents/VERIFY.py rule {rid}")
+        return Check(rid, claim, "UNKNOWN", None, f"unsupported rule kind={kind!r}", required, next=f"FIX .vae/VERIFY.py rule {rid}")
     rx = None
     if kind != "contains":
         try:
             rx = re.compile(str(rule.get("pattern") or ""), re.MULTILINE)
         except re.error as e:
-            return Check(rid, claim, "UNKNOWN", None, f"invalid regex: {e}", required, next=f"FIX regex in .agents/VERIFY.py rule {rid}")
+            return Check(rid, claim, "UNKNOWN", None, f"invalid regex: {e}", required, next=f"FIX regex in .vae/VERIFY.py rule {rid}")
     needle = str(rule.get("text") or "")
     if "glob" in rule:
         # WHY changed files only: policy applies to new work without blocking on untouched legacy code.
@@ -434,8 +445,18 @@ def check_env(repo: Path, changed: Iterable[str]) -> Check:
     )
 
 
+def prose_pages(paths: Iterable[str], config: dict[str, Any]) -> list[str]:
+    """The pages the prose check reads: every Markdown page, plus the HTML pages CONFIG["prose"]["html"] names (globs).
+    WHY named, not every .html: templates, fixtures and generated reports are HTML too, but only a site is prose."""
+    cfg = config.get("prose")
+    globs = (cfg.get("html") or ()) if isinstance(cfg, dict) else ()
+    globs = [globs] if isinstance(globs, str) else [str(g) for g in globs]
+    return sorted(p for p in paths if is_doc(p) or (Path(p).suffix.lower() in HTML_EXT and any(fnmatch.fnmatchcase(p, g) for g in globs)))
+
+
 def prose_findings(repo: Path, pages: Iterable[str], config: dict[str, Any], apply_fix: bool = False) -> list[Finding]:
-    """Scan (and with apply_fix first repair) doc pages under CONFIG["prose"]: {"allow": {glob: chars}, "phrases": [regex]}."""
+    """Scan (and with apply_fix first repair) doc pages under CONFIG["prose"]: {"allow": {glob: chars}, "phrases": [regex],
+    "html": [glob]}."""
     cfg = config.get("prose")
     cfg = cfg if isinstance(cfg, dict) else {}
     allow_map = cfg.get("allow") or {}
@@ -447,7 +468,7 @@ def prose_findings(repo: Path, pages: Iterable[str], config: dict[str, Any], app
         allow = "".join(str(chars) for glob, chars in allow_map.items() if fnmatch.fnmatchcase(rel, glob))
         text = f.read_text("utf-8", errors="replace")
         if apply_fix:
-            fixed = fix(text, allow)
+            fixed = fix(text, allow, html=Path(rel).suffix.lower() in HTML_EXT)
             if fixed != text:
                 f.write_text(fixed, "utf-8")
                 text = fixed
@@ -462,7 +483,7 @@ def check_prose(repo: Path, pages: list[str], config: dict[str, Any]) -> Check:
     try:
         found = prose_findings(repo, pages, config)
     except re.error as e:
-        return Check("prose", claim, "UNKNOWN", None, f"invalid CONFIG['prose']['phrases'] regex: {e}", next="FIX .agents/VERIFY.py CONFIG['prose']")
+        return Check("prose", claim, "UNKNOWN", None, f"invalid CONFIG['prose']['phrases'] regex: {e}", next="FIX .vae/VERIFY.py CONFIG['prose']")
     hits = [str(f) for f in found]
     fixable = sorted({f.path for f in found if f.fixable})
     nxt = None
@@ -615,8 +636,9 @@ def verify(repo: Path, changed_paths: list[str] | None = None, suites: bool = Tr
     checks.append(verifier)
     timeout = int(config.get("timeout_s", 180))
     checks.append(check_doc_pages(repo, changed_paths, config))
-    if doc_paths:
-        checks.append(check_prose(repo, doc_paths, config))
+    pages = prose_pages(changed_paths, config)
+    if pages:
+        checks.append(check_prose(repo, pages, config))
     if not suites or (doc_paths and not code_paths):
         # WHY prose-only: a page edit cannot change what lint, tests or e2e prove; rerunning the suites for a typo
         # would only make the gate slower. Project rules still run, so page-specific invariants hold.
@@ -717,7 +739,7 @@ def verify(repo: Path, changed_paths: list[str] | None = None, suites: bool = Tr
 
 
 def invalid_rule(rule: Any) -> Check:
-    return Check("custom.invalid", "custom rule valid", "UNKNOWN", None, f"rule is not dict: {rule!r}", next="FIX .agents/VERIFY.py RULES")
+    return Check("custom.invalid", "custom rule valid", "UNKNOWN", None, f"rule is not dict: {rule!r}", next="FIX .vae/VERIFY.py RULES")
 
 
 def render_checks(checks: list[Check], evidence_max: int = 1200) -> list[str]:

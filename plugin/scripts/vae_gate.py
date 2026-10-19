@@ -9,6 +9,7 @@ from pathlib import Path
 
 from vae_repo import (
     PLUGIN_ROOT,
+    STATE_DIR,
     changed_since,
     code_fingerprint,
     file_hash,
@@ -123,7 +124,7 @@ def validate_docs(path: Path, fp: str, changed_paths: list[str], repo: Path | No
 VERIFY_NEXT = (
     "NEXT: fix the lowest causal failure; rerun only needed scope. IF cause=? THEN probe before editing "
     f"(smallest discriminating observation; temporary lines tagged `{PROBE_TAG}`). "
-    "IF a new deterministic failure class is not yet encoded THEN add a test OR .agents/VERIFY.py rule. NOT claim VERIFIED from inference.\n"
+    "IF a new deterministic failure class is not yet encoded THEN add a test OR .vae/VERIFY.py rule. NOT claim VERIFIED from inference.\n"
     "HARNESS: a FAIL is your work, NOT a reason to end the turn or hand off: apply the failing check's fix yourself, then rerun LOOP. "
     "NOT propose bypassing the gate (`! git commit`, `--no-verify`, a `CONFIG` switch that disables a check) as the way out. "
     "ONLY IF a check's fix says the decision is the human's THEN ask for exactly that decision with its options, after fixing everything else."
@@ -146,7 +147,7 @@ def review_instruction(fp: str, path: Path, changed: list[str], plugin_root: Pat
         "e2e (consumes the built artifact; EVERY page|route|screen|component of a UI at least once in a real Playwright browser with WebGL2|network|permissions it needs; EVERY CLI command|API endpoint at least once), observability (no leftover probe|debug spam; logs ISO-8601 UTC first + level).\n"
         "PASS2 structure + Ponytail: separated concerns in small testable modules; delete|reuse → stdlib → native → installed dependency → minimum code; NOT duplicate machinery, speculative config|abstraction, unmeasured optimization.\n"
         "Actionable finding REQUIRES location + causal evidence + minimal fix; fix EVERY one. "
-        "IF root cause VERIFIED AND recurrence mechanically checkable THEN regression test OR .agents/VERIFY.py rule ELSE learning.status=UNKNOWN + why; "
+        "IF root cause VERIFIED AND recurrence mechanically checkable THEN regression test OR .vae/VERIFY.py rule ELSE learning.status=UNKNOWN + why; "
         "NOT a test pinning env|config values that worked once.\n"
         + (f"PAGES {json.dumps(pages, separators=(',', ':'))}: review EVERY changed unit against {plugin_root}/references/PROSE.md "
            "(B evidence, L logic, P precision, R relevance, A structure, S style, T typography incl. T07 Mermaid); fix what the page|code supports, "
@@ -187,8 +188,12 @@ def bounded(repo: Path, session_id: str, text: str, limit: int = 9000) -> str:
 
 
 def verify_key(repo: Path, fp: str) -> str:
-    # WHY: policy files sit outside the code fingerprint yet change verification results, so they key the cache too.
-    parts = [fp, file_hash(repo / ".agents" / "VERIFY.py"), file_hash(repo / ".gitignore")]
+    # WHY: policy files sit outside the code fingerprint yet change verification results, so they key the cache too:
+    # VERIFY.py, .gitignore and every project check script that a `command` rule runs from .vae/checks/.
+    checks = repo / STATE_DIR / "checks"
+    scripts = sorted(p for p in checks.rglob("*") if p.is_file() and "__pycache__" not in p.parts) if checks.is_dir() else []
+    parts = [fp, file_hash(repo / STATE_DIR / "VERIFY.py"), file_hash(repo / ".gitignore"),
+             *(f"{p.relative_to(repo)}={file_hash(p)}" for p in scripts)]
     return hashlib.sha256("\0".join(parts).encode()).hexdigest()
 
 

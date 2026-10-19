@@ -1,16 +1,35 @@
-"""Project scaffolding and hygiene: `init` (layout, CI, managed AGENTS.md block) and `doctor --repo`."""
+"""Project scaffolding and hygiene: `init` (layout, CI, managed AGENTS.md block), `doctor --repo` and its `--tidy`."""
 from __future__ import annotations
 
 import json
+import os
 import re
+import shutil
+import time
 from pathlib import Path
 from typing import Any
 
 from vae_hooks import RULES_TEXT
-from vae_repo import PLUGIN_ROOT, listed_files, run, stacks, walk_files
+from vae_repo import (
+    BUNDLE_AFTER_DAYS,
+    PLUGIN_ROOT,
+    STAMP_RE,
+    STATE_DIR,
+    bundle_old,
+    history_problems,
+    listed_files,
+    run,
+    stacks,
+    walk_files,
+    write_text_atomic,
+)
+from vae_research import endpoint_checks
 from vae_state import (
     EPISODE_LEADS,
+    FOLDER_RE,
+    MEMORY_HISTORY,
     MEMORY_LINE,
+    SESSIONS,
     STATE_BUDGET,
     ensure_from_template,
     episode_entries,
@@ -39,7 +58,7 @@ MANAGED_END = "<!-- defuss-vae:end -->"
 
 def managed_block(repo: Path) -> str:
     """The session rules for hosts without hooks, plus the defaults of the stacks this repo uses (as at session start)."""
-    read = "Read `.agents/MEMORY.md` + `.agents/CLI_GIST.md` before engineering work; `grep` `.agents/EPISODES.md` for recurring failures."
+    read = "Read `.vae/MEMORY.md` + `.vae/CLI_GIST.md` before engineering work; `grep` `.vae/EPISODES.md` for recurring failures."
     defaults = stack_defaults(stacks(listed_files(repo)))
     lines = [f"{s} {ln[2:]}" for s, group in sorted(defaults.items()) for ln in group]
     extra = ("\nStack defaults (plugin `references/STACKS.md`):\n" + "\n".join(lines)) if lines else ""
@@ -145,7 +164,7 @@ def github_ci(repo: Path, config: dict[str, Any], template_root: Path = PLUGIN_R
 
 def init_project(repo: Path, template_root: Path = PLUGIN_ROOT) -> list[str]:
     """Scaffold the layout; never overwrites anything the project already owns."""
-    rels = (".agents/VERIFY.py", ".agents/EPISODES.md", ".agents/MEMORY.md", ".agents/CLI_GIST.md", "Makefile")
+    rels = (".vae/VERIFY.py", ".vae/EPISODES.md", ".vae/MEMORY.md", ".vae/CLI_GIST.md", "Makefile")
     changed = [r for r in rels if ensure_from_template(repo, r, template_root)]
     ignored = ignored_probes(repo)
     gi = repo / ".gitignore"
@@ -172,8 +191,8 @@ PATH_REF = re.compile(r"(?<![\w./<-])((?:[\w.-]+/)+[\w.-]+)(?=[:,;\s)`'\"]|$)")
 
 def memory_sources(repo: Path) -> list[tuple[str, str]]:
     """(file, entry) for every agent memory entry, and every AGENTS.md bullet outside the managed block."""
-    out = [(f".agents/{n}", e) for n in STATE_BUDGET for e in memory_entries(repo / ".agents" / n)]
-    out += [(".agents/EPISODES.md", e) for e in episode_entries(repo)]
+    out = [(f".vae/{n}", e) for n in STATE_BUDGET for e in memory_entries(repo / STATE_DIR / n)]
+    out += [(".vae/EPISODES.md", e) for e in episode_entries(repo)]
     agents = repo / "AGENTS.md"
     if agents.exists():
         text = agents.read_text("utf-8", errors="replace")
@@ -206,12 +225,12 @@ def check_stale(repo: Path) -> Check:
 
 
 def doctor_repo(repo: Path) -> list[Check]:
-    """Deterministic memory hygiene: loadable policy, bounded + epistemically tagged state, layout."""
+    """Deterministic memory hygiene: loadable policy, bounded + epistemically tagged state, layout; research endpoints."""
     init_cmd = f"RUN: python3 {PLUGIN_ROOT}/scripts/vae.py init --repo {repo}"
     verifier, config, _ = check_verifier(repo, "state.verifier")
     checks = [verifier]
     for name, budget in STATE_BUDGET.items():
-        p = repo / ".agents" / name
+        p = repo / STATE_DIR / name
         if not p.exists():
             checks.append(Check(f"state.{name}", "exists", "VERIFIED", False, "missing", next=init_cmd))
             continue
@@ -229,7 +248,7 @@ def doctor_repo(repo: Path) -> list[Check]:
         checks.append(Check(
             f"state.{name}", want, "VERIFIED", ok,
             f"bytes={size}" + "".join(f"; {k}={v[:5]}" for k, v in bad.items() if v),
-            next=None if ok else f"CONSOLIDATE .agents/{name}: merge, delete stale|derivable lines, tag every entry"
+            next=None if ok else f"CONSOLIDATE .vae/{name}: merge, delete stale|derivable lines, tag every entry"
             + (", one concise line each with its BC evidence" if name == "MEMORY.md" else ""),
         ))
     leads = [e for e in episode_entries(repo) if is_lead(e)]
@@ -239,5 +258,82 @@ def doctor_repo(repo: Path) -> list[Check]:
         next=None if len(leads) <= EPISODE_LEADS else
         f"SETTLE in wrap per {PLUGIN_ROOT}/references/CONSOLIDATION.md: promote each lead or delete it with evidence",
     ))
+    broken = history_problems(repo / MEMORY_HISTORY)
+    checks.append(Check(
+        "state.history", f"every archived memory version in {MEMORY_HISTORY}/ exists and matches its sha256", "VERIFIED",
+        not broken, f"broken={broken[:5]}" if broken else "chains intact",
+        next=None if not broken else f"INSPECT {MEMORY_HISTORY}/: restore the named archive from a backup or report the loss; never rewrite history",
+    ))
     checks += [check_stale(repo), check_layout(repo), check_gitignore(repo, config), check_wiring(repo, config)]
-    return checks
+    # Research endpoints only when configured: a project without .vae/.env.*.json gets no new checks.
+    return checks + endpoint_checks(repo)
+
+
+SESSION_MAX_AGE_D = 14  # a session folder untouched this long belongs to a finished session
+ORPHAN_TMP_S = 3600  # a registry temp file this old was left by an interrupted write
+LOG_ARCHIVES = "var/log/vae/archive"
+
+
+def newest_mtime(folder: Path) -> float:
+    return max((f.stat().st_mtime for f in folder.rglob("*") if f.is_file()), default=folder.stat().st_mtime)
+
+
+def pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except OSError:  # PermissionError: it exists but is someone else's; any other error: unknown, so keep the file
+        return True
+    return True
+
+
+def tidy(repo: Path, apply: bool, now: float | None = None) -> list[Check]:
+    """defuss-vae's own leftovers in `tmp/` and its week-old log archives; `apply` removes the leftovers and bundles
+    the archives. Every other file in `tmp/` is the project's and only counted.
+
+    WHY so narrow: `tmp/` is the project's scratch space too, so only files whose meaning defuss-vae knows are judged.
+    Never touched: `tmp/vae/memory/` (memory history) and any log; logs are bundled, not deleted."""
+    now = time.time() if now is None else now
+    tmp, vae_tmp = repo / "tmp", repo / "tmp" / "vae"
+    sessions = sorted(d for d in vae_tmp.iterdir() if d.is_dir() and FOLDER_RE.fullmatch(d.name)) if vae_tmp.is_dir() else []
+    stale = [d for d in sessions[:-1] if now - newest_mtime(d) > SESSION_MAX_AGE_D * 86400]
+    # An edit run (page snapshot, findings, model traces) is done with once applied and discussed; the same age rule.
+    edits = vae_tmp / "edit"
+    old_runs = [d for d in sorted(edits.iterdir()) if d.is_dir() and now - newest_mtime(d) > SESSION_MAX_AGE_D * 86400] \
+        if edits.is_dir() else []
+    orphans = [f for f in vae_tmp.glob("SWARM_STATUS.*.tmp") if now - f.stat().st_mtime > ORPHAN_TMP_S] if vae_tmp.is_dir() else []
+    dead = []
+    for f in tmp.glob("*.pid") if tmp.is_dir() else ():
+        try:
+            if not pid_alive(int(f.read_text("utf-8").strip())):
+                dead.append(f)
+        except (OSError, ValueError):
+            continue  # unreadable or not a number: not ours to judge
+    leftovers = stale + old_runs + orphans + dead
+    kept = sorted(f.name for f in tmp.iterdir() if f.name not in ("vae", ".gitignore") and f not in dead) if tmp.is_dir() else []
+    archives = repo / LOG_ARCHIVES
+    cutoff = time.strftime("%Y%m%d", time.gmtime(now - BUNDLE_AFTER_DAYS * 86400))
+    due = [f for f in archives.iterdir() if (m := STAMP_RE.search(f.name)) and m.group(1) < cutoff] if archives.is_dir() else []
+    rel = [str(f.relative_to(repo)) + ("/" if f.is_dir() else "") for f in leftovers]
+    bundled: list[str] = []
+    if apply:
+        for f in leftovers:
+            shutil.rmtree(f) if f.is_dir() else f.unlink()
+        if stale:  # the index names each session's folder; drop the lines of the folders just removed
+            index = vae_tmp / SESSIONS
+            gone = {d.name for d in stale}
+            lines = index.read_text("utf-8").splitlines() if index.exists() else []
+            write_text_atomic(index, "".join(f"{ln}\n" for ln in lines if ln.partition("\t")[0] not in gone))
+        bundled = bundle_old(archives, now=now, force=True)
+    cmd = f"RUN: python3 {PLUGIN_ROOT}/scripts/vae.py doctor --repo {repo} --tidy --apply"
+    return [
+        Check("tidy.tmp", "defuss-vae leftovers in tmp/ are gone (old sessions and edit runs, interrupted writes, dead pid files)", "VERIFIED",
+              apply or not leftovers, (f"removed={rel[:10]}" if apply else f"deletable={rel[:10]}") + (f" (+{len(rel) - 10})" if len(rel) > 10 else "")
+              if rel else "none", required=False, next=None if apply or not leftovers else cmd),
+        Check("tidy.logs", f"check-log archives older than {BUNDLE_AFTER_DAYS} days are bundled per day", "VERIFIED",
+              apply or not due, (f"bundled={bundled}" if apply else f"due={len(due)} files") if due or bundled else "none due",
+              required=False, next=None if apply or not due else cmd),
+        Check("tidy.kept", "every other tmp/ entry is the project's own and stays", "VERIFIED", True,
+              f"kept={kept[:10]}" + (f" (+{len(kept) - 10})" if len(kept) > 10 else "") if kept else "none", required=False),
+    ]

@@ -17,19 +17,24 @@ COVERAGE_MIN ?= 60
 help: ## list the verbs with their usage (default goal)
 	@awk -F':.*## ' '/^[a-zA-Z0-9_ -]+:.*## /{printf "  %-12s %s\n", $$1, $$2}' $(firstword $(MAKEFILE_LIST))
 
+# CloakBrowser upgrades its binary in the background unless this is false; with it, the pinned package runs the
+# Chromium build it ships with. Exported to every recipe, so `make setup` and `make e2e` use the same build.
+export CLOAKBROWSER_AUTO_UPDATE := false
+
 # Dev tooling only (coverage, compat, lint run through uv; the website's browser e2e through bun); the hooks themselves
-# need just python3.
-setup: ## install uv and bun if missing, then the site e2e's locked deps (dev tooling; the hooks need only python3)
+# need just python3. GitHub Actions sets CI=true and skips the site's outbound-link check, so it skips CloakBrowser.
+setup: ## install uv and bun if missing, the site e2e's locked deps and, outside CI, CloakBrowser's Chromium
 	@[ -x "$(UV)" ] || curl -LsSf https://astral.sh/uv/install.sh | sh
 	@[ -x "$(BUN)" ] || curl -fsSL https://bun.sh/install | bash
 	cd $(SITE_E2E) && $(BUN) install --frozen-lockfile
+	@[ -n "$$CI" ] || BUN=$(BUN) sh $(SITE_E2E)/install-cloakbrowser.sh
 
 # Uniform layout verbs (plugin/templates/Makefile); this plugin is hooks + CLI, so there is no service.
 start stop restart status log: ## no service: this plugin is hooks + CLI
 	@echo "∅ $@: defuss-vae runs no service"
 
-metrics: ## runtime prompt budget: bytes per skill (each < 6000, all < 28000)
-	@wc -c $(PLUGIN)/skills/*/SKILL.md $(PLUGIN)/references/VAE-DIALECT.md
+metrics: ## runtime prompt budget: bytes per skill (each < 6000, all < 38000), then the dialect reference
+	@wc -c $(PLUGIN)/skills/*/SKILL.md; wc -c $(PLUGIN)/references/VAE-DIALECT.md
 
 bench: dist ## gate latency on the installed release: cold verify vs cached review/docs loop
 	$(PYTHON) tests/e2e.py $(DIST) --bench
@@ -68,3 +73,6 @@ dist: ## the release zip: plugin/ at the archive root
 	@mkdir -p output && rm -f $(DIST) && cd $(PLUGIN) && zip -qr ../$(DIST) . -x '*/__pycache__/*' '*.pyc' '*.DS_Store' && echo $(DIST)
 
 package: verify dist ## verify, then build the release zip
+
+dev: # start the development server for the documentation site
+	bunx serve ./docs

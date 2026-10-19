@@ -9,6 +9,8 @@
   .vae-section { width: 100%; max-width: 76rem; padding-inline: 1rem; scroll-margin-top: 5rem; }
   .vae-icon { width: 1em; height: 1em; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .vae-icon-fill { fill: currentColor; stroke: none; }
+  /* a Lucide icon before each section heading, in the accent colour */
+  .vae-h-icon { width: .85em; height: .85em; margin-inline-end: .35em; vertical-align: -.1em; color: var(--chart-2); }
   .vae-ext { width: .75em; height: .75em; margin-inline-start: .15em; vertical-align: -.05em; opacity: .75; }
   .mk-hero-note a, .mk-footer-copy a, .mk-features-desc a, .mk-stats-desc a, .vae-footnote a, .vae-prose a, .vae-table a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
   .mk-hero-desc code, .vae-intro code, .vae-prose code, .vae-table code, .mk-section-header-desc code { font-family: var(--font-mono); font-size: .875em; }
@@ -42,7 +44,7 @@
   .vae-trust { display: flex; flex-wrap: wrap; gap: .4rem 1.1rem; list-style: none; margin: 0; padding: 0;
     color: var(--muted-foreground); font-size: .75rem; }
   .vae-trust li { display: flex; align-items: center; gap: .4rem; }
-  .vae-trust li::before { content: ''; width: .3rem; height: .3rem; border-radius: 50%; background: var(--chart-2); }
+  .vae-tick { color: var(--chart-2); stroke-width: 3; }
 
   /* Uses the existing tabs component: click and keyboard behavior stay owned by defuss-shadcn. */
   .vae-demo-wrap { min-width: 0; }
@@ -71,15 +73,20 @@
   .vae-demo-code { margin-block: 1rem 1.25rem; padding: .875rem 1rem; border: 1px solid var(--border); border-radius: var(--radius-lg);
     background: var(--muted); color: var(--foreground); overflow-wrap: anywhere; }
   .vae-demo-code code { font-family: var(--font-mono); font-size: .75rem; line-height: 1.8; }
-  .vae-demo-code code > span { font-weight: 650; }
+  .vae-demo-code code > span:first-child { font-weight: 650; }
+  /* the tabs' gate lines take mockup-code's line tones: its muted variant's on the light surface, its own on the dark one */
+  .vae-demo-code { --_dim: var(--muted-foreground); --_success: oklch(0.52 0.14 150); --_warning: oklch(0.58 0.14 70);
+    --_info: oklch(0.52 0.14 250); --_destructive: var(--destructive); }
+  .dark .vae-demo-code { --_dim: oklch(0.68 0.01 286); --_success: oklch(0.8 0.16 150); --_warning: oklch(0.84 0.15 80);
+    --_info: oklch(0.76 0.13 245); --_destructive: oklch(0.72 0.18 25); }
   .vae-demo-checks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin: 0; padding: 0; list-style: none; }
   .vae-demo-checks li { padding-block-start: .625rem; border-block-start: 2px solid var(--border); font-size: .75rem; font-weight: 600; }
   .vae-demo-checks li span { display: block; font-size: .6875rem; font-weight: 400; color: var(--muted-foreground); }
   .vae-demo-checks li[data-state="blocked"] { border-color: var(--destructive); }
   .vae-demo-checks li[data-state="passed"] { border-color: var(--chart-2); }
-  .vae-demo-note { display: flex; justify-content: center; align-items: flex-start; gap: .5rem; margin: 1rem 0 0;
+  .vae-demo-note { display: flex; justify-content: center; align-items: center; gap: .5rem; margin: 1rem 0 0;
     color: var(--muted-foreground); font-size: .75rem; line-height: 1.5; }
-  .vae-demo-note .vae-icon { margin-block-start: .2em; color: var(--foreground); }
+  .vae-demo-note .vae-icon { color: var(--foreground); }
 
   /* Early evidence links to its full context, instead of presenting study results as forecasts. */
   .vae-proof { display: grid; grid-template-columns: 1fr 1.6fr auto; align-items: center; gap: 2rem;
@@ -91,11 +98,11 @@
   .vae-proof dl > div { display: flex; flex-direction: column-reverse; }
   .vae-proof dt { font-size: .6875rem; color: var(--muted-foreground); }
   .vae-proof dd { margin: 0; font-size: clamp(1.125rem, 2.1vw, 1.625rem); font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-  .vae-proof-source { color: var(--foreground); font-size: .75rem; text-underline-offset: .2em; }
-  .vae-evidence-detail { padding-block: .875rem; border-block: 1px solid var(--border); font-size: .8125rem; color: var(--muted-foreground); }
-  .vae-evidence-detail summary { color: var(--foreground); cursor: pointer; font-weight: 550; }
-  .vae-evidence-detail p { margin: .875rem 0 0; }
-  .vae-evidence-detail a { color: inherit; text-decoration: underline; text-underline-offset: .2em; }
+  /* a white button in both themes: the outline variant is white in light mode, dark mode inverts it */
+  .vae-proof-source { font-weight: 600; box-shadow: var(--shadow-md); }
+  .dark .vae-proof-source { background: var(--foreground); color: var(--background); border-color: var(--foreground); }
+  /* the outline variant's hover sets --accent-foreground, which is light in dark mode: keep the dark ink on the light button */
+  .dark .vae-proof-source:hover { background: color-mix(in oklch, var(--foreground) 88%, var(--background)); color: var(--background); }
   @media (max-width: 62rem) {
     .vae-hero { grid-template-columns: minmax(0, 1fr); max-width: 44rem; gap: 2.5rem; }
     .vae-hero .mk-hero-title { font-size: clamp(2.75rem, 7.5vw, 4.4rem); }
@@ -160,25 +167,62 @@
      instead of squeezing ten nodes into a phone-wide grid where every label wraps word by word */
   @media (max-width: 60rem) { .vae-loop .diagram-canvas { min-width: 60rem; } }
   .vae-scroll-hint { text-align: center; }
+  /* the research run spans the section; below 60rem it keeps its proportions and scrolls like the loop */
+  .vae-research-run { margin-block: 1rem 0; }
+  @media (max-width: 60rem) { .vae-research-run .diagram-canvas { min-width: 56rem; } }
   @media (min-width: 60.001rem) { .vae-scroll-hint { display: none; } }
   .vae-reads { display: grid; gap: 2rem 3rem; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); align-items: center; margin-block-start: clamp(3rem, 7vw, 5rem); }
   .vae-reads .mockup-code { margin: 0; }
+  /* the review editor's screenshot in the site's active theme (html.dark, set by site.js or the OS preference) */
+  .vae-shot { margin: 0; }
+  .vae-shot img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); }
+  .dark .vae-shot-light, :root:not(.dark) .vae-shot-dark { display: none; }
+  /* the review loop sits in the text column: a smaller ring than the component's 40rem default, which the
+     component scales down to fit (data-fit) on a phone instead of scrolling */
+  .vae-review-loop { margin: .75rem 0 0; }
+  .vae-memory-map { margin: .25rem 0 .5rem; }
+  /* below 33rem of figure width the file names outgrow their columns: keep the canvas at 32rem and let the
+     component scale it to fit, as it does for the review loop */
+  @container (max-width: 33rem) { .diagram.vae-memory-map .diagram-canvas { min-width: 32rem; } }
+  .diagram.vae-review-loop .diagram-canvas { min-width: 30rem; min-block-size: 19rem; --rx: 35%; --ry: 36%; --station: 8rem; --hub: 5.5rem; }
   .vae-prose { display: flex; flex-direction: column; gap: .75rem; }
   .vae-prose h3 { margin: 0; font-size: 1.25rem; font-weight: 600; }
   .vae-prose p { margin: 0; color: var(--muted-foreground); text-wrap: pretty; }
+  .vae-prose a:has(> .vae-ext) { white-space: nowrap; }
+  /* the slop check: the marks it rejects, struck through, beside the sentence that names them */
+  .vae-prose .vae-slopcheck { display: flex; gap: .875rem; align-items: center; padding: .875rem 1rem; color: var(--foreground);
+    border: 1px solid var(--border); border-radius: var(--radius-xl); background: color-mix(in oklab, var(--chart-2) 6%, var(--card));
+    box-shadow: inset 4px 0 0 var(--chart-2); font-size: .875rem; }
+  .vae-slop-marks { display: grid; grid-template-columns: repeat(2, auto); gap: .3rem; flex: none; }
+  .vae-slop-marks kbd { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border: 1px solid var(--border);
+    border-radius: var(--radius-md); color: var(--foreground); font: 500 1.125rem/1 var(--font-sans);
+    background: linear-gradient(to top right, transparent calc(50% - 1px), color-mix(in oklab, var(--destructive) 80%, transparent) 50%,
+      transparent calc(50% + 1px)), var(--background); }
   @media (max-width: 56rem) { .vae-reads { grid-template-columns: minmax(0, 1fr); } }
 
   /* lessons become code: the reasoning beside the ladder of retention forms, strongest first, and a rule's shape */
   .vae-codify { display: grid; gap: 2rem 3rem; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: start; margin-block-start: clamp(3rem, 7vw, 5rem); }
   .vae-codify-side { display: flex; flex-direction: column; gap: 1.25rem; min-width: 0; }
   .vae-codify-side .mockup-code { margin: 0; }
-  /* the VERIFY.py listing, coloured like JSON: keys, strings, the name and the punctuation take the window's own line
-     tones (mockup-code's --_info / --_success / --_warning / --_dim), so they keep the contrast it tunes per variant;
-     hand-marked spans, because a highlighter (the docs load Shiki from esm.sh) would add a second CDN for seven lines */
-  .vae-tok-key { color: var(--_info); }
-  .vae-tok-str { color: var(--_success); }
-  .vae-tok-name { color: var(--_warning); }
+  .mk-section-header + .vae-codify { margin-block-start: 2.5rem; }
+  .vae-codify + .vae-table { margin-block-start: 2.5rem; }
+  /* a comparison: plain first column, the failure muted, the answer in full ink */
+  .vae-table.vae-compare .table-cell:first-child { font-family: inherit; white-space: normal; min-width: 12rem; }
+  .vae-table.vae-compare .table-cell:nth-child(2) { color: var(--muted-foreground); }
+  .vae-table.vae-compare .table-cell:last-child { color: var(--foreground); }
+  .vae-swarm-map { margin-block: 1rem 0; }
+  @media (max-width: 60rem) { .vae-swarm-map .diagram-canvas { min-width: 52rem; } }
+  /* the listings, coloured by hand: keys, strings, names and punctuation, plus the gate's and the dialect's
+     operators and outcomes (ok, wait, bad), take the window's own line tones (mockup-code's --_info / --_success /
+     --_warning / --_destructive / --_dim), so they keep the contrast it tunes per variant; hand-marked spans, because
+     a highlighter (the docs load Shiki from esm.sh) would add a second CDN for a few short listings */
+  .vae-tok-key, .vae-tok-op { color: var(--_info); }
+  .vae-tok-str, .vae-tok-ok { color: var(--_success); }
+  .vae-tok-name, .vae-tok-wait { color: var(--_warning); }
+  .vae-tok-bad { color: var(--_destructive); }
   .vae-tok-punct { color: var(--_dim); }
+  .vae-prose .mockup-code { margin: .5rem 0 0; }
+  .vae-prose .mockup-code code { font-size: inherit; }
   .vae-ladder { display: flex; flex-direction: column; gap: .625rem; margin: 0; padding: 0; list-style: none; }
   .vae-rung { position: relative; display: flex; flex-direction: column; gap: .25rem; padding: .875rem 1rem .875rem 3.5rem;
     border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); }
@@ -193,6 +237,8 @@
   .vae-rung-desc { font-size: .875rem; color: var(--muted-foreground); text-wrap: pretty; }
   .vae-rung code { font-family: var(--font-mono); font-size: .875em; }
   @media (max-width: 56rem) { .vae-codify { grid-template-columns: minmax(0, 1fr); } }
+  /* side by side, a flipped block shows its ladder and code first; stacked on a phone, the text still leads */
+  @media (min-width: 56.001rem) { .vae-codify-flip { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); } .vae-codify-flip > .vae-codify-side { order: -1; } }
 
   /* workflow: a legend of the three kinds, then the stage table */
   .vae-kinds { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); margin-block: 2.5rem 1.5rem; }
@@ -208,6 +254,9 @@
   .vae-table .table-cell:first-child { white-space: nowrap; font-family: var(--font-mono); font-weight: 600; }
   .vae-table .table-cell:nth-child(3) { min-width: 11rem; color: var(--muted-foreground); }
   .vae-table .table-cell:last-child { min-width: 20rem; }
+  /* the stages table's "Affected" column: what each stage changes, the verifier in the accent the diagrams give it */
+  .vae-badges { display: flex; flex-wrap: wrap; gap: .25rem; min-width: 9rem; }
+  .vae-badges .badge[data-affects="verifier"] { border-color: var(--chart-2); color: var(--chart-2); }
   .vae-footnote { margin: 1rem 0 0; font-size: .75rem; color: var(--muted-foreground); text-wrap: pretty; }
   .vae-footnote-mark { font-size: .5em; color: var(--muted-foreground); }
 
@@ -216,6 +265,8 @@
   .vae-tasks .table-container { border: 0; }
   .vae-tasks .table-cell[data-numeric], .vae-tasks .table-head[data-numeric] { text-align: end; font-variant-numeric: tabular-nums; }
   .mk-stat-value { font-variant-numeric: tabular-nums; }
+  /* "55 to 231": the numbers carry the weight, the word between them reads as words, not as an arrow */
+  .vae-to { margin-inline: .2em; font-size: .5em; font-weight: 500; letter-spacing: 0; color: var(--muted-foreground); }
   .mk-stats-desc code { font-family: var(--font-mono); font-size: .875em; }
 
   /* install: tabs of terminal windows, each with a copy button in its title bar */

@@ -1,6 +1,6 @@
 {
   "name": "defuss-vae",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Verified agentic engineering with deterministic lifecycle gates.",
   "license": "MIT",
   "skills": "./skills/",
@@ -8,7 +8,7 @@
   "interface": {
     "displayName": "defuss-vae",
     "shortDescription": "Lean verified agentic engineering",
-    "longDescription": "Planning, implementation, review, documentation, wrap-up and swarm-status skills; hooks force verifier, review and documentation gates before commits.",
+    "longDescription": "Planning, implementation, review, documentation, wrap-up, swarm-status, verification-cost and deep-research skills; hooks force verifier, review and documentation gates before commits.",
     "developerName": "defuss",
     "category": "Productivity",
     "capabilities": ["Instructions", "Lifecycle hooks"]

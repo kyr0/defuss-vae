@@ -19,6 +19,8 @@ CONFIG = {
     # Static check of every changed doc page (*.md|*.mdx|*.markdown); False disables it.
     # allow: {glob: characters a page may use as house style}, e.g. {"docs/de/*.md": "\u201e\u201c"} for German quotes.
     # phrases: extra slop regexes (any language), case-insensitive, flagged as findings.
+    # html: globs of HTML pages that are prose (a project site, e.g. ["docs/*.html"]), checked in their text and
+    # reader-facing attributes; other HTML files (templates, reports) are code.
     # HYPOTHESIS: most projects need no allow entry; add one only for a page whose house style needs a flagged character.
     # README.md covers the root and each package with a changed CLI|API; ARCH.md each package with changed production code
     # or deployment|schema files. A page covers the folders below it up to the next package manifest; tests, examples,
@@ -27,11 +29,17 @@ CONFIG = {
     "arch": {"exclude": []},       # folder globs exempt from ARCH.md coverage; False drops it
     # Changed package.json: packageManager, description, license, author; new packages also type, linter, library build.
     "package": {"manager": "bun", "type": "module", "lint": "oxlint", "library_build": "pkgroll"},  # False disables
-    "prose": {"allow": {}, "phrases": []},
+    # Optional for edit runs (references/EDIT.md): "guidelines" (textsorte, zielgruppe, kommunikationsziel, hausstil,
+    # geschuetzte_begriffe: terms a replacement must keep) and "edit" (max_part_chars, heading_depth, attempts, the
+    # budgets, tool_scope, trace, max_tokens_total); unset keys keep pro-edit's defaults.
+    "prose": {"allow": {}, "phrases": [], "html": []},
 }
 
 # Deterministic invariants only; no semantic guesses.
 # kinds: command | file_exists | contains | regex | not_regex
+# When none of these can express an invariant (it needs parsing, several files, a running program or project
+# semantics), plan the check like a test: write .vae/checks/<id>.py (stdlib, exits non-zero and prints what to fix)
+# and add {"id": "<id>", "kind": "command", "command": "python3 .vae/checks/<id>.py", "claim": "..."}.
 # scope: "path" = one exact file; "glob" = every changed code file matching (fnmatch); "glob" + "docs": True = every
 # changed doc page matching, e.g. {"id": "docs.arch.diagram", "kind": "contains", "path": "docs/ARCHITECTURE.md",
 # "text": "```mermaid", "claim": "architecture page keeps its diagram"}.

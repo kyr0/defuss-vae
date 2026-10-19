@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "defuss-vae",
-  "version": "0.8.0",
-  "description": "Lean verified agentic engineering: plan, implement, verify, doc, doc-edit, wrap and status skills plus deterministic verify/review/docs lifecycle gates.",
+  "version": "0.9.0",
+  "description": "Lean verified agentic engineering: plan, implement, verify, doc, doc-edit, wrap, status, optimize and research skills plus deterministic verify/review/docs lifecycle gates.",
   "author": {
     "name": "defuss"
   },
@@ -13,5 +13,21 @@
     "code-review",
     "yagni",
     "testing"
-  ]
+  ],
+  "extensions": {
+    "com.openai": {
+      "hooks": "./hooks/hooks.json",
+      "interface": {
+        "displayName": "defuss-vae",
+        "shortDescription": "Lean verified agentic engineering",
+        "longDescription": "Planning, implementation, review, documentation, wrap-up, swarm-status, verification-cost and deep-research skills; hooks force verifier, review and documentation gates before commits.",
+        "developerName": "defuss",
+        "category": "Productivity",
+        "capabilities": [
+          "Instructions",
+          "Lifecycle hooks"
+        ]
+      }
+    }
+  }
 }

@@ -1,6 +1,7 @@
 """Shared fixtures: real temp git repos, a real shell, the plugin on sys.path (no mocks)."""
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -10,6 +11,10 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 ROOT = REPO / "plugin"  # the installable payload; repo root holds maintainer files only
 sys.path.insert(0, str(ROOT / "scripts"))
+# Session starts in tests must neither reach GitHub nor write the user's cache: the release check is off and its cache
+# lives in a throwaway folder (inherited by every hook and CLI subprocess). test_update turns it on per test.
+os.environ.setdefault("VAE_UPDATE_CHECK", "0")
+os.environ.setdefault("XDG_CACHE_HOME", tempfile.mkdtemp(prefix="vae-test-cache-"))
 
 from vae_verify import Check, VerifyReport
 
@@ -54,7 +59,7 @@ class RepoCase(unittest.TestCase):
         self.write("README.md", "# calc\n\nAdds two numbers.\n")
         self.write("ARCH.md", "# Architecture: calc\n\nOne pure function; no I/O, no personal data.\n")
         self.write("test_calc.py", "import unittest\nfrom calc import add\n\nclass T(unittest.TestCase):\n    def test_add(self): self.assertEqual(add(2, 3), 5)\n")
-        self.write(".agents/VERIFY.py", (
+        self.write(".vae/VERIFY.py", (
             f"CONFIG={{'coverage_min':60, 'test_command':{test_command!r}, 'lint_command':{LINT_CMD!r}, 'e2e_commands':[{e2e!r}],\n"
             f" 'coverage_command':\"{PY} -c \\\"print('TOTAL {coverage}%')\\\"\", 'timeout_s':60, 'layout':{layout}{config}}}\n"
             f"RULES={rules}\n"
